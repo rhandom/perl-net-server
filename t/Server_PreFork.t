@@ -21,6 +21,9 @@ print "not ok 2\n" if $@;
 
 ### become a new type of server
 package Net::Server::Test;
+
+use Net::Server::PreFork;
+
 @ISA = qw(Net::Server::PreFork);
 use IO::Socket;
 local $SIG{ALRM} = sub { die };
@@ -134,13 +137,14 @@ if( $fork && $pipe){
     }else{
 
       ### start up a server bound to two ports
-      close STDERR;
+      close(STDERR);
       Net::Server::Test->run(port => "localhost:$ports[0]",
                              port => $ports[1],
                              setsid => 1,
                              min_servers  => 1,
                              min_spare_servers => 0,
-                             max_requests => 2);
+                             max_requests => 2,
+                             );
 
       exit;
 
