@@ -1,0 +1,5 @@
+Move protocols out into their own modules. (Net::Server::Proto::TCP)
+After protocols are moved out, allow for Net::Server::Proto::SSL
+Clean up signal handling in the parent of Fork and PreFork.
+Revise parent of PreFork to use max_spare_servers and min_spare_servers.
+Move daemonization into Net::Server::Daemonize.
