@@ -87,7 +87,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -f %{name}-filelist
 %defattr(-,root,root)
-%doc README
+%doc README examples
 
 %post
 
