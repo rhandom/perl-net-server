@@ -192,6 +192,13 @@ sub post_configure {
     _SERVER_LOG->autoflush(1);
 
   }
+
+  ### check for an existing pid_file
+  if( defined $prop->{pid_file} ){
+    if( ! eval{ check_pid_file( $prop->{pid_file} ) } ){
+      $self->fatal( $@ );
+    }
+  }
   
   ### completetly daemonize by closing STDIN, STDOUT (should be done before fork)
   if( defined($prop->{setsid}) || length($prop->{log_file}) ){
@@ -200,10 +207,10 @@ sub post_configure {
   }
 
   ### background the process
-  if( defined($prop->{background}) || defined($prop->{setsid}) ){
-    my $pid = fork;
-    if( not defined $pid ){ $self->fatal("Couldn't fork [$!]"); }
-    exit if $pid;
+  if( defined($prop->{setsid}) || defined($prop->{background}) ){
+    my $pid = eval{ safe_fork() };
+    if( not defined $pid ){ $self->fatal( $@ ); }
+    exit(0) if $pid;
     $self->log(2,"Process Backgrounded");
   }
 
@@ -376,19 +383,10 @@ sub post_bind {
 
   ### allow for a pid file (must be done after backgrounding)
   if( defined $prop->{pid_file} ){
-    $prop->{pid_file_unlink} = undef;
-    unless( $prop->{pid_file} =~ m|^([\w\.\-/]+)$| ){
-      $self->fatal("Unsecure filename \"$prop->{pid_file}\"");
-    }
-    $prop->{pid_file} = $1;
-    $self->log(1,"pid_file \"$prop->{pid_file}\" already exists.  Overwriting.")
-      if -e $prop->{pid_file};
-    if( open(PID, ">$prop->{pid_file}") ){
-      print PID $$;
-      close PID;
+    if( eval{ create_pid_file( $prop->{pid_file}, $$ ) } ){
       $prop->{pid_file_unlink} = 1;
     }else{
-      $self->fatal("Couldn't open pid file \"$prop->{pid_file}\" [$!].");
+      $self->fatal( $@ );
     }
   }
 
