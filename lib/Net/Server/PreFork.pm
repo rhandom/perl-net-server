@@ -218,7 +218,10 @@ sub run_child {
 
   ### restore sigs (turn off warnings during)
   $SIG{INT} = $SIG{TERM} = $SIG{QUIT}
-    = $SIG{CHLD} = 'DEFAULT';
+    = $SIG{CHLD} = sub {
+      $self->child_finish_hook;
+      exit;
+    };
 
   ### let pipes take care of themselves
   $SIG{PIPE} = sub { $prop->{SigPIPEd} = 1 };
@@ -234,6 +237,7 @@ sub run_child {
   $prop->{SigHUPed}  = 0;
   $SIG{HUP} = sub {
     unless( $prop->{connected} ){
+      $self->child_finish_hook;
       exit;
     }
     $prop->{SigHUPed} = 1;
