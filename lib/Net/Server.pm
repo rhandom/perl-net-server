@@ -200,12 +200,13 @@ sub post_configure {
     $prop->{syslog_facility} = ($fac =~ /^((\w+)($|\|))*/)
       ? $1 : 'daemon';
 
-    require "Sys/Syslog.pm";
+    require Sys::Syslog;
     Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
-    Sys::Syslog::openlog(   $prop->{syslog_ident},
-                            $prop->{syslog_logopt},
-                            $prop->{syslog_facility},
-                            ) || die "Couldn't open syslog [$!]";
+    if( ! Sys::Syslog::openlog($prop->{syslog_ident},
+                               $prop->{syslog_logopt},
+                               $prop->{syslog_facility}) ){
+      die "Couldn't open syslog [$!]" if $prop->{syslog_logopt} ne 'ndelay';
+    }
 
   ### open a logging file
   }elsif( $prop->{log_file} ){
@@ -750,7 +751,7 @@ sub process_request {
   ### handle udp packets (udp echo server)
   if( $prop->{udp_true} ){
     if( $prop->{udp_data} =~ /dump/ ){
-      require "Data/Dumper.pm";
+      require Data::Dumper;
       $prop->{client}->send( Data::Dumper::Dumper( $self ) , 0);
     }else{
       $prop->{client}->send("You said \"$prop->{udp_data}\"", 0 );
@@ -781,7 +782,7 @@ sub process_request {
       }
 
       if( /dump/ ){
-        require "Data/Dumper.pm";
+        require Data::Dumper;
         print Data::Dumper::Dumper( $self );
       }
 
