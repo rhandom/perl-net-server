@@ -24,7 +24,7 @@ print "not ok 2\n" if $@;
 package Net::Server::Test;
 @ISA = qw(Net::Server);
 use IO::Socket;
-local $SIG{ALRM} = sub { die };
+local $SIG{ALRM} = sub { die "timeout"; };
 my $alarm = 15;
 
 
@@ -108,18 +108,18 @@ if( $fork && $pipe ){
       $remote->send("Are you there?",0);
       my $data = undef;
       $remote->recv($data,4096,0);  
-      die unless defined $data;
+      die "No data returned" unless defined $data;
 
 
       ### connect to child under tcp
       $remote = IO::Socket::INET->new(PeerAddr => 'localhost',
                                       PeerPort => $ports[0],
                                       Proto    => 'tcp');
-      die unless defined $remote;
+      die "No socket returned" unless defined $remote;
 
       ### sample a line
       my $line = <$remote>;
-      die unless $line =~ /Net::Server/;
+      die "No line returned" unless $line =~ /Net::Server/;
 
       ### shut down the server
       print $remote "exit\n";
@@ -138,7 +138,8 @@ if( $fork && $pipe ){
 
     alarm 0;
   };
-  print "not ok 5\n" if $@;
+  print STDERR "[$@]\n" if $@;
+  print "not ok 6\n" if $@;
 
 }else{
   print "not ok 5\n";

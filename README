@@ -2,6 +2,7 @@ NAME
     Net::Server - Extensible, general Perl server engine
 
 SYNOPSIS
+      #!/usr/bin/perl -w -T
       package MyPackage;
 
       use Net::Server;
@@ -12,6 +13,10 @@ SYNOPSIS
       }
 
       MyPackage->run();
+      exit;
+
+OBTAINING
+    Visit http://seamons.com/ for the latest version.
 
 FEATURES
      * Single Server Mode
@@ -19,10 +24,13 @@ FEATURES
      * Preforking Mode
      * Forking Mode
      * Multi port accepts on Single, Preforking, and Forking modes
+     * Simultaneous accept/recv on tcp and udp
      * User customizable hooks
      * Chroot ability after bind
      * Change of user and group after bind
      * Basic allow/deny access control
+     * Customized logging (choose Syslog, log_file, or STDERR)
+     * HUP able server (clean restarts via sig HUP)
      * Taint clean
      * Written in Perl
      * Protection against buffer overflow
@@ -56,7 +64,8 @@ DESCRIPTION
     the `Net::Server::PreFork' class borrows concepts of min_start_servers,
     max_servers, and min_waiting servers. `Net::Server::PreFork' also uses
     the concept of an flock serialized accept when accepting on multiple
-    ports.
+    ports (PreFork can choose between flock, IPC::Semaphore, and pipe to
+    control serialization).
 
 PERSONALITIES
     `Net::Server' is built around a common class (Net::Server) and is
@@ -96,8 +105,12 @@ PERSONALITIES
         to receive a client request, up to `max_servers'. Each of these
         children will process up to `max_requests' client connections. This
         type is good for a heavily hit site, and should scale well for most
-        applications. (Multi port accept is accomplished using flock to
-        serialize the children).
+        applications. Multi port accept is accomplished using either flock,
+        IPC::Semaphore, or pipe to serialize the children. Serialization may
+        also be switched on for single port in order to get around an OS
+        that does not allow multiple children to accept at the same time.
+        For a further discussion of serialization see the
+        Net::Server::PreFork manpage.
 
     Single
         All methods fall back to Net::Server. This personality is provided
@@ -108,7 +121,20 @@ PERSONALITIES
     allows for easy addition of new features, a separate development
     process, and reduced code bloat in the core module.
 
-SAMPLE
+SOCKET ACCESS
+    Once started, the Net::Server will take care of binding to port and
+    waiting for connections. Once a connection is received, the Net::Server
+    will accept on the socket and will store the result (the client
+    connection) in $self->{server}->{client}. This property is a Socket
+    blessed into the the IO::Socket classes. UDP servers are slightly
+    different in that they will perform a recv instead of an accept.
+
+    To make programming easier, during the post_accept phase, STDIN and
+    STDOUT are opened to the client connection. This allows for programs to
+    be written using <STDIN> and print "out\n" to print to the client
+    connection. UDP will require using a ->send call.
+
+SAMPLE CODE
     The following is a very simple server. The main functionality occurs in
     the process_request method call as shown below. Notice the use of
     timeouts to prevent Denial of Service while reading. (Other examples of
@@ -191,7 +217,7 @@ ARGUMENTS
       $server->run();
       #--------------- file test.pl ---------------
 
-    All four methods for passing arguments may be used at the same time.
+    All five methods for passing arguments may be used at the same time.
     Once an argument has been set, it is not over written if another method
     passes the same argument. `Net::Server' will look for arguments in the
     following order:
@@ -200,6 +226,7 @@ ARGUMENTS
       2) Arguments passed on command line.
       3) Arguments passed to the run method.
       4) Arguments passed via a conf file.
+      5) Arguments set in the configure_hook.
 
     Key/value pairs used by the server are removed by the configuration
     process so that server layers on top of `Net::Server' can pass and read
@@ -208,67 +235,108 @@ ARGUMENTS
     `Net::Server::Single' modules. (Other personalities may use additional
     parameters and may optionally not use parameters from the base class.)
 
-      Key               Value            Default
-      conf_file         "filename"       undef
+      Key               Value                    Default
+      conf_file         "filename"               undef
 
-      log_level         0-5              1
-      log_file          "filename"       undef
-      pid_file          "filename"       undef
+      log_level         0-4                      2
+      log_file          (filename|Sys::Syslog)   undef
+      pid_file          "filename"               undef
 
-      port              \d+              20203
-      host              "host"           "localhost"
-      proto             "proto"          "tcp"
-      listen            \d+              10
+      syslog_logsock    (unix|inet)              unix
+      syslog_ident      "identity"               "net_server"
+      syslog_logopt     (cons|ndelay|nowait|pid) pid
+      syslog_facility   \w+                      daemon
 
-      reverse_lookups   1                undef
-      allow             /regex/          none
-      deny              /regex/          none
+      port              \d+                      20203
+      host              "host"                   "*"
+      proto             "proto"                  "tcp"
+      listen            \d+                      SOMAXCONN
 
-      chroot            "directory"      undef
-      user              (uid|username)   "nobody"
-      group             (gid|group)      "nobody"
-      background        1                undef
+      reverse_lookups   1                        undef
+      allow             /regex/                  none
+      deny              /regex/                  none
+
+      chroot            "directory"              undef
+      user              (uid|username)           "nobody"
+      group             (gid|group)              "nobody"
+      background        1                        undef
+      setsid            1                        undef
+
+      udp_recv_len      \d+                      4096
+      udp_recv_flags    \d+                      0
 
     conf_file
         Filename from which to read additional key value pair arguments for
         starting the server. Default is undef.
 
     log_level
-        Ranges from 0 to 5 in level. Specifies what level of error will be
-        logged. "O" means logging is off. "5" means very verbose. These
-        levels should be able to correlate to syslog levels. Default is 1.
+        Ranges from 0 to 4 in level. Specifies what level of error will be
+        logged. "O" means logging is off. "4" means very verbose. These
+        levels should be able to correlate to syslog levels. Default is 2.
+        These levels correlate to syslog levels as defined by the following
+        key/value pairs: 0=>'err', 1=>'warning', 2=>'notice', 3=>'info',
+        4=>'debug'.
 
     log_file
         Name of log file to be written to. If no name is given and hook is
-        not overridden, log goes to STDERR. Default is undef.
+        not overridden, log goes to STDERR. Default is undef. If the magic
+        name "Sys::Syslog" is used, all logging will take place via the
+        Sys::Syslog module. If syslog is used the parameters
+        `syslog_logsock', `syslog_ident', and `syslog_logopt',and
+        `syslog_facility' may also be defined. If a `log_file' is given or
+        if `setsid' is set, STDIN and STDOUT will automatically be opened to
+        /dev/null and STDERR will be opened to STDOUT. This will prevent any
+        output from ending up at the terminal.
 
     pid_file
         Filename to store pid of parent process. Generally applies only to
         forking servers. Default is none (undef).
 
+    syslog_logsock
+        Only available if `log_file' is equal to "Sys::Syslog". May be
+        either "unix" of "inet". Default is "unix". See the Sys::Syslog
+        manpage.
+
+    syslog_ident
+        Only available if `log_file' is equal to "Sys::Syslog". Id to
+        prepend on syslog entries. Default is "net_server". See the
+        Sys::Syslog manpage.
+
+    syslog_logopt
+        Only available if `log_file' is equal to "Sys::Syslog". May be
+        either zero or more of "pid","cons","ndelay","nowait". Default is
+        "pid". See the Sys::Syslog manpage.
+
+    syslog_facility
+        Only available if `log_file' is equal to "Sys::Syslog". See the
+        Sys::Syslog manpage and the syslog manpage. Default is "daemon".
+
     port
         Local port on which to bind. If low port, process must start as
         root. If multiple ports are given, all will be bound at server
-        startup. May be of the form `host:port/proto', `host:port', or
-        `port', where *host* represents a hostname residing on the local
-        box, where *port* represents either the number of the port (eg.
-        "80") or the service designation (eg. "http"), and where *proto*
-        represents the protocol to be used. If the protocol is not
+        startup. May be of the form `host:port/proto', `host:port',
+        `port/proto', or `port', where *host* represents a hostname residing
+        on the local box, where *port* represents either the number of the
+        port (eg. "80") or the service designation (eg. "http"), and where
+        *proto* represents the protocol to be used. If the protocol is not
         specified, *proto* will default to the `proto' specified in the
         arguments. If `proto' is not specified there it will default to
         "tcp". If *host* is not specified, *host* will default to `host'
         specified in the arguments. If `host' is not specified there it will
-        default to "localhost". Default port is 20203.
+        default to "*". Default port is 20203.
 
     host
-        Local host or addr upon which to bind port. See the IO::Socket
-        manpage.
+        Local host or addr upon which to bind port. If a value of '*' is
+        given, the server will bind that port on all available addresses on
+        the box. See the IO::Socket manpage.
 
     proto
-        Protocol to use when binding ports. See the IO::Socket manpage.
+        Protocol to use when binding ports. See the IO::Socket manpage. As
+        of release 0.60, Net::Server supports tcp and udp. Other types
+        (unix, etc) may work but have not been tested.
 
     listen
-          See L<IO::Socket>
+          See L<IO::Socket>.  Not used with udp protocol.
 
     reverse_lookups
         Specify whether to lookup the hostname of the connected IP.
@@ -299,6 +367,23 @@ ARGUMENTS
     background
         Specifies whether or not the server should fork after the bind
         method to release itself from the command line. Defaults to undef.
+        Process will also background if `setsid' is set.
+
+    setsid
+        Specifies whether or not the server should fork after the bind
+        method to release itself from the command line and then run the
+        `POSIX::setsid()' command to truly daemonize. Defaults to undef. If
+        a `log_file' is given or if `setsid' is set, STDIN and STDOUT will
+        automatically be opened to /dev/null and STDERR will be opened to
+        STDOUT. This will prevent any output from ending up at the terminal.
+
+    udp_recv_len
+        Specifies the number of bytes to read from the UDP connection
+        handle. Data will be read into $self->{server}->{udp_data}. Default
+        is 4096. See the IO::Socket::INET manpage and the recv manpage.
+
+    udp_recv_flags
+        See the recv manpage. Default is 0.
 
 PROPERTIES
     All of the `ARGUMENTS' listed above become properties of the server
@@ -349,6 +434,13 @@ CONFIGURATION FILE
       log_file    /var/log/server.log
       log_level   3
       pid_file    /tmp/server.pid
+
+      ### optional syslog directive
+      ### used in place of log_file above
+      #log_file       Sys::Syslog
+      #syslog_logsock unix
+      #syslog_ident   myserver
+      #syslog_logopt  pid|cons
 
       ### access control
       allow       .+\.(net|com)
@@ -483,16 +575,30 @@ HOOKS
     `$self->write_to_log_hook'
         This hook handles writing to log files. The default hook is to write
         to STDERR, or to the filename contained in the parameter `log_file'.
-        The arguments passed are a log level of 0 to 5 (5 being very
-        verbose), and a log line. If it is desired to use the syslog, a
-        customized hook may be put in place. (A future version may include
-        this as a configurable option).
+        The arguments passed are a log level of 0 to 4 (4 being very
+        verbose), and a log line. If log_file is equal to "Sys::Syslog",
+        then logging will go to Sys::Syslog and will bypass the
+        write_to_log_hook.
 
     `$self->fatal_hook'
         This hook occurs when the server has encountered an unrecoverable
         error. Arguments passed are the error message, the package, file,
         and line number. The hook may close the server, but it is suggested
         that it simply return and use the built in shut down features.
+
+    `$self->restart_open_hook' This hook occurs if a server has been HUPed
+    (restarted via the HUP signal. It occurs just before reopening to the
+    filenos of the sockets that were already opened.
+    `$self->restart_close_hook' This hook occurs if a server has been HUPed
+    (restarted via the HUP signal. It occurs just before restarting the
+    server via exec.
+RESTARTING
+    Each of the server personalities (except for INET), support restarting
+    via a HUP signal (see "kill -l"). When a HUP is received, the server
+    will close children (if any), make sure that sockets are left open, and
+    re-exec using the same commandline parameters that initially started the
+    server. (Note: for this reason it is important that @ARGV is not
+    modified until `->run' is called.
 
 TO DO
     There are several tasks to perform before the alpha label can be removed
@@ -504,30 +610,12 @@ TO DO
         implementing some mail servers and banner servers on a high hit
         site.
 
-    Thread Personality
-        Some servers offer a threaded server. Create `Net::Server::Thread'
-        as a new personality.
-
     Other Personalities
         Explore any other personalities
-
-    Sig Handling
-        Solidify which signals are handled by base class. Possibly catch
-        more that are ignored currently.
-
-    `HUP'
-        Allow for a clean hup allowing for re-exec and re-read of
-        configuration files. This includes multiport mode.
 
     Net::HTTPServer, etc
         Create various types of servers. Possibly, port exising servers to
         user Net::Server as a base layer.
-
-    More documentation
-        Show more examples and explain process flow more.
-
-    Better Tests
-        Do better tests during "make test"
 
 FILES
       The following files are installed as part of this
@@ -544,9 +632,24 @@ AUTHOR
     Paul T. Seamons paul@seamons.com
 
 THANKS
-    Thanks to Rob Brown for help with miscellaneous concepts such as
-    tracking down the serialized select via flock ala Apache. Thanks to
-    Jonathan J. Miner for patching a blatant problem in the reverse lookups.
+    Thanks to Rob Brown <rbrown@about-inc.com> for help with miscellaneous
+    concepts such as tracking down the serialized select via flock ala
+    Apache and the reference to IO::Select making multiport servers
+    possible. And for researching into allowing sockets to remain open upon
+    exec (making HUP possible).
+
+    Thanks to Jonathan J. Miner <miner@doit.wisc.edu> for patching a blatant
+    problem in the reverse lookups.
+
+    Thanks to Bennett Todd <bet@rahul.net> for pointing out a problem in
+    Solaris 2.5.1 which does not allow multiple children to accept on the
+    same port at the same time. Also for showing some sample code from
+    Viktor Duchovni which now represents the semaphore option of the
+    serialize argument in the PreFork server.
+
+    Thanks to *traveler* and *merlyn* from http://perlmonks.org for pointing
+    me in the right direction for determining the protocol used on a socket
+    connection.
 
 SEE ALSO
     Please see also the Net::Server::Fork manpage, the Net::Server::INET

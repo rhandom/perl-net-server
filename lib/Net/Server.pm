@@ -260,6 +260,8 @@ sub pre_bind {
                                   $prop->{proto},
                                   ) || next;
     push @{ $prop->{sock} }, $obj;
+    open(_LOG,">>test.log");
+    print _LOG __LINE__."[".$obj->NS_proto."][".$obj->NS_port."]\n";
   }
   if( @{ $prop->{sock} } < 1 ){
     $self->fatal("No valid socket parameters found");
@@ -976,6 +978,7 @@ sub options {
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
                udp_recv_len udp_recv_flags
+               unix_path unix_type
                ) ){
     $ref->{$_} = \$prop->{$_};
   }
