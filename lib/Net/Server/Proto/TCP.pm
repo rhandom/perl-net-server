@@ -57,6 +57,15 @@ sub object {
   return $sock;
 }
 
+sub log_connect {
+  my $sock = shift;
+  my $server = shift;
+  my $host   = $sock->NS_host; 
+  my $port   = $sock->NS_port;
+  my $proto  = $sock->NS_proto;
+ $server->log(2,"Binding to $proto port $port on host $host\n");
+}
+
 ### connect the first time
 sub connect {
   my $sock   = shift;
@@ -66,8 +75,6 @@ sub connect {
   my $host  = $sock->NS_host;
   my $port  = $sock->NS_port;
 
-  $server->log(2,"Binding to TCP port $port on host $host\n");
-      
   my %args = ();
   $args{LocalPort} = $port;                  # what port to bind on
   $args{Proto}     = 'tcp';                  # what procol to use
@@ -93,6 +100,19 @@ sub reconnect {
   $sock->fdopen( $fd, 'w' )
     or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 
+}
+
+### allow for endowing the child
+sub accept {
+  my $sock = shift;
+  my $client = $sock->SUPER::accept();
+
+  ### pass items on
+  if( defined($client) ){
+    $client->NS_proto( $sock->NS_proto );
+  }
+
+  return $client;
 }
 
 ### a string containing any information necessary for restarting the server
@@ -124,7 +144,7 @@ sub AUTOLOAD {
       my $sock = shift;
       if( @_ ){
         ${*$sock}{$prop} = shift;
-        delete ${*$sock}{$prop} unless defined ${*$sock}{$prop};
+        return delete ${*$sock}{$prop} unless defined ${*$sock}{$prop};
       }else{
         return ${*$sock}{$prop};
       }

@@ -25,6 +25,7 @@ use strict;
 use vars qw( $VERSION );
 use Socket qw( inet_aton inet_ntoa AF_INET );
 use IO::Socket ();
+use IO::Select ();
 use POSIX ();
 use Fcntl ();
 use Net::Server::Proto ();
@@ -212,7 +213,9 @@ sub post_configure {
   }
 
   ### completetly daemonize by closing STDERR (should be done after fork)
-  if( defined($prop->{setsid}) || length($prop->{log_file}) ){
+  if( length($prop->{log_file}) ){
+    open STDERR, '>&_SERVER_LOG' || die "Can't open STDERR to _SERVER_LOG [$!]";
+  }elsif( defined($prop->{setsid}) ){
     open STDERR, '>&STDOUT' || die "Can't open STDERR to STDOUT [$!]";
   }
 
@@ -298,6 +301,7 @@ sub bind {
 
       foreach ( @{ $prop->{sock} } ){
         if( $hup_string eq $_->hup_string() ){
+          $_->log_connect($self);
           $_->reconnect( $fd, $self );
           last;
         }
@@ -309,6 +313,7 @@ sub bind {
   }else{
 
     foreach my $sock ( @{ $prop->{sock} } ){
+      $sock->log_connect($self);
       $sock->connect( $self );
     }
 
@@ -317,7 +322,6 @@ sub bind {
   ### if more than one port we'll need to select on it
   if( @{ $prop->{port} } > 1 ){
     $prop->{multi_port} = 1;
-    require "IO/Select.pm";
     $prop->{select} = IO::Select->new();
     foreach ( @{ $prop->{sock} } ){
       $prop->{select}->add( $_ );
@@ -397,10 +401,6 @@ sub post_bind {
   ### most cases, a closed pipe will take care of itself
   $SIG{PIPE} = 'IGNORE';
 
-  ### record warns and dies
-  $SIG{__WARN__} = sub { $self->log(1, $_[0]); warn $_[0]; };
-  $SIG{__DIE__}  = sub { $self->log(0, $_[0]); die  $_[0]; };
-
   ### catch children (mainly for Fork and PreFork but works for any chld)
   $SIG{CHLD} = \&sig_chld;
 
@@ -471,8 +471,9 @@ sub accept {
       $prop->{client}   = $sock;
       $prop->{udp_true} = 1;
       $prop->{udp_peer} = $sock->recv($prop->{udp_data},
-                                      $prop->{udp_recv_len},
-                                      $prop->{udp_recv_flags});
+                                      $sock->NS_recv_len,
+                                      $sock->NS_recv_flags,
+                                      );
     ### blocking accept per proto
     }else{
       delete $prop->{udp_true};
@@ -536,11 +537,19 @@ sub post_accept {
 
 }
 
-
 ### read information about the client connection
 sub get_client_info {
   my $self = shift;
   my $prop = $self->{server};
+  my $sock = $prop->{client};
+
+  ### handle unix style connections
+  if( UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto() eq 'UNIX' ){
+    my $path = $sock->NS_unix_path;
+    $self->log(3,$self->log_time
+               ." CONNECT UNIX Socket: \"$path\"\n");
+    return;
+  }
 
   ### read information about this connection
   my $sockname = getsockname( STDIN );
@@ -557,7 +566,9 @@ sub get_client_info {
   }
   
   ### try to get some info about the remote host
+  my $proto_type = 'TCP';
   if( $prop->{udp_true} ){
+    $proto_type = 'UDP';
     ($prop->{peerport} ,$prop->{peeraddr})
       = Socket::sockaddr_in( $prop->{udp_peer} );
   }else{
@@ -582,8 +593,8 @@ sub get_client_info {
   }
 
   $self->log(3,$self->log_time
-             ." CONNECT peer: \"$prop->{peeraddr}:$prop->{peerport}\""
-             ." local: \"$prop->{sockaddr}:$prop->{sockport}\"\n");
+             ." CONNECT $proto_type Peer: \"$prop->{peeraddr}:$prop->{peerport}\""
+             ." Local: \"$prop->{sockaddr}:$prop->{sockport}\"\n");
 
 }
 
@@ -659,7 +670,7 @@ sub process_request {
       s/\r?\n$//;
       
       print ref($self),":$$: You said \"$_\"\r\n";
-      $self->log(4,$_); # very verbose log
+      $self->log(5,$_); # very verbose log
       
       if( /get (\w+)/ ){
         print "$1: $self->{server}->{$1}\r\n";

@@ -95,6 +95,10 @@ sub new {
   return \*HAND;
 }  
 
+sub NS_proto {
+  return '';
+}
+
 ### tied handle methods
 sub TIEHANDLE {
   my ($class, $in, $out) = @_;

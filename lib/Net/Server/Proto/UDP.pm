@@ -63,8 +63,6 @@ sub connect {
   my $host  = $sock->NS_host;
   my $port  = $sock->NS_port;
 
-  $server->log(2,"Binding to UDP port $port on host $host\n");
-      
   my %args = ();
   $args{LocalPort} = $port;                  # what port to bind on
   $args{Proto}     = 'udp';                  # what procol to use
