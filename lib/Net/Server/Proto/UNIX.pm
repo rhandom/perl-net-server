@@ -32,6 +32,7 @@ sub object {
   my $class = ref($type) || $type || __PACKAGE__;
 
   my ($default_host,$port,$server) = @_;
+  my $prop = $server->{server};
 
   my $u_type = $server->{server}->{unix_type} || SOCK_STREAM;
   my $u_path = $server->{server}->{unix_path} || undef;
@@ -49,12 +50,32 @@ sub object {
     $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
   }
 
-  if( $u_type != SOCK_STREAM && $u_type != SOCK_DGRAM ){
+
+  ### create a blank socket
+  my $sock = $class->SUPER::new();
+
+
+  ### set a few more parameters for SOCK_DGRAM
+  if( $u_type == SOCK_DGRAM ){
+    
+    $prop->{udp_recv_len} = 4096
+      unless defined($prop->{udp_recv_len})
+      && $prop->{udp_recv_len} =~ /^\d+$/;
+    
+    $prop->{udp_recv_flags} = 0
+      unless defined($prop->{udp_recv_flags})
+      && $prop->{udp_recv_flags} =~ /^\d+$/;
+    
+    $sock->NS_recv_len(   $prop->{udp_recv_len} );
+    $sock->NS_recv_flags( $prop->{udp_recv_flags} );
+
+  }elsif( $u_type == SOCK_STREAM ){
+
+  }else{
     $server->fatal("Invalid type for UNIX socket ($u_type)... must be SOCK_STREAM or SOCK_DGRAM");
   }
 
-  my $sock = $class->SUPER::new();
-
+  ### set some common parameters
   $sock->NS_unix_type( $u_type );
   $sock->NS_unix_path( $u_path );
   $sock->NS_proto('UNIX');
@@ -66,7 +87,9 @@ sub log_connect {
   my $sock = shift;
   my $server    = shift;
   my $unix_path = $sock->NS_unix_path;
-  $server->log(2,"Binding to UNIX socket at file $unix_path\n");
+  my $type = $sock->NS_unix_type == SOCK_STREAM ? 'SOCK_STREAM' : 'SOCK_DGRAM';
+  
+  $server->log(2,"Binding to UNIX socket file $unix_path using $type\n");
 }
 
 ### connect the first time
@@ -82,7 +105,9 @@ sub connect {
   my %args = ();
   $args{Local}  = $unix_path;       # what socket file to bind to
   $args{Type}   = $unix_type;       # SOCK_STREAM (default) or SOCK_DGRAM
-  $args{Listen} = $prop->{listen};  # how many connections for kernel to queue
+  if( $unix_type != SOCK_DGRAM ){
+    $args{Listen} = $prop->{listen};  # how many connections for kernel to queue
+  }
 
   ### remove the old socket if it is still there
   if( -e $unix_path && ! unlink($unix_path) ){
@@ -145,7 +170,7 @@ sub AUTOLOAD {
     die "No property called.";
   }
 
-  if( $prop =~ /^(NS_proto|NS_unix_path|NS_unix_type)$/ ){
+  if( $prop =~ /^(NS_proto|NS_unix_path|NS_unix_type|NS_recv_len|NS_recv_flags)$/ ){
     no strict 'refs';
     * { __PACKAGE__ ."::". $prop } = sub {
       my $sock = shift;

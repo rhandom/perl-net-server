@@ -1,6 +1,6 @@
 # -*- perl -*-
 #
-#  Net::Server::PreFork - Net::Server Protocol
+#  Net::Server::Proto - Net::Server Protocol compatibility layer
 #  
 #  $Id$
 #  
@@ -33,7 +33,7 @@ sub object {
   my $proto_class;
 
   ### first find the proto
-  if( $port =~ s/[\/\|]([\w:]+)$// ){
+  if( $port =~ s/[\/\|]([\w:]+)$// ){  # hate this regex, doesn't allow bare filenames
     $proto_class = $1;
   }else{
     $proto_class = $default_proto;
@@ -71,36 +71,248 @@ sub object {
 
 }
 
-
-### self installer
-sub AUTOLOAD {
-  my $self = shift;
-
-  my ($prop) = $AUTOLOAD =~ /::([^:]+)$/ ? $1 : '';
-  if( ! $prop ){
-    die "No property called.";
-  }
-
-  if( $prop =~ /^(proto|port|host|sock|fileno)$/ ){
-    no strict 'refs';
-    * { __PACKAGE__ ."::". $prop } = sub {
-      my $self = shift;
-      if( @_ ){
-        $self->{$prop} = shift;
-        delete $self->{$prop} unless defined $self->{$prop};
-      }else{
-        return $self->{$prop};
-      }
-    };
-    use strict 'refs';
-
-    $self->$prop(@_);
-
-  }else{
-    die "What method is that? [$prop]";
-  }
-}
-
-
 1;
 
+__END__
+
+=head1 NAME
+
+  Net::Server::Proto - adp0 - Net::Server Protocol compatibility layer
+
+=head1 SYNOPSIS
+
+  # Net::Server::Proto and its accompianying modules are not
+  # intended to be used outside the scope of Net::Server.
+
+  # That being said, here is how you use them.  This is
+  # only intended for anybody wishing to extend the
+  # protocols to include some other set (ie maybe a 
+  # database connection protocol)
+
+  use Net::Server::Proto;
+
+  my $sock = Net::Server::Proto->object(
+    $default_host,    # host to use if none found in port
+    $port,            # port to connect to
+    $default_proto,   # proto to use if none found in port
+    $server_obj,      # Net::Server object
+    );
+
+  
+  ### Net::Server::Proto will attempt to interface with
+  ### sub modules named simillar to Net::Server::Proto::TCP
+  ### Individual sub modules will be loaded by
+  ### Net::Server::Proto as they are needed.
+
+  use Net::Server::Proto::TCP; # can be TCP/UDP/UNIX/etc
+
+  ### Return an object which is a sub class of IO::Socket
+  ### At this point the object is not connected.
+  ### The method can gather any other information that it
+  ### needs from the server object.
+  my $sock = Net::Server::Proto::TCP->object(
+    $default_host,    # host to use if none found in port
+    $port,            # port to connect to
+    $server_obj,      # Net::Server object
+    );
+
+  ### Log that a connection is about to occur.
+  ### Use the facilities of the passed Net::Server object.
+  $sock->log_connect( $server );
+
+  ### Actually bind to port or socket file.  This
+  ### is typically done by calling the configure method.
+  $sock->connect();
+
+  ### Allow for rebinding to an already open fileno.
+  ### Typically will just do an fdopen.
+  $sock->reconnect();
+
+  ### Return a unique identifying string for this sock that
+  ### can be used when reconnecting.
+  my $str = $sock->hup_string();
+
+  ### Return the proto that is being used by this module.
+  my $proto = $sock->NS_proto();
+
+
+=head1 DESCRIPTION
+
+Net::Server::Proto is an intermediate module which returns
+IO::Socket style objects blessed into its own set of classes
+(ie Net::Server::Proto::TCP).  These classes should contain
+as a minimum, the following methods:
+
+=over 4
+
+=item object
+ 
+Return an object which is a sub class of IO::Socket
+At this point the object is not connected.
+The method can gather any other information that it
+needs from the server object.
+Arguments are default_host, port, and a Net::Server
+style server object.
+
+=item log_connect
+
+Log that a connection is about to occur.
+Use the facilities of the passed Net::Server object.
+
+=item connect
+
+Actually bind to port or socket file.  This
+is typically done internally by calling the configure
+method of the IO::Socket super class.
+
+=item reconnect
+
+Allow for rebinding to an already open fileno.
+Typically will just do an fdopen using the IO::Socket
+super class.
+
+=item hup_string
+
+Return a unique identifying string for this sock that
+can be used when reconnecting.  This is done to allow
+information including the file descriptor of the open 
+sockets to be passed via %ENV during an exec.  This
+string should always be the same based upon the configuration
+parameters.
+
+=item NS_proto
+
+Net::Server protocol.  Return the protocol that is being
+used by this module.  This does not have to be a registered
+or known protocol.
+
+=back
+
+=head1 PORT
+
+The port is the most important argument passed to the sub
+module classes and to Net::Server::Proto itself.  It is 
+easier to show results and then explain.
+
+  # example 1 ###################################
+
+  $port = "20203";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::TCP
+  # NS_host  = default_domain.com
+  # NS_port  = 20203
+  # NS_proto = TCP
+
+  # example 2 ###################################
+
+  $port = "someother.com:20203";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::TCP
+  # NS_host  = someother.com
+  # NS_port  = 20203
+  # NS_proto = TCP
+
+  # example 3 ###################################
+
+  $port = "someother.com:20203/udp";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::UDP
+  # NS_host  = someother.com
+  # NS_port  = 20203
+  # NS_proto = UDP
+
+  # example 4 ###################################
+
+  $port = "someother.com:20203/Net::Server::Proto::UDP";
+  $def_host  = "default_domain.com";
+  $def_proto = "TCP";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::UDP
+  # NS_host  = someother.com
+  # NS_port  = 20203
+  # NS_proto = UDP
+
+  # example 5 ###################################
+
+  $port = "someother.com:20203/MyObject::TCP";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = MyObject::TCP
+  # NS_host  = someother.com
+  # NS_port  = 20203
+  # NS_proto = TCP (depends on MyObject::TCP module)
+
+  # example 6 ###################################
+
+  $port = "/tmp/mysock.file|unix";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::UNIX
+  # NS_host  = undef
+  # NS_port  = undef
+  # NS_unix_path = /tmp/mysock.file
+  # NS_unix_type = SOCK_STREAM
+  # NS_proto = UNIX
+
+  # example 7 ###################################
+
+  $port = "/tmp/mysock.file|".SOCK_DGRAM."|unix";
+  $def_host  = "";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::UNIX
+  # NS_host  = undef
+  # NS_port  = undef
+  # NS_unix_path = /tmp/mysock.file
+  # NS_unix_type = SOCK_DGRAM
+  # NS_proto = UNIX
+
+  # example 8 ###################################
+
+  $port = "/tmp/mysock.file|".SOCK_DGRAM."|unix";
+  $def_host  = "";
+  $def_proto = "UNIX";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::UNIX
+  # NS_host  = undef
+  # NS_port  = undef
+  # NS_unix_path = /tmp/mysock.file
+  # NS_unix_type = SOCK_DGRAM
+  # NS_proto = UNIX
+
+Local port/socket on which to bind.  If low port, process must
+start as root.  If multiple ports are given, all will be
+bound at server startup.  May be of the form
+C<host:port/proto>, C<host:port>, C<port/proto>, or C<port>,
+where I<host> represents a hostname residing on the local
+box, where I<port> represents either the number of the port
+(eg. "80") or the service designation (eg.  "http"), and
+where I<proto> represents the protocol to be used.  See
+L<Net::Server::Proto>.  If you are working with unix sockets,
+you may also specify C<socket_file|unix> or
+C<socket_file|type|unix> where type is SOCK_DGRAM or
+SOCK_STREAM.  If the protocol is not specified, I<proto> will
+default to the C<proto> specified in the arguments.  If C<proto> is not
+specified there it will default to "tcp".  If I<host> is not
+specified, I<host> will default to C<host> specified in the
+arguments.  If C<host> is not specified there it will
+default to "*".  Default port is 20203.
+
+
+=cut

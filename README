@@ -12,7 +12,7 @@ SYNOPSIS
          #...code...
       }
 
-      MyPackage->run();
+      MyPackage->run(port => 160);
       exit;
 
 OBTAINING
@@ -24,7 +24,7 @@ FEATURES
      * Preforking Mode
      * Forking Mode
      * Multi port accepts on Single, Preforking, and Forking modes
-     * Simultaneous accept/recv on tcp and udp
+     * Simultaneous accept/recv on tcp, udp, and unix sockets
      * User customizable hooks
      * Chroot ability after bind
      * Change of user and group after bind
@@ -240,8 +240,8 @@ ARGUMENTS
 
       log_level         0-4                      2
       log_file          (filename|Sys::Syslog)   undef
-      pid_file          "filename"               undef
 
+      ## syslog parameters
       syslog_logsock    (unix|inet)              unix
       syslog_ident      "identity"               "net_server"
       syslog_logopt     (cons|ndelay|nowait|pid) pid
@@ -249,21 +249,28 @@ ARGUMENTS
 
       port              \d+                      20203
       host              "host"                   "*"
-      proto             "proto"                  "tcp"
+      proto             (tcp|udp|unix)           "tcp"
       listen            \d+                      SOMAXCONN
 
       reverse_lookups   1                        undef
       allow             /regex/                  none
       deny              /regex/                  none
 
+      ## daemonization parameters
+      pid_file          "filename"               undef
       chroot            "directory"              undef
       user              (uid|username)           "nobody"
       group             (gid|group)              "nobody"
       background        1                        undef
       setsid            1                        undef
 
+      ## UDP protocol parameters
       udp_recv_len      \d+                      4096
       udp_recv_flags    \d+                      0
+
+      ## UNIX socket parameters
+      unix_type         (SOCK_STREAM|SOCK_DGRAM) SOCK_STREAM
+      unix_path         "filename"               undef
 
     conf_file
         Filename from which to read additional key value pair arguments for
@@ -312,31 +319,37 @@ ARGUMENTS
         Sys::Syslog manpage and the syslog manpage. Default is "daemon".
 
     port
-        Local port on which to bind. If low port, process must start as
-        root. If multiple ports are given, all will be bound at server
-        startup. May be of the form `host:port/proto', `host:port',
-        `port/proto', or `port', where *host* represents a hostname residing
-        on the local box, where *port* represents either the number of the
-        port (eg. "80") or the service designation (eg. "http"), and where
-        *proto* represents the protocol to be used. If the protocol is not
-        specified, *proto* will default to the `proto' specified in the
-        arguments. If `proto' is not specified there it will default to
-        "tcp". If *host* is not specified, *host* will default to `host'
-        specified in the arguments. If `host' is not specified there it will
-        default to "*". Default port is 20203.
+        See the Net::Server::Proto manpage. Local port/socket on which to
+        bind. If low port, process must start as root. If multiple ports are
+        given, all will be bound at server startup. May be of the form
+        `host:port/proto', `host:port', `port/proto', or `port', where
+        *host* represents a hostname residing on the local box, where *port*
+        represents either the number of the port (eg. "80") or the service
+        designation (eg. "http"), and where *proto* represents the protocol
+        to be used. See the Net::Server::Proto manpage. If you are working
+        with unix sockets, you may also specify `socket_file|unix' or
+        `socket_file|type|unix' where type is SOCK_DGRAM or SOCK_STREAM. If
+        the protocol is not specified, *proto* will default to the `proto'
+        specified in the arguments. If `proto' is not specified there it
+        will default to "tcp". If *host* is not specified, *host* will
+        default to `host' specified in the arguments. If `host' is not
+        specified there it will default to "*". Default port is 20203.
 
     host
         Local host or addr upon which to bind port. If a value of '*' is
         given, the server will bind that port on all available addresses on
-        the box. See the IO::Socket manpage.
+        the box. See the Net::Server::Proto manpage. See the IO::Socket
+        manpage.
 
     proto
-        Protocol to use when binding ports. See the IO::Socket manpage. As
-        of release 0.60, Net::Server supports tcp and udp. Other types
-        (unix, etc) may work but have not been tested.
+        See the Net::Server::Proto manpage. Protocol to use when binding
+        ports. See the IO::Socket manpage. As of release 0.70, Net::Server
+        supports tcp, udp, and unix. Other types will need to be added later
+        (or custom modules extending the Net::Server::Proto class may be
+        used).
 
     listen
-          See L<IO::Socket>.  Not used with udp protocol.
+          See L<IO::Socket>.  Not used with udp protocol (or UNIX SOCK_DGRAM).
 
     reverse_lookups
         Specify whether to lookup the hostname of the connected IP.

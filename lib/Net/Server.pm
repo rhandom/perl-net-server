@@ -23,7 +23,7 @@ package Net::Server;
 
 use strict;
 use vars qw( $VERSION );
-use Socket qw( inet_aton inet_ntoa AF_INET );
+use Socket qw( inet_aton inet_ntoa AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM );
 use IO::Socket ();
 use IO::Select ();
 use POSIX ();
@@ -467,13 +467,14 @@ sub accept {
     }
 
     ### receive a udp packet
-    if( $sock->NS_proto eq 'UDP' ){
+    if( SOCK_DGRAM == $sock->getsockopt(Socket::SOL_SOCKET(),Socket::SO_TYPE()) ){
       $prop->{client}   = $sock;
       $prop->{udp_true} = 1;
       $prop->{udp_peer} = $sock->recv($prop->{udp_data},
                                       $sock->NS_recv_len,
                                       $sock->NS_recv_flags,
                                       );
+
     ### blocking accept per proto
     }else{
       delete $prop->{udp_true};
@@ -524,9 +525,6 @@ sub post_accept {
   ### keep track of the requests
   $prop->{requests} ++;
 
-  ### don't do anything for udp
-#  return if $prop->{udp_true};
-
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   *STDIN  = \*{ $prop->{client} };
@@ -544,10 +542,11 @@ sub get_client_info {
   my $sock = $prop->{client};
 
   ### handle unix style connections
-  if( UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto() eq 'UNIX' ){
+  if( UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto eq 'UNIX' ){
     my $path = $sock->NS_unix_path;
     $self->log(3,$self->log_time
                ." CONNECT UNIX Socket: \"$path\"\n");
+
     return;
   }
 
@@ -606,6 +605,12 @@ sub post_accept_hook {}
 sub allow_deny {
   my $self = shift;
   my $prop = $self->{server};
+  my $sock = $prop->{client};
+
+  ### unix sockets are immune to this check
+  if( UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto eq 'UNIX' ){
+    return 1;
+  }
 
   ### if no allow or deny parameters are set, allow all
   return 1 unless @{ $prop->{allow} } || @{ $prop->{deny} };
@@ -649,7 +654,7 @@ sub process_request {
       require "Data/Dumper.pm";
       $prop->{client}->send( Data::Dumper::Dumper( $self ) , 0);
     }else{
-      $prop->{client}->send( "You said \"$prop->{udp_data}\"", 0);
+      $prop->{client}->send("You said \"$prop->{udp_data}\"", 0 );
     }
     return;
   }
@@ -1070,7 +1075,7 @@ Net::Server - Extensible, general Perl server engine
      #...code...
   }
 
-  MyPackage->run();
+  MyPackage->run(port => 160);
   exit;
 
 =head1 OBTAINING
@@ -1084,7 +1089,7 @@ Visit http://seamons.com/ for the latest version.
  * Preforking Mode
  * Forking Mode
  * Multi port accepts on Single, Preforking, and Forking modes
- * Simultaneous accept/recv on tcp and udp
+ * Simultaneous accept/recv on tcp, udp, and unix sockets
  * User customizable hooks
  * Chroot ability after bind
  * Change of user and group after bind
@@ -1334,8 +1339,8 @@ parameters from the base class.)
 
   log_level         0-4                      2
   log_file          (filename|Sys::Syslog)   undef
-  pid_file          "filename"               undef
 
+  ## syslog parameters
   syslog_logsock    (unix|inet)              unix
   syslog_ident      "identity"               "net_server"
   syslog_logopt     (cons|ndelay|nowait|pid) pid
@@ -1343,21 +1348,28 @@ parameters from the base class.)
 
   port              \d+                      20203
   host              "host"                   "*"
-  proto             "proto"                  "tcp"
+  proto             (tcp|udp|unix)           "tcp"
   listen            \d+                      SOMAXCONN
 
   reverse_lookups   1                        undef
   allow             /regex/                  none
   deny              /regex/                  none
 
+  ## daemonization parameters
+  pid_file          "filename"               undef
   chroot            "directory"              undef
   user              (uid|username)           "nobody"
   group             (gid|group)              "nobody"
   background        1                        undef
   setsid            1                        undef
 
+  ## UDP protocol parameters
   udp_recv_len      \d+                      4096
   udp_recv_flags    \d+                      0
+
+  ## UNIX socket parameters
+  unix_type         (SOCK_STREAM|SOCK_DGRAM) SOCK_STREAM
+  unix_path         "filename"               undef
 
 =over 4
 
@@ -1418,16 +1430,20 @@ See L<Sys::Syslog> and L<syslog>.  Default is "daemon".
 
 =item port
 
-Local port on which to bind.  If low port, process must
+See L<Net::Server::Proto>.
+Local port/socket on which to bind.  If low port, process must
 start as root.  If multiple ports are given, all will be
 bound at server startup.  May be of the form
 C<host:port/proto>, C<host:port>, C<port/proto>, or C<port>,
 where I<host> represents a hostname residing on the local
 box, where I<port> represents either the number of the port
 (eg. "80") or the service designation (eg.  "http"), and
-where I<proto> represents the protocol to be used.  If the
-protocol is not specified, I<proto> will default to the
-C<proto> specified in the arguments.  If C<proto> is not
+where I<proto> represents the protocol to be used.  See
+L<Net::Server::Proto>.  If you are working with unix sockets,
+you may also specify C<socket_file|unix> or
+C<socket_file|type|unix> where type is SOCK_DGRAM or
+SOCK_STREAM.  If the protocol is not specified, I<proto> will
+default to the C<proto> specified in the arguments.  If C<proto> is not
 specified there it will default to "tcp".  If I<host> is not
 specified, I<host> will default to C<host> specified in the
 arguments.  If C<host> is not specified there it will
@@ -1437,17 +1453,19 @@ default to "*".  Default port is 20203.
 
 Local host or addr upon which to bind port.  If a value of '*' is
 given, the server will bind that port on all available addresses
-on the box.  See L<IO::Socket>.
+on the box.  See L<Net::Server::Proto>. See L<IO::Socket>.
 
 =item proto
 
+See L<Net::Server::Proto>.
 Protocol to use when binding ports.  See L<IO::Socket>.  As
-of release 0.60, Net::Server supports tcp and udp.  Other
-types (unix, etc) may work but have not been tested.
+of release 0.70, Net::Server supports tcp, udp, and unix.  Other
+types will need to be added later (or custom modules extending the
+Net::Server::Proto class may be used).
 
 =item listen
 
-  See L<IO::Socket>.  Not used with udp protocol.
+  See L<IO::Socket>.  Not used with udp protocol (or UNIX SOCK_DGRAM).
 
 =item reverse_lookups
 

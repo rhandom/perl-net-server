@@ -140,8 +140,8 @@ if( $fork && $pipe ){
 
     alarm 0;
   };
-  print STDERR "[$@]\n" if $@;
-  print "not ok 6\n" if $@;
+
+  print "not ok 5\n" if $@;
 
 }else{
   print "not ok 5\n";
