@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.72';
+$VERSION = '0.73';
 
 ### program flow
 sub run {
@@ -1019,7 +1019,7 @@ sub write_to_log_hook {
     # do nothing
   }else{
     my $old = select(STDERR);
-    print $_, "\n";
+    print $_. "\n";
     select($old);
   }
 

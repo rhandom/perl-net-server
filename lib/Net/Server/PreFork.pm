@@ -21,9 +21,11 @@ package Net::Server::PreFork;
 
 use strict;
 use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
-use POSIX ();
+use POSIX qw(WNOHANG);
 use Fcntl ();
 use Net::Server;
+use Net::Server::SIG qw(register_sig check_sigs);
+use IO::Select ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -70,13 +72,16 @@ sub post_configure {
     unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
   }
 
+  ### we will need to force a select handle
+  $prop->{multi_port} = 1;
+
   ### I need to know who is the parent
   $prop->{ppid} = $$;
 
 }
 
 
-### now that we are bound prepare serialization
+### now that we are bound, prepare serialization
 sub post_bind {
   my $self = shift;
   my $prop = $self->{server};
@@ -84,54 +89,45 @@ sub post_bind {
   ### do the parents
   $self->SUPER::post_bind;
 
-  ### set up serialization
-  if( defined($prop->{multi_port}) 
-      || defined($prop->{serialize})
-      || $^O =~ /solaris/i ){
+  ### clean up method to use for serialization
+  if( ! defined($prop->{serialize}) 
+      || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/ ){
+    $prop->{serialize} = 'flock';
+  }
 
-    ### clean up method to use for serialization
-    if( !defined($prop->{serialize}) 
-        || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/ ){
-      $prop->{serialize} = 'flock';
-    }
-
-    ### set up lock file
-    if( $prop->{serialize} eq 'flock' ){
-      $self->log(3,"Setting up serialization via flock");
-      if( defined($prop->{lock_file}) ){
-        $prop->{lock_file_unlink} = undef;
-      }else{
-        $prop->{lock_file} = POSIX::tmpnam();
-        $prop->{lock_file_unlink} = 1;
-      }
-
-    ### set up semaphore
-    }elsif( $prop->{serialize} eq 'semaphore' ){
-      $self->log(3,"Setting up serialization via semaphore");
-      require "IPC/SysV.pm";
-      require "IPC/Semaphore.pm";
-      my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(),
-                                  1,
-                                  IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT(),
-                                  ) || $self->fatal("Semaphore error [$!]");
-      $s->setall(1) || $self->fatal("Semaphore create error [$!]");
-      $prop->{sem} = $s;
-
-    ### set up pipe
-    }elsif( $prop->{serialize} eq 'pipe' ){
-      pipe( _WAITING, _READY );
-      _READY->autoflush(1);
-      _WAITING->autoflush(1);
-      $prop->{_READY}   = *_READY;
-      $prop->{_WAITING} = *_WAITING;
-      print _READY "First\n";
-
+  ### set up lock file
+  if( $prop->{serialize} eq 'flock' ){
+    $self->log(3,"Setting up serialization via flock");
+    if( defined($prop->{lock_file}) ){
+      $prop->{lock_file_unlink} = undef;
     }else{
-      $self->fatal("Unknown serialization type \"$prop->{serialize}\"");
+      $prop->{lock_file} = POSIX::tmpnam();
+      $prop->{lock_file_unlink} = 1;
     }
 
+  ### set up semaphore
+  }elsif( $prop->{serialize} eq 'semaphore' ){
+    $self->log(3,"Setting up serialization via semaphore");
+    require "IPC/SysV.pm";
+    require "IPC/Semaphore.pm";
+    my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(),
+                                1,
+                                IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT(),
+                                ) || $self->fatal("Semaphore error [$!]");
+    $s->setall(1) || $self->fatal("Semaphore create error [$!]");
+    $prop->{sem} = $s;
+    
+  ### set up pipe
+  }elsif( $prop->{serialize} eq 'pipe' ){
+    pipe( _WAITING, _READY );
+    _READY->autoflush(1);
+    _WAITING->autoflush(1);
+    $prop->{_READY}   = *_READY;
+    $prop->{_WAITING} = *_WAITING;
+    print _READY "First\n";
+    
   }else{
-    $prop->{serialize} = '';
+    $self->fatal("Unknown serialization type \"$prop->{serialize}\"");
   }
 
 }
@@ -197,7 +193,8 @@ sub run_child {
   my $prop = $self->{server};
 
   ### restore sigs (turn off warnings during)
-  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = 'DEFAULT';
+  $SIG{INT} = $SIG{TERM} = $SIG{QUIT}
+    = $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
 
   $self->log(4,"Child Preforked ($$)\n");
   delete $prop->{children};
@@ -315,7 +312,7 @@ sub run_parent {
   my $self=shift;
   my $prop = $self->{server};
 
-  $self->log(4,"Parent ready for children\n");
+  $self->log(4,"Parent ready for children.\n");
 
   ### prepare to read from children
   local *_READ = $prop->{_READ};
@@ -331,47 +328,49 @@ sub run_parent {
   = $prop->{last_checked_for_dequeue}
   = time();
 
-  ### find the lowest positive time interval
-  my $alarm = (sort {$a <=> $b}
-               grep {defined($_) && $_>0} 
-               ($prop->{check_for_dead},
-                $prop->{check_for_waiting},
-                $prop->{check_for_dequeue},
-                ))[0];
-  
-  ### catch an alarm or a restart signal
-  ### do as little as possible here, work is done below
-  $SIG{ALRM} = sub{ $self->{sig} ||= 'alrm'; print _WRITE "$$ alrm\n"; };
-  $SIG{HUP}  = sub{ $self->{sig}   =  'hup'; print _WRITE "$$ hup\n";  };
+  ### register some of the signals for safe handling
+  register_sig(PIPE => 'IGNORE',
+               INT  => sub { $self->server_close() },
+               TERM => sub { $self->server_close() },
+               QUIT => sub { $self->server_close() },
+               HUP  => sub { $self->sig_hup() },
+               CHLD => sub {
+                 while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
+                   last unless $chld > 0;
+                   delete $prop->{children}->{$chld};
+                 }
+               },
+               );
+
+  ### need a selection handle
+  my $select = IO::Select->new();
+  $select->add(\*_READ);
 
   ### loop on reading info from the children
-  alarm($alarm);
-  while( <_READ> ){
-    alarm(0);
+  while( 1 ){
+
+    ### Wait to read.
+    ## Normally it is not good to do selects with
+    ## getline or <$fh> but this is controlled output
+    ## where everything that comes through came from us.
+    my @fh = $select->can_read(10);
+    if( &check_sigs() ){
+      last if $prop->{_HUP};
+    }
+    next unless @fh;
+    my $fh = shift(@fh);
+    next unless defined $fh;
     
-    next if not defined $_;
+    ### read a line
+    my $line = <$fh>;
+    next if not defined $line;
 
     ### optional test by user hook
-    last if $self->parent_read_hook($_);
+    last if $self->parent_read_hook($line);
 
     ### child should say "$pid waiting\n"
-    next unless /^(\d+)\ +(.+)$/;
+    next unless $line =~ /^(\d+)\ +(.+)$/;
     my ($pid,$status) = ($1,$2);
-
-    ### allow for parent to get a word in edgewise
-    if( $pid == $$ || defined $self->{sig} ){
-      my $sig = delete($self->{sig}) || '';
-      if( $status eq 'alrm' ){
-        $self->coordinate_children();
-        alarm($alarm);
-        next;
-      }
-      if( $status eq 'hup' || $sig eq 'hup' ){
-        $self->sig_hup();
-        _READ->close();
-        last;
-      }
-    }
 
     ### record the status
     if( $status eq 'exiting' ){
@@ -385,7 +384,6 @@ sub run_parent {
       $self->coordinate_children();
     }
 
-    alarm($alarm);
   }
 
   ### allow fall back to main run method
