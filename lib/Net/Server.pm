@@ -35,7 +35,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.87';
+$VERSION = '0.88';
 
 ### program flow
 sub run {
