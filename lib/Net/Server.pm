@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.83';
+$VERSION = '0.84';
 
 ### program flow
 sub run {
@@ -571,10 +571,13 @@ sub accept {
     ### success
     return 1 if defined $prop->{client};
 
+    $self->log(2,"Accept failed with $retries tries left.");
+
     ### try again in a second
     sleep(1);
 
   }
+  $self->log(1,"Ran out of accept retries!");
 
   return undef;
 }
@@ -619,6 +622,8 @@ sub post_accept {
     STDIN->autoflush(1);
     STDOUT->autoflush(1);
     select(STDOUT);
+  }else{
+    $self->log(1,"Client socket information could not be determined!");
   }
 
 }
@@ -658,8 +663,7 @@ sub get_client_info {
     $proto_type = 'UDP';
     ($prop->{peerport} ,$prop->{peeraddr})
       = Socket::sockaddr_in( $prop->{udp_peer} );
-  }else{
-    $prop->{peername} = getpeername( STDIN );
+  }elsif( $prop->{peername} = getpeername( STDIN ) ){
     ($prop->{peerport}, $prop->{peeraddr})
       = Socket::unpack_sockaddr_in( $prop->{peername} );
   }
@@ -780,7 +784,6 @@ sub process_request {
 
       alarm($timeout);
     }
-    alarm($previous_alarm);
 
   };
   alarm($previous_alarm);
@@ -1177,8 +1180,8 @@ sub delete_child {
     $prop->{child_select}->remove( $prop->{children}->{$pid}->{sock} );
     $prop->{children}->{$pid}->{sock}->close();
   }
-  
-  delete $prop->{children}->{$pid};  
+
+  delete $prop->{children}->{$pid};
 }
 
 ###----------------------------------------------------------###
@@ -2055,7 +2058,7 @@ the protocol used on a socket connection.
 Thanks to Jeremy Howard <j+daemonize at howard.fm> for
 numerous suggestions and for work on Net::Server::Daemonize.
 
-Thanks to Vadim <vadim at hardison.net> for patches to 
+Thanks to Vadim <vadim at hardison.net> for patches to
 implement parent/child communication on PreFork.pm.
 
 =head1 SEE ALSO
