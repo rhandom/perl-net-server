@@ -170,18 +170,19 @@ sub run_n_children {
 
   $self->log(3,"Starting \"$n\" children");
   $prop->{last_start} = time();
-  
-  if( $prop->{unix_sockets} ) {
-    ($parentsock, $childsock) = 
-      IO::Socket::UNIX->socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
-  }
 
   for( 1..$n ){
+
+    if( $prop->{child_communication} ) {
+      ($parentsock, $childsock) = 
+        IO::Socket::UNIX->socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+    }
+
     my $pid = fork;
 
     ### trouble
     if( not defined $pid ){
-      if( $prop->{unix_sockets} ){
+      if( $prop->{child_communication} ){
         $parentsock->close();
         $childsock->close();
       }
@@ -190,7 +191,7 @@ sub run_n_children {
 
     ### parent
     }elsif( $pid ){
-      if( $prop->{unix_sockets} ){
+      if( $prop->{child_communication} ){
 	$prop->{child_select}->add($parentsock);
         $prop->{children}->{$pid}->{sock} = $parentsock;
       }
@@ -200,7 +201,7 @@ sub run_n_children {
 
     ### child
     }else{
-      if( $prop->{unix_sockets} ){
+      if( $prop->{child_communication} ){
         $prop->{parent_sock} = $childsock;
       }
       $self->run_child;
