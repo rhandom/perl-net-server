@@ -614,7 +614,7 @@ TO DO
     Other Personalities
         Explore any other personalities
 
-    Net::HTTPServer, etc
+    Net::Server::HTTP, etc
         Create various types of servers. Possibly, port exising servers to
         user Net::Server as a base layer.
 

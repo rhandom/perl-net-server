@@ -225,8 +225,8 @@ sub set_gid {
 ### backward compatibility sub
 sub set_user {
   my ($user, @group) = @_;
-  set_uid( $user )  || return undef;
   set_gid( @group ) || return undef;
+  set_uid( $user )  || return undef;
   return 1;
 }
 

@@ -7,7 +7,8 @@ lib/Net/Server.pm		Base Module containing core functionality
 lib/Net/Server/Fork.pm		Sub class allowing for fork upon accept
 lib/Net/Server/INET.pm		Sub class allowing for inetd process
 lib/Net/Server/MultiType.pm	Sub class allowing for running any sub class
-lib/Net/Server/PreFork.pm	Sub class allowing for pre forked processes
+lib/Net/Server/PreFork.pm	Sub class allowing for managed pre forked processes
+lib/Net/Server/PreForkSimple.pm	Sub class allowing for simple pre forked processes
 lib/Net/Server/Single.pm	Sub class allowing for parallelism of base class
 lib/Net/Server/Proto.pm         Class for managing different connection types
 lib/Net/Server/Proto/TCP.pm     Proto interface to IO::Socket::INET
@@ -21,6 +22,7 @@ t/Server_Fork.t                 Test script for Net::Server::Fork
 t/Server_INET.t                 Test script for Net::Server::INET
 t/Server_MultiType.t            Test script for Net::Server::MultiType
 t/Server_PreFork.t              Test script for Net::Server::PreFork
+t/Server_PreForkSimple.t        Test script for Net::Server::PreForkSimple
 t/Server_Single.t               Test script for Net::Server::Single
 t/UDP_test.t                    Test script for UDP connection
 t/UNIX_test.t                   Test script for UNIX Socket connections

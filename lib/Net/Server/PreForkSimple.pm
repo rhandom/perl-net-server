@@ -1,6 +1,6 @@
 # -*- perl -*-
 #
-#  Net::Server::PreFork - Net::Server personality
+#  Net::Server::PreForkSimple - Net::Server personality
 #  
 #  $Id$
 #  
@@ -17,21 +17,19 @@
 #  
 ################################################################
 
-package Net::Server::PreFork;
+package Net::Server::PreForkSimple;
 
 use strict;
 use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
 use POSIX qw(WNOHANG);
 use Fcntl ();
-use Net::Server::PreForkSimple;
 use Net::Server::SIG qw(register_sig check_sigs);
 use IO::Select ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
 ### fall back to parent methods
-@ISA = qw(Net::Server::PreForkSimple);
-
+@ISA = qw(Net::Server);
 
 ### override-able options for this package
 sub options {
@@ -41,11 +39,9 @@ sub options {
 
   $self->SUPER::options($ref);
 
-  foreach ( qw(min_servers
-               min_spare_servers max_spare_servers
-               spare_servers
-               check_for_waiting
-               ) ){
+  foreach ( qw(max_servers max_requests max_dequeue
+               check_for_dead check_for_dequeue
+               lock_file serialize) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
   }
@@ -57,100 +53,96 @@ sub post_configure {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### legacy check
-  if( defined($prop->{spare_servers}) ){
-    die "The Net::Server::PreFork argument \"spare_servers\" has been
-deprecated as of version '0.75' in order to implement greater child
-control.  The new arguments to take \"spare_servers\" place are
-\"min_spare_servers\" and \"max_spare_servers\".  The defaults are 5
-and 15 respectively.  Please remove \"spare_servers\" from your
-argument list.  See the Perldoc Net::Server::PreFork for more
-information.
-";
-  }
-
   ### let the parent do the rest
   ### must do this first so that ppid reflects backgrounded process
   $self->SUPER::post_configure;
 
   ### some default values to check for
-  my $d = {min_servers       => 5,    # min num of servers to always have running
-           min_spare_servers => 2,    # min num of servers just sitting there
-           max_spare_servers => 10,   # max num of servers just sitting there
-           check_for_waiting => 10,   # how often to see if children laying around
+  my $d = {max_servers       => 50,   # max num of servers to run
+           max_requests      => 1000, # num of requests for each child to handle
+           check_for_dead    => 30,   # how often to see if children are alive
            };
   foreach (keys %$d){
     $prop->{$_} = $d->{$_}
     unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
   }
 
-  if( $prop->{min_spare_servers} > $prop->{max_spare_servers} ){
-    $self->fatal("Error: \"min_spare_servers\" must be less than "
-                 ."\"max_spare_servers\"");
-  }
+  ### we will need to force a select handle
+  $prop->{multi_port} = 1;
 
-  if( $prop->{min_spare_servers} > $prop->{min_servers} ){
-    $self->fatal("Error: \"min_spare_servers\" must be less than "
-                 ."\"min_servers\"");
-  }
+  ### I need to know who is the parent
+  $prop->{ppid} = $$;
+}
 
-  if( $prop->{max_spare_servers} >= $prop->{max_servers} ){
-    $self->fatal("Error: \"max_spare_servers\" must be less than "
-                 ."\"max_servers\"");
+
+### now that we are bound, prepare serialization
+sub post_bind {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  ### do the parents
+  $self->SUPER::post_bind;
+
+  ### clean up method to use for serialization
+  if( ! defined($prop->{serialize}) 
+      || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/i ){
+    $prop->{serialize} = 'flock';
+  }
+  $prop->{serialize} =~ tr/A-Z/a-z/;
+
+  ### set up lock file
+  if( $prop->{serialize} eq 'flock' ){
+    $self->log(3,"Setting up serialization via flock");
+    if( defined($prop->{lock_file}) ){
+      $prop->{lock_file_unlink} = undef;
+    }else{
+      $prop->{lock_file} = POSIX::tmpnam();
+      $prop->{lock_file_unlink} = 1;
+    }
+
+  ### set up semaphore
+  }elsif( $prop->{serialize} eq 'semaphore' ){
+    $self->log(3,"Setting up serialization via semaphore");
+    require "IPC/SysV.pm";
+    require "IPC/Semaphore.pm";
+    my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(),
+                                1,
+                                IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT(),
+                                ) || $self->fatal("Semaphore error [$!]");
+    $s->setall(1) || $self->fatal("Semaphore create error [$!]");
+    $prop->{sem} = $s;
+    
+  ### set up pipe
+  }elsif( $prop->{serialize} eq 'pipe' ){
+    pipe( _WAITING, _READY );
+    _READY->autoflush(1);
+    _WAITING->autoflush(1);
+    $prop->{_READY}   = *_READY;
+    $prop->{_WAITING} = *_WAITING;
+    print _READY "First\n";
+    
+  }else{
+    $self->fatal("Unknown serialization type \"$prop->{serialize}\"");
   }
 
 }
-
 
 ### prepare for connections
 sub loop {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### get ready for child->parent communication
-  pipe(_READ,_WRITE);
-  $prop->{_READ}  = *_READ;
-  $prop->{_WRITE} = *_WRITE;
-
   ### get ready for children
   $prop->{children} = {};
 
-  $self->log(3,"Beginning prefork ($prop->{min_servers} processes)\n");
-
-  ### keep track of the status
-  $prop->{tally} = {time       => time(),
-                    waiting    => 0,
-                    processing => 0,
-                    dequeue    => 0};
+  $self->log(3,"Beginning prefork ($prop->{max_servers} processes)\n");
 
   ### start up the children
-  $self->run_n_children( $prop->{min_servers} );
+  $self->run_n_children( $prop->{max_servers} );
 
   ### finish the parent routines
   $self->run_parent;
   
-}
-
-### sub to kill of a specified number of children
-sub kill_n_children {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $n    = shift;
-  return unless $n > 0;
-
-  return unless time() - $prop->{last_kill} > 10;
-  $prop->{last_kill} = time();
-
-  $self->log(3,"Killing \"$n\" children");
-
-  foreach (keys %{ $prop->{children} }){
-    next unless $prop->{children}->{$_} eq 'waiting';
-    if( ! kill('HUP',$_) ){
-      delete $prop->{children}->{$_};
-      next;
-    }
-    last if --$n <= 0;
-  }
 }
 
 ### subroutine to start up a specified number of children
@@ -160,8 +152,7 @@ sub run_n_children {
   my $n     = shift;
   return unless $n > 0;
 
-  $self->log(3,"Starting \"$n\" children");
-  $prop->{last_start} = time();
+  $self->log(2,"Starting \"$n\" children");
   
   for( 1..$n ){
     my $pid = fork;
@@ -172,8 +163,7 @@ sub run_n_children {
 
     ### parent
     }elsif( $pid ){
-      $prop->{children}->{$pid} = 'waiting';
-      $prop->{tally}->{waiting} ++;
+      $prop->{children}->{$pid} = 1;
 
     ### child
     }else{
@@ -182,7 +172,6 @@ sub run_n_children {
     }
   }
 }
-
 
 ### child process which will accept on the port
 sub run_child {
@@ -194,8 +183,6 @@ sub run_child {
     = $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
 
   $self->log(4,"Child Preforked ($$)\n");
-
-  delete $prop->{$_} foreach qw(children tally last_start last_process);
 
   $self->child_init_hook;
 
@@ -213,22 +200,87 @@ sub run_child {
   while( $self->accept() ){
     
     $prop->{connected} = 1;
-    print _WRITE "$$ processing\n";
 
     $self->run_client_connection;
 
     last if $self->done;
 
     $prop->{connected} = 0;
-    print _WRITE "$$ waiting\n";
 
   }
   
   $self->child_finish_hook;
 
-  print _WRITE "$$ exiting\n";
+  $self->log(4,"Child leaving ($prop->{max_requests})");
   exit;
 
+}
+
+### hooks at the beginning and end of forked child processes
+sub child_init_hook {}
+sub child_finish_hook {}
+
+
+
+### We can only let one process do the selecting at a time
+### this override makes sure that nobody else can do it
+### while we are.  We do this either by opening a lock file
+### and getting an exclusive lock (this will block all others
+### until we release it) or by using semaphores to block
+sub accept {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  local *LOCK;
+
+  ### serialize the child accepts
+  if( $prop->{serialize} eq 'flock' ){
+    open(LOCK,">$prop->{lock_file}")
+      || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\" [$!]");
+    flock(LOCK,Fcntl::LOCK_EX())
+      || $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
+
+  }elsif( $prop->{serialize} eq 'semaphore' ){
+    $prop->{sem}->op( 0, -1, IPC::SysV::SEM_UNDO() )
+      || $self->fatal("Semaphore Error [$!]");
+
+  }elsif( $prop->{serialize} eq 'pipe' ){
+    scalar <_WAITING>; # read one line - kernel says who gets it
+  }
+
+
+  ### now do the accept method
+  my $accept_val = $self->SUPER::accept();
+
+
+  ### unblock serialization
+  if( $prop->{serialize} eq 'flock' ){
+    flock(LOCK,Fcntl::LOCK_UN());
+
+  }elsif( $prop->{serialize} eq 'semaphore' ){
+    $prop->{sem}->op( 0, 1, IPC::SysV::SEM_UNDO() )
+      || $self->fatal("Semaphore Error [$!]");
+
+  }elsif( $prop->{serialize} eq 'pipe' ){
+    print _READY "Next!\n";
+  }
+
+  ### return our success
+  return $accept_val;
+
+}
+
+
+### is the looping done (non zero value says its done)
+sub done {
+  my $self = shift;
+  my $prop = $self->{server};
+  return 1 if $prop->{requests} >= $prop->{max_requests};
+  return 1 if $prop->{SigHUPed};
+  if( ! kill(0,$prop->{ppid}) ){
+    $self->log(3,"Parent process gone away. Shutting down");
+    return 1;
+  }
 }
 
 
@@ -239,20 +291,9 @@ sub run_parent {
 
   $self->log(4,"Parent ready for children.\n");
   
-  ### prepare to read from children
-  local *_READ = $prop->{_READ};
-  _READ->autoflush(1);
-
-  ### allow for writing to _READ
-  local *_WRITE = $prop->{_WRITE};
-  _WRITE->autoflush(1);
-
   ### set some waypoints
   $prop->{last_checked_for_dead}
-  = $prop->{last_checked_for_waiting}
   = $prop->{last_checked_for_dequeue}
-  = $prop->{last_process}
-  = $prop->{last_kill}
   = time();
 
   ### register some of the signals for safe handling
@@ -274,153 +315,85 @@ sub run_parent {
 #               },
                );
 
-  ### need a selection handle
-  my $select = IO::Select->new();
-  $select->add(\*_READ);
-
-  ### loop on reading info from the children
+  ### loop forever
   while( 1 ){
 
-    ### Wait to read.
-    ## Normally it is not good to do selects with
-    ## getline or <$fh> but this is controlled output
-    ## where everything that comes through came from us.
-    my @fh = $select->can_read(10);
-    if( &check_sigs() ){
+    ### sleep up to 10 seconds
+    select(undef,undef,undef,10);
+
+    ### check for any signals
+    my @sigs = &check_sigs();
+    if( @sigs ){
       last if $prop->{_HUP};
     }
-    if( ! @fh ){
-      $self->coordinate_children();
-      next;
+
+    my $time = time();
+
+    ### periodically make sure children are alive
+    if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
+      $prop->{last_checked_for_dead} = $time;
+      foreach (keys %{ $prop->{children} }){
+        ### see if the child can be killed
+        kill(0,$_) or delete $prop->{children}->{$_};
+      }
     }
 
-    ### get the filehandle
-    my $fh = shift(@fh);
-    next unless defined $fh;
-    
-    ### read a line
-    my $line = <$fh>;
-    next if not defined $line;
-
-    ### optional test by user hook
-    last if $self->parent_read_hook($line);
-
-    ### child should say "$pid status\n"
-    next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
-    my ($pid,$status) = ($1,$2);
-
-    ### record the status
-    $prop->{children}->{$pid} = $status;
-    if( $status eq 'processing' ){
-      $prop->{tally}->{processing} ++;
-      $prop->{tally}->{waiting} --;
-      $prop->{last_process} = time();
-    }elsif( $status eq 'waiting' ){
-      $prop->{tally}->{processing} --;
-      $prop->{tally}->{waiting} ++;
-    }elsif( $status eq 'exiting' ){
-      $prop->{tally}->{processing} --;
-      delete $prop->{children}->{$pid};
+    ### make sure we always have max_servers
+    my $total_n = 0;
+    my $total_d = 0;
+    foreach (values %{ $prop->{children} }){
+      if( $_ eq 'dequeue' ){
+        $total_d ++;
+      }else{
+        $total_n ++;
+      }
     }
 
-    ### check up on the children
-    $self->coordinate_children();
+    if( $prop->{max_servers} > $total_n ){
+      $self->run_n_children( $prop->{max_servers} - $total_n );
+    }
+
+    ### periodically check to see if we should clear the queue
+    if( defined $prop->{check_for_dequeue} ){
+      if( $time - $prop->{last_checked_for_dequeue}
+          > $prop->{check_for_dequeue} ){
+        $prop->{last_checked_for_dequeue} = $time;
+        if( defined($prop->{max_dequeue})
+            && $total_d < $prop->{max_dequeue} ){
+          $self->run_dequeue();
+        }
+      }
+    }
+
 
   }
 
   ### allow fall back to main run method
+
 }
 
+### allow for other process to tie in to the parent read
+sub parent_read_hook {}
 
-### routine to determine if more children need to be started or stopped
-sub coordinate_children {
+### routine to shut down the server (and all forked children)
+sub server_close {
   my $self = shift;
   my $prop = $self->{server};
-  my $time = time();
 
-  ### re-tally the possible types (only once a minute)
-  ### this might not be even necessary but is a nice sanity check
-  if( $time - $prop->{tally}->{time} > 6 ){
-    my $w = $prop->{tally}->{waiting};
-    my $p = $prop->{tally}->{processing};
-    $prop->{tally} = {time       => $time,
-                      waiting    => 0,
-                      processing => 0,
-                      dequeue    => 0};
-    foreach (values %{ $prop->{children} }){
-      $prop->{tally}->{$_} ++;
-    }
-    $w -= $prop->{tally}->{waiting};
-    $p -= $prop->{tally}->{processing};
-    $self->log(3,"Processing diff ($p), Waiting diff ($w)")
-      if $p || $w;
-  }
+  ### if a parent, fork off cleanup sub and close
+  if( ! defined $prop->{ppid} || $prop->{ppid} == $$ ){
 
-  my $total = $prop->{tally}->{waiting} + $prop->{tally}->{processing};
+    $self->SUPER::server_close();
 
-  ### need more min_servers
-  if( $total < $prop->{min_servers} ){
-    $self->run_n_children( $prop->{min_servers} - $total );
-    
-  ### need more min_spare_servers (up to max_servers)
-  }elsif( $prop->{tally}->{waiting} < $prop->{min_spare_servers} 
-          && $total < $prop->{max_servers} ){
-    my $n1 = $prop->{min_spare_servers} - $prop->{tally}->{waiting};
-    my $n2 = $prop->{max_servers} - $total;
-    $self->run_n_children( ($n2 > $n1) ? $n1 : $n2 );
+  ### if a child, signal the parent and close
+  ### normally the child shouldn't, but if they do...
+  }else{
 
-  }
+    kill(2,$prop->{ppid});
 
-
-  ### check to see if we should kill off some children
-  if( $time - $prop->{last_checked_for_waiting} > $prop->{check_for_waiting} ){
-    $prop->{last_checked_for_waiting} = $time;
-
-    ### need fewer max_spare_servers (down to min_servers)
-    if( $prop->{tally}->{waiting} > $prop->{max_spare_servers}
-        && $total > $prop->{min_servers} ){
-
-      ### see if we haven't started any in the last ten seconds
-      if( $time - $prop->{last_start} > 10 ){
-        my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
-        my $n2 = $total - $prop->{min_servers};
-        $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-      }      
-
-    ### how did this happen?
-    }elsif( $total > $prop->{max_servers} ){
-      $self->kill_n_children( $total - $prop->{max_servers} );
-      
-    }
   }
   
-  ### periodically make sure children are alive
-  if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
-    $prop->{last_checked_for_dead} = $time;
-    foreach (keys %{ $prop->{children} }){
-      ### see if the child can be killed
-      kill(0,$_) or delete $prop->{children}->{$_};
-    }
-  }
-
-  ### take us down to min if we haven't had a request in a while
-  if( $time - $prop->{last_process} > 30 && $prop->{tally}->{waiting} > $prop->{min_spare_servers} ){
-    my $n1 = $prop->{tally}->{waiting} - $prop->{min_spare_servers};
-    my $n2 = $total - $prop->{min_servers};
-    $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-  }
-
-  ### periodically check to see if we should clear the queue
-  if( defined $prop->{check_for_dequeue} ){
-    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
-      $prop->{last_checked_for_dequeue} = $time;
-      if( defined($prop->{max_dequeue})
-          && $prop->{tally}->{dequeue} < $prop->{max_dequeue} ){
-        $self->run_dequeue();
-      }
-    }
-  }
-
+  exit;
 }
 
 
