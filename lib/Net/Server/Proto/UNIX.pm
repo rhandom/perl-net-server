@@ -93,7 +93,7 @@ sub log_connect {
   my $sock = shift;
   my $server    = shift;
   my $unix_path = $sock->NS_unix_path;
-  my $type = $sock->NS_unix_type == SOCK_STREAM ? 'SOCK_STREAM' : 'SOCK_DGRAM';
+  my $type = ($sock->NS_unix_type == SOCK_STREAM) ? 'SOCK_STREAM' : 'SOCK_DGRAM';
   
   $server->log(2,"Binding to UNIX socket file $unix_path using $type\n");
 }
