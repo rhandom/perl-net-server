@@ -54,7 +54,8 @@ sub loop {
                );
 
   if ( defined $prop->{check_for_dequeue} ) {
-    $mux->set_timeout( $prop->{check_for_dequeue} );
+    # It does not matter which socket the timeout is associated with.
+    $mux->set_timeout( $prop->{sock}->[0], $prop->{check_for_dequeue} );
   }
 
   $mux->loop(sub {
@@ -223,10 +224,9 @@ sub mux_timeout {
   my $mux  = shift;
   my $fh   = shift;
 
-  $self->{net_server}->{server}->{peerport};
   if ( my $check = $self->{net_server}->{server}->{check_for_dequeue} ) {
     $self->run_dequeue();
-    $mux->set_timeout( $check );
+    $mux->set_timeout( $fh, $check );
   } else {
     $self->_link_stdout($mux, $fh);
     $self->SUPER::mux_timeout($mux, $fh);
