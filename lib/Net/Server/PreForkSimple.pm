@@ -177,7 +177,10 @@ sub run_child {
 
   ### restore sigs (turn off warnings during)
   $SIG{INT} = $SIG{TERM} = $SIG{QUIT}
-    = $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
+    = $SIG{CHLD} = sub {
+      $self->child_finish_hook;
+      exit;
+    };
 
   $self->log(4,"Child Preforked ($$)\n");
 
@@ -188,6 +191,7 @@ sub run_child {
   $prop->{SigHUPed}  = 0;
   $SIG{HUP} = sub {
     unless( $prop->{connected} ){
+      $self->child_finish_hook;
       exit;
     }
     $prop->{SigHUPed} = 1;
