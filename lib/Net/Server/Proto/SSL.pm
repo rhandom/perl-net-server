@@ -1,20 +1,20 @@
 # -*- perl -*-
 #
 #  Net::Server::Proto::SSL - Net::Server Protocol module
-#  
+#
 #  $Id$
-#  
+#
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
-#  
+#
 #  This package may be distributed under the terms of either the
-#  GNU General Public License 
+#  GNU General Public License
 #    or the
 #  Perl Artistic License
 #
 #  All rights reserved.
-#  
+#
 ################################################################
 
 package Net::Server::Proto::SSL;
@@ -22,7 +22,7 @@ package Net::Server::Proto::SSL;
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
 use Net::Server::Proto::TCP ();
-use IO::Socket::SSL ();
+eval { use IO::Socket::SSL (); } or warn "Module IO::Socket::SSL is required for SSL.";
 
 $VERSION = $Net::Server::VERSION; # done until separated
 @ISA = qw(IO::Socket::SSL);
@@ -75,7 +75,7 @@ sub object {
 sub log_connect {
   my $sock = shift;
   my $server = shift;
-  my $host   = $sock->NS_host; 
+  my $host   = $sock->NS_host;
   my $port   = $sock->NS_port;
   my $proto  = $sock->NS_proto;
  $server->log(2,"Binding to $proto port $port on host $host\n");
@@ -102,7 +102,7 @@ sub connect {
     next unless /^SSL_/;
     $args{$_} = $prop->{$_};
   }
-  
+
   ### connect to the sock
   $sock->SUPER::configure(\%args)
     or $server->fatal("Can't connect to SSL port $port on $host [$!]");
