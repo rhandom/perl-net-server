@@ -28,6 +28,13 @@ $VERSION = $Net::Server::VERSION; # done until separated
 
 @ISA = qw(Net::Server);
 
+sub post_configure {
+  my $self = shift;
+  $self->{server}->{_is_inet} = 1;
+  $self->SUPER::post_configure();
+  delete $self->{server}->{_is_inet};
+}
+
 ### no need to prepare bind
 sub pre_bind {}
 

@@ -228,9 +228,11 @@ sub post_configure {
   }
 
   ### completetly daemonize by closing STDIN, STDOUT (should be done before fork)
-  if( defined($prop->{setsid}) || length($prop->{log_file}) ){
-    open STDIN,  '</dev/null' || die "Can't read /dev/null  [$!]";
-    open STDOUT, '>/dev/null' || die "Can't write /dev/null [$!]";
+  if( ! $prop->{_is_inet} ){
+    if( defined($prop->{setsid}) || length($prop->{log_file}) ){
+      open STDIN,  '</dev/null' || die "Can't read /dev/null  [$!]";
+      open STDOUT, '>/dev/null' || die "Can't write /dev/null [$!]";
+    }
   }
 
   ### background the process
