@@ -21,7 +21,7 @@ package Net::Server::Proto::TCP;
 
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
-use IO::Socket::INET ();
+use IO::Socket ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 @ISA = qw(IO::Socket::INET);

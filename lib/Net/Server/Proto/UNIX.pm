@@ -21,7 +21,7 @@ package Net::Server::Proto::UNIX;
 
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
-use IO::Socket::UNIX ();
+use IO::Socket ();
 use Socket qw(SOCK_STREAM SOCK_DGRAM);
 
 $VERSION = $Net::Server::VERSION; # done until separated
