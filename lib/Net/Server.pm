@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.80';
+$VERSION = '0.81';
 
 ### program flow
 sub run {
@@ -1209,6 +1209,7 @@ Visit http://seamons.com/ for the latest version.
  * Multiplexing Mode using a single process
  * Multi port accepts on Single, Preforking, and Forking modes
  * Simultaneous accept/recv on tcp, udp, and unix sockets
+ * Safe signal handling in Fork/PreFork avoids perl signal trouble
  * User customizable hooks
  * Chroot ability after bind
  * Change of user and group after bind

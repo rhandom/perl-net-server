@@ -27,6 +27,7 @@ FEATURES
      * Multiplexing Mode using a single process
      * Multi port accepts on Single, Preforking, and Forking modes
      * Simultaneous accept/recv on tcp, udp, and unix sockets
+     * Safe signal handling in Fork/PreFork avoids perl signal trouble
      * User customizable hooks
      * Chroot ability after bind
      * Change of user and group after bind

@@ -219,18 +219,6 @@ There are no additional hooks in Net::Server::MultiType.
 
 See L<Net::Server>
 
-=head1 FILES
-
-  The following files are installed as part of this
-  distribution.
-
-  Net/Server.pm
-  Net/Server/Fork.pm
-  Net/Server/INET.pm
-  Net/Server/MultiType.pm
-  Net/Server/PreFork.pm
-  Net/Server/Single.pm
-
 =head1 AUTHOR
 
 Paul T. Seamons paul@seamons.com
