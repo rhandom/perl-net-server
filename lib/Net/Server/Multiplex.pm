@@ -22,7 +22,8 @@ use vars qw($VERSION @ISA);
 use Net::Server;
 use Net::Server::SIG qw(register_sig check_sigs);
 use Carp qw(confess);
-eval { use IO::Multiplex 1.02; } or warn "Module IO::Multiplex is required for Multiplex.";
+eval { require IO::Multiplex; import IO::Multiplex 1.02; };
+$@ && warn "Module IO::Multiplex is required for Multiplex.";
 
 $VERSION = $Net::Server::VERSION;
 @ISA = qw(Net::Server);

@@ -22,7 +22,8 @@ package Net::Server::Proto::SSL;
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
 use Net::Server::Proto::TCP ();
-eval { use IO::Socket::SSL (); } or warn "Module IO::Socket::SSL is required for SSL.";
+eval { require IO::Socket::SSL; };
+$@ && warn "Module IO::Socket::SSL is required for SSL.";
 
 $VERSION = $Net::Server::VERSION; # done until separated
 @ISA = qw(IO::Socket::SSL);
