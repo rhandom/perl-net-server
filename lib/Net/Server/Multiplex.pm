@@ -142,12 +142,6 @@ sub init {
 # modified by future connections through Net::Server.
 # Any values within it that this object may need to use
 # later must be copied within itself.
-
-# NEVER: If you override
-# this subroutine with your own, be sure to at least
-# set the {net_server} key to the Net::Server object
-# passed for compatibility purposes with other internal
-# subroutines which use it.
 sub new {
   my $package  = shift;
   my $net_server= shift;
@@ -391,11 +385,13 @@ functionality.
 
 The loop() method of Net::Server has been overridden to run the
 loop routine of IO::Multiplex instead.  The Net::Server methods
-may access the IO::Multiplex object at C<$self-E<gt>{mux}> if desired.
+may access the IO::Multiplex object at C<$self-E<gt>{mux}> if
+desired.  The IO::Multiplex methods may access the Net::Server
+object at C<$self-E<gt>{net_server}> if desired.
 
-The process_request() method is not used with this personality.
+The process_request() method is never used with this personality.
 
-The other Net::Server hooks and methods work the same.
+The other Net::Server hooks and methods should work the same.
 
 =head1 TIMEOUTS
 
@@ -417,7 +413,7 @@ which you should define yourself.
 The main loop() routine will call $obj->mux_timeout($mux, $fh)
 when the timeout specified in set_timeout is reached where
 $fh is the same as the one specified in set_timeout() and
-$obj is its corresponding object (Either the unique client
+$obj is its corresponding object (either the unique client
 specific object or the main listen callback object) and
 $mux is the main IO::Multiplex object itself.
 
