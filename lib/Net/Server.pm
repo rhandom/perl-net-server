@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.76';
+$VERSION = '0.77';
 
 ### program flow
 sub run {
@@ -1191,6 +1191,7 @@ Visit http://seamons.com/ for the latest version.
  * Basic allow/deny access control
  * Customized logging (choose Syslog, log_file, or STDERR)
  * HUP able server (clean restarts via sig HUP)
+ * Dequeue ability in all Fork and PreFork modes.
  * Taint clean
  * Written in Perl
  * Protection against buffer overflow

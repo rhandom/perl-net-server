@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Server.
 
+0.77  Aug 27 10:00
+        - Added dequeuing ability to Fork mode server.
+        - All Fork and PreFork modes now have dequeue ability.
+
 0.76  Aug 24 11:16
         - Added Net::Server::PreForkSimple
                 - Simpler PreFork server that only attempts to

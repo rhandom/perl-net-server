@@ -40,7 +40,8 @@ sub options {
 
   $self->SUPER::options($ref);
 
-  foreach ( qw(max_servers check_for_dead) ){
+  foreach ( qw(max_servers max_dequeue
+               check_for_dead check_for_dequeue) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
   }
@@ -94,13 +95,14 @@ sub loop {
                },
                );
 
+  my ($last_checked_for_dead, $last_checked_for_dequeue) = (time(), time());
+
   ### this is the main loop
   while( 1 ){
-
-    my $last_checked_for_dead = time();
-
+    
     ### make sure we don't use too many processes
-    while ((keys %{ $prop->{children} }) > $prop->{max_servers}){
+    my $n_children = grep { !/dequeue/ } (values %{ $prop->{children} });
+    while ($n_children > $prop->{max_servers}){
 
       ### block for a moment (don't look too often)
       select(undef,undef,undef,5);
@@ -117,7 +119,21 @@ sub loop {
       }
     }
 
-    
+    ### periodically check to see if we should clear a queue
+    if( defined $prop->{check_for_dequeue} ){
+      my $time = time();
+      if( $time - $last_checked_for_dequeue
+          > $prop->{check_for_dequeue} ){
+        $last_checked_for_dequeue = $time;
+        if( defined($prop->{max_dequeue}) ){
+          my $n_dequeue = grep { /dequeue/ } (values %{ $prop->{children} });
+          if( $n_dequeue < $prop->{max_dequeue} ){
+            $self->run_dequeue();
+          }
+        }
+      }
+    }
+
     ### try to call accept
     if( ! $self->accept() ){
       last if $prop->{_HUP};
@@ -268,6 +284,20 @@ This only takes place if the maximum number of child processes
 The maximum number of children to fork.  The server will
 not accept connections until there are free children. Default
 is 256 children.
+
+=item max_dequeue
+
+The maximum number of dequeue processes to start.  If a
+value of zero or undef is given, no dequeue processes will
+be started.  The number of running dequeue processes will
+be checked by the check_for_dead variable.
+
+=item check_for_dequeue
+
+Seconds to wait before forking off a dequeue process.  It
+is intended to use the dequeue process to take care of 
+items such as mail queues.  If a value of undef is given,
+no dequeue processes will be started.
 
 =back
 
