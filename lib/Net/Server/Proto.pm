@@ -33,7 +33,7 @@ sub object {
   my $proto_class;
 
   ### first find the proto
-  if( $port =~ s|/([\w:]+)$|| ){
+  if( $port =~ s/[\/\|]([\w:]+)$// ){
     $proto_class = $1;
   }else{
     $proto_class = $default_proto;

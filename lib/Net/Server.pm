@@ -260,8 +260,6 @@ sub pre_bind {
                                   $prop->{proto},
                                   ) || next;
     push @{ $prop->{sock} }, $obj;
-    open(_LOG,">>test.log");
-    print _LOG __LINE__."[".$obj->NS_proto."][".$obj->NS_port."]\n";
   }
   if( @{ $prop->{sock} } < 1 ){
     $self->fatal("No valid socket parameters found");
@@ -270,24 +268,6 @@ sub pre_bind {
   $prop->{listen} = Socket::SOMAXCONN()
     unless defined($prop->{listen}) && $prop->{listen} =~ /^\d{1,3}$/;
 
-#  use Data::Dumper qw(Dumper);
-#  print Dumper $self;
-#  exit;
-
-  ### do udp properties if any port is udp
-  foreach( @{ $prop->{sock} } ){
-    next unless $_->NS_proto eq 'UDP';
-
-    $prop->{udp_recv_len} = 4096
-      unless defined($prop->{udp_recv_len})
-        && $prop->{udp_recv_len} =~ /^\d+$/;
-    
-    $prop->{udp_recv_flags} = 0
-      unless defined($prop->{udp_recv_flags})
-        && $prop->{udp_recv_flags} =~ /^\d+$/;
-
-    last;
-  }
 }
 
 ### method for invoking procol specific bindings

@@ -34,7 +34,7 @@ sub object {
   my $host;
 
   ### allow for things like "domain.com:80"
-  if( $port =~ m|^([\w\.\-\*\/]+):(\w+)$| ){
+  if( $port =~ m/^([\w\.\-\*\/]+):(\w+)$/ ){
     ($host,$port) = ($1,$2);
 
   ### allow for things like "80"
@@ -118,7 +118,7 @@ sub AUTOLOAD {
     die "No property called.";
   }
 
-  if( $prop =~ /^(NS_proto|NS_port|NS_host)$/ ){
+  if( $prop =~ /^(NS_proto|NS_port|NS_host|NS_recv_len|NS_recv_flags)$/ ){
     no strict 'refs';
     * { __PACKAGE__ ."::". $prop } = sub {
       my $sock = shift;

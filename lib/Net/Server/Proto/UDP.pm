@@ -30,11 +30,26 @@ sub object {
   my $type  = shift;
   my $class = ref($type) || $type || __PACKAGE__;
 
-  my $self = $class->SUPER::object( @_ );
+  my $sock = $class->SUPER::object( @_ );
 
-  $self->NS_proto('UDP');
+  $sock->NS_proto('UDP');
 
-  return $self;
+  ### set a few more parameters
+  my($default_host,$port,$server) = @_;
+  my $prop = $server->{server};
+
+  $prop->{udp_recv_len} = 4096
+    unless defined($prop->{udp_recv_len})
+    && $prop->{udp_recv_len} =~ /^\d+$/;
+    
+  $prop->{udp_recv_flags} = 0
+    unless defined($prop->{udp_recv_flags})
+    && $prop->{udp_recv_flags} =~ /^\d+$/;
+
+  $sock->NS_recv_len(   $prop->{udp_recv_len} );
+  $sock->NS_recv_flags( $prop->{udp_recv_flags} );
+
+  return $sock;
 }
 
 
