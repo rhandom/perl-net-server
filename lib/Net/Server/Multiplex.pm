@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001, Rob Brown <rob@roobik.com>
+#  Copyright (C) 2002, Rob Brown <bbb@cpan.org>
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
@@ -45,7 +45,7 @@ sub loop {
   ###
 
   ### register some of the signals for safe handling
-  register_sig(PIPE => 'IGNORE',
+  register_sig(PIPE => sub { $self->log(4, "SIG$_[0] received") },
                INT  => sub { $self->server_close() },
                TERM => sub { $self->server_close() },
                QUIT => sub { $self->server_close() },
