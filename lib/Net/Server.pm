@@ -440,7 +440,7 @@ sub post_bind {
     }
     if( $prop->{chown_log_file} ){
       delete $prop->{chown_log_file};
-      push @chown_files, $prop->{log_file};      
+      push @chown_files, $prop->{log_file};
     }
     my $uid = $prop->{user};
     my $gid = (split(/\ /,$prop->{group}))[0];
