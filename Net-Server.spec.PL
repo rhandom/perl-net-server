@@ -55,8 +55,9 @@ Version:	@VERSION@
 Release:	1
 License:	Artistic
 Group:		Development/Languages/Perl
-Source0:	http://www.cpan.org./authors/id/B/BB/BBB/%{perlmod}-%{version}.tar.gz
-Packager:	Rob Brown <bbb@cpan.org>
+Source0:	http://seamons.com/net_server/%{perlmod}-%{version}.tar.gz
+URL:		http://seamons.com/net_server.html
+Packager:	Paul Seamons <paul@seamons.com>
 Prefix: 	/usr
 BuildRequires:	perl
 Requires:	perl
@@ -64,7 +65,8 @@ BuildRoot:	/var/tmp/%{name}-%{version}-root-%(id -u -n)
 Provides:	%{perlmod} = %{version}
 
 %description
-%{perlmod} Perl Module
+Net::Server is an extensible, class oriented module written in perl
+and intended to be the back end layer of internet protocol servers.
 
 %prep
 %setup -q -n %{perlmod}-%{version}
