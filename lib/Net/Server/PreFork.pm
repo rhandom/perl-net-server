@@ -92,7 +92,7 @@ information.
                  ."\"max_spare_servers\"");
   }
 
-  if( $prop->{min_spare_servers} >= $prop->{min_servers} ){
+  if( $prop->{min_spare_servers} > $prop->{min_servers} ){
     $self->fatal("Error: \"min_spare_servers\" must be less than "
                  ."\"min_servers\"");
   }
