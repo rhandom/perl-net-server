@@ -1,13 +1,15 @@
 Revision history for Perl extension Net::Server.
 
-0.86  Mar 21 08:38 2003
+0.86  Nov 06 2003
+        - Patch to fix Net::Server::Daemonize setuid bug:
+          http://www.ijs.si/software/amavisd/net-server.patch
         - Add a fix in the argument handling of configure
           to account for some alpha systems (James Vasak)
         - For RedHat 8.0 perl.req, avoid demanding that
           perl(IO::Muliplex) and perl(IO::Socket::SSL)
           rpms are installed just to use Net::Server.
 
-0.85  Sep 24 09:51 2002 - 0.85  Mar 06 18:00 2003
+0.85  Mar 06 18:00 2003
         - Lower timeouts during tests (Anil Madhavapeddy)	
         - Add configure_hook to MultiType (Michael Alan Dorman)
         - More graceful exit of children in PreForkSimple (Helge Kraenz)

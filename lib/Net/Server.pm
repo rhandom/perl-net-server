@@ -476,9 +476,11 @@ sub post_bind {
     }
   };
   if( $@ ){
-    if( $< == 0 || $> == 0 ){
+    if( $> == 0 ){
       $self->fatal( $@ );
-    } else {
+    } elsif( $< == 0){
+      $self->log(2,"NOTICE: Effective UID changed, but Real UID is 0: $@");
+    }else{
       $self->log(2,$@);
     }
   }

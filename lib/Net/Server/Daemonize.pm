@@ -204,8 +204,7 @@ sub set_uid {
     die "Couldn't become uid \"$uid\"\n";
   }
   my $result = POSIX::setuid( $uid );
-  if( ! defined($result)
-      || $result != $uid ){ # assuming this is true for all systems
+  if( ! defined($result) ){
     die "Couldn't POSIX::setuid to \"$uid\" [$!]\n";
   }
   return 1;
