@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Server.
 
+0.85  Mar 06 18:00 2003
+        - Add documentation about run_dequeue.
+        - Add run_dequeue feature to Multiplex personality.
+
 0.84  May 22 08:00 2002
         - Safer peername check in get_client_info to
           avoid crashing under certain conditions.
