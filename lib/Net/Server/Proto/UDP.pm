@@ -38,6 +38,12 @@ sub object {
   my($default_host,$port,$server) = @_;
   my $prop = $server->{server};
 
+  ### read any additional protocol specific arguments
+  $server->configure({
+    udp_recv_len   => \$prop->{udp_recv_len},
+    udp_recv_flags => \$prop->{udp_recv_flags},
+  });
+
   $prop->{udp_recv_len} = 4096
     unless defined($prop->{udp_recv_len})
     && $prop->{udp_recv_len} =~ /^\d+$/;

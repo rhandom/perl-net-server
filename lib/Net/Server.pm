@@ -47,6 +47,10 @@ sub run {
   $self->{server}->{commandline} = [ $0, @ARGV ]
     unless defined $self->{server}->{commandline};
 
+  ### prepare to cache configuration parameters
+  $self->{server}->{conf_file_args} = undef;
+  $self->{server}->{configure_args} = undef;
+
   $self->configure_hook;      # user customizable hook
 
   $self->configure(@_);       # allow for reading of commandline,
@@ -57,6 +61,10 @@ sub run {
   $self->post_configure_hook; # user customizable hook
 
   $self->pre_bind;            # finalize ports to be bound
+
+  ### get rid of cached config parameters
+  delete $self->{server}->{conf_file_args};
+  delete $self->{server}->{configure_args};
 
   $self->bind;                # connect to port(s)
                               # setup selection handle for multi port
@@ -122,16 +130,29 @@ sub configure_hook {}
 sub configure {
   my $self = shift;
   my $prop = $self->{server};
+  my $template = undef;
+
+  ### allow for a template to be passed
+  if( $_[0] && ref($_[0]) ){
+    $template = shift;
+  }
 
   ### do command line
-  $self->process_args( \@ARGV ) if defined @ARGV;
+  $self->process_args( \@ARGV, $template ) if defined @ARGV;
 
   ### do startup file args
-  $self->process_args( \@_ ) if defined @_;
+  ### cache a reference for multiple calls later
+  my $args = undef;
+  if( $prop->{configure_args} && ref($prop->{configure_args}) ){
+    $args = $prop->{configure_args};
+  }else{
+    $args = $prop->{configure_args} = \@_;
+  }
+  $self->process_args( $args, $template ) if defined $args;
 
   ### do a config file
   if( defined $prop->{conf_file} ){
-    $self->process_conf( $prop->{conf_file} );
+    $self->process_conf( $prop->{conf_file}, $template );
   }
 
 }
@@ -1004,8 +1025,6 @@ sub options {
                host proto listen reverse_lookups
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
-               udp_recv_len udp_recv_flags
-               unix_path unix_type
                ) ){
     $ref->{$_} = \$prop->{$_};
   }
@@ -1019,9 +1038,14 @@ sub options {
 sub process_args {
   my $self = shift;
   my $ref  = shift;
-  my $template = {};
-  $self->options( $template );
+  my $template = shift; # allow for custom passed in template
 
+  ### if no template is passed, obtain our own
+  if( ! $template || ! ref($template) ){
+    $template = {}; 
+    $self->options( $template );
+  }
+  
   foreach (my $i=0 ; $i < @$ref ; $i++ ){
 
     if( $ref->[$i] =~ /^(?:--)?(\w+)([=\ ](\S+))?$/
@@ -1044,29 +1068,37 @@ sub process_args {
     }
 
   }
+
 }
 
 
 ### routine for loading conf file parameters
+### cache the args temporarily to handle multiple calls
 sub process_conf {
   my $self = shift;
   my $file = shift;
+  my $template = shift;
+  $template = undef if ! $template || ! ref($template);
   my @args = ();
 
-  $file = ($file =~ m|^([\w\.\-/]+)$|)
-    ? $1 : $self->fatal("Unsecure filename \"$file\"");
+  if( ! $self->{server}->{conf_file_args} ){
+    $file = ($file =~ m|^([\w\.\-/]+)$|)
+      ? $1 : $self->fatal("Unsecure filename \"$file\"");
+    
+    if( not open(_CONF,"<$file") ){
+      $self->fatal("Couldn't open conf \"$file\" [$!]");
+    }
+    
+    while(<_CONF>){
+      push( @args, "$1=$2") if m/^\s*((?:--)?\w+)[=:]?\s*(\S+)/;
+    }
+    
+    close(_CONF);
 
-  if( not open(_CONF,"<$file") ){
-    $self->fatal("Couldn't open conf \"$file\" [$!]");
+    $self->{server}->{conf_file_args} = \@args;
   }
 
-  while(<_CONF>){
-    push( @args, "$1=$2") if m/^\s*((?:--)?\w+)[=:]?\s*(\S+)/;
-  }
-
-  close(_CONF);
-
-  $self->process_args( \@args );
+  $self->process_args( $self->{server}->{conf_file_args}, $template );
 }
 
 

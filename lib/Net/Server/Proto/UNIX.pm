@@ -34,8 +34,14 @@ sub object {
   my ($default_host,$port,$server) = @_;
   my $prop = $server->{server};
 
-  my $u_type = $server->{server}->{unix_type} || SOCK_STREAM;
-  my $u_path = $server->{server}->{unix_path} || undef;
+  ### read any additional protocol specific arguments
+  $server->configure({
+    unix_type => \$prop->{unix_type},
+    unix_path => \$prop->{unix_path},
+  });
+
+  my $u_type = $prop->{unix_type} || SOCK_STREAM;
+  my $u_path = $prop->{unix_path} || undef;
 
   ### allow for things like "/tmp/myfile.sock|SOCK_STREAM"
   if( $port =~ m/^([\w\.\-\*\/]+)\|(\d+)$/ ){
