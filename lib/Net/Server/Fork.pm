@@ -8,6 +8,8 @@
 #                      paul@seamons.com
 #                      http://seamons.com/
 #
+#  Copyright (C) 2003-2004, Rob Brown bbb@cpan.org
+#
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
 #    or the
@@ -136,12 +138,18 @@ sub loop {
       }
     }
 
+    ### call the pre accept hook
+    $self->pre_accept_hook;
+
     ### try to call accept
     ### accept will check signals as appropriate
     if( ! $self->accept() ){
       last if $prop->{_HUP};
       next;
     }
+
+    ### call the post accept hook
+    $self->post_accept_hook;
 
     ### fork a child so the parent can go back to listening
     my $pid = fork;
@@ -167,6 +175,8 @@ sub loop {
 
   ### fall back to the main run routine
 }
+
+sub pre_accept_hook {};
 
 ### Net::Server::Fork's own accept method which
 ### takes advantage of safe signals
@@ -307,6 +317,14 @@ See L<Net::Server>
 
 =over 4
 
+=item C<$self-E<gt>pre_accept_hook()>
+
+This hook occurs just before the accept is called.
+
+=item C<$self-E<gt>post_accept_hook()>
+
+This hook occurs just after accept but before the fork.
+
 =item C<$self-E<gt>run_dequeue()>
 
 This hook only gets called in conjuction with the
@@ -322,10 +340,11 @@ See L<Net::Server>
 
 Paul T. Seamons paul@seamons.com
 
+and maintained by Rob Brown bbb@cpan.org
+
 =head1 SEE ALSO
 
 Please see also
-L<Net::Server::Fork>,
 L<Net::Server::INET>,
 L<Net::Server::PreFork>,
 L<Net::Server::MultiType>,
