@@ -22,7 +22,6 @@ package Net::Server::PreFork;
 use strict;
 use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
 use POSIX qw(WNOHANG);
-use Fcntl ();
 use Net::Server::PreForkSimple;
 use Net::Server::SIG qw(register_sig check_sigs);
 use IO::Select ();
@@ -445,9 +444,10 @@ Net::Server::PreFork - Net::Server personality
 
 =head1 DESCRIPTION
 
-Please read the pod on Net::Server first.  This module
-is a personality, or extension, or sub class, of the
-Net::Server module.
+Please read the pod on Net::Server and Net::Server::PreForkSimple
+first.  This module is a personality, or extension, or sub class,
+of the Net::Server::PreForkSimple class which is a sub class of
+Net::Server.  See L<Net::Server::PreForkSimple>.
 
 This personality binds to one or more ports and then forks
 C<min_servers> child process.  The server will make sure
@@ -465,8 +465,10 @@ Please see the sample listed in Net::Server.
 =head1 COMMAND LINE ARGUMENTS
 
 In addition to the command line arguments of the Net::Server
-base class, Net::Server::PreFork contains several other 
-configurable parameters.
+base class and the Net::Server::PreForkSimple parent class,
+Net::Server::PreFork contains several other configurable
+parameters.  You really should also see
+L<Net::Server::PreForkSimple>.
 
   Key               Value                   Default
   min_servers       \d+                     5
@@ -508,57 +510,10 @@ See I<min_spare_servers>.
 The maximum number of child servers to start.  This does not
 apply to dequeue processes.
 
-=item max_requests
-
-The number of client connections to receive before a
-child terminates.
-
-=item serialize
-
-Determines whether the server serializes child connections.
-Options are undef, flock, semaphore, or pipe.  Default is undef.
-On multi_port servers or on servers running on Solaris, the
-default is flock.  The flock option uses blocking exclusive
-flock on the file specified in I<lock_file> (see below).
-The semaphore option uses IPC::Semaphore (thanks to Bennett
-Todd) for giving some sample code.  The pipe option reads on a 
-pipe to choose the next.  the flock option should be the
-most bulletproof while the pipe option should be the most
-portable.  (Flock is able to reliquish the block if the
-process dies between accept on the socket and reading
-of the client connection - semaphore and pipe do not)
-
-=item lock_file
-
-Filename to use in flock serialized accept in order to
-serialize the accept sequece between the children.  This
-will default to a generated temporary filename.  If default
-value is used the lock_file will be removed when the server
-closes.
-
-=item check_for_dead
-
-Seconds to wait before checking to see if a child died
-without letting the parent know.
-
 =item check_for_waiting
 
 Seconds to wait before checking to see if we can kill
 off some waiting servers.
-
-=item max_dequeue
-
-The maximum number of dequeue processes to start.  If a
-value of zero or undef is given, no dequeue processes will
-be started.  The number of running dequeue processes will
-be checked by the check_for_dead variable.
-
-=item check_for_dequeue
-
-Seconds to wait before forking off a dequeue process.  It
-is intended to use the dequeue process to take care of 
-items such as mail queues.  If a value of undef is given,
-no dequeue processes will be started.
 
 =back
 
@@ -613,29 +568,15 @@ this point C<min_servers> are forked and wait for
 connections.  When a child accepts a connection, finishs
 processing a client, or exits, it relays that information to
 the parent, which keeps track and makes sure there are
-enough children to fulfill C<min_servers>, C<spare_servers>,
-and C<max_servers>.
+enough children to fulfill C<min_servers>, C<min_spare_servers>,
+C<max_spare_servers>, and C<max_servers>.
 
 =head1 HOOKS
 
-There are three additional hooks in the PreFork server.
+There is one additional hook in the PreFork server.
+See L<Net::Server::PreForkSimple> for other hooks.
 
 =over 4
-
-=item C<$self-E<gt>child_init_hook()>
-
-This hook takes place immeditately after the child process
-forks from the parent and before the child begins
-accepting connections.  It is intended for any addiotional
-chrooting or other security measures.  It is suggested
-that all perl modules be used by this point, so that
-the most shared memory possible is used.
-
-=item C<$self-E<gt>child_finish_hook()>
-
-This hook takes place immediately before the child tells
-the parent that it is exiting.  It is intended for 
-saving out logged information or other general cleanup.
 
 =item C<$self-E<gt>parent_read_hook()>
 
@@ -648,18 +589,6 @@ argument.
 =head1 TO DO
 
 See L<Net::Server>
-
-=head1 FILES
-
-  The following files are installed as part of this
-  distribution.
-
-  Net/Server.pm
-  Net/Server/Fork.pm
-  Net/Server/INET.pm
-  Net/Server/MultiType.pm
-  Net/Server/PreFork.pm
-  Net/Server/Single.pm
 
 =head1 AUTHOR
 
@@ -674,9 +603,12 @@ See L<Net::Server>
 Please see also
 L<Net::Server::Fork>,
 L<Net::Server::INET>,
-L<Net::Server::PreFork>,
+L<Net::Server::PreForkSingle>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
+L<Net::Server::SIG>
+L<Net::Server::Daemonize>
+L<Net::Server::Proto>
 
 =cut
 

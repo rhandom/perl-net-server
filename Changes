@@ -1,5 +1,14 @@
 Revision history for Perl extension Net::Server.
 
+0.76  Aug 24 11:16
+        - Added Net::Server::PreForkSimple
+                - Simpler PreFork server that only attempts to
+                  maintain a constant number of child servers.
+                - Changed Net::Server::PreFork to subclass
+                  off of Net::Server::PreForkSimple.  No
+                  functional changes.
+                - Fixed a bug in Net::Server::Daemonize::set_user.
+
 0.75  Aug 23 10:49
         - Both Net::Server::Fork and Net::Server::PreFork are
                 using safe signals via Net::Server::SIG.
@@ -19,7 +28,6 @@ Revision history for Perl extension Net::Server.
                 properly.
         - Fix in Multiport accept with signals.
         - Updated perldocs
-                
 
 0.73  Aug 21 17:06
         - Net::Server::PreFork is on safe signals.

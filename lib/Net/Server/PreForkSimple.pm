@@ -23,8 +23,8 @@ use strict;
 use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
 use POSIX qw(WNOHANG);
 use Fcntl ();
+use Net::Server ();
 use Net::Server::SIG qw(register_sig check_sigs);
-use IO::Select ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -66,9 +66,6 @@ sub post_configure {
     $prop->{$_} = $d->{$_}
     unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
   }
-
-  ### we will need to force a select handle
-  $prop->{multi_port} = 1;
 
   ### I need to know who is the parent
   $prop->{ppid} = $$;
@@ -152,7 +149,7 @@ sub run_n_children {
   my $n     = shift;
   return unless $n > 0;
 
-  $self->log(2,"Starting \"$n\" children");
+  $self->log(3,"Starting \"$n\" children");
   
   for( 1..$n ){
     my $pid = fork;
@@ -403,11 +400,11 @@ __END__
 
 =head1 NAME
 
-Net::Server::PreFork - Net::Server personality
+Net::Server::PreForkSimple - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use Net::Server::PreFork;
+  use Net::Server::PreForkSimple;
   @ISA = qw(Net::Server::PreFork);
 
   sub process_request {
@@ -423,13 +420,14 @@ is a personality, or extension, or sub class, of the
 Net::Server module.
 
 This personality binds to one or more ports and then forks
-C<min_servers> child process.  The server will make sure
-that at any given time there are C<min_spare_servers> available
-to receive a client request, up to C<max_servers>.  Each of
+C<max_servers> child processes.  The server will make sure
+that at any given time there are always C<max_servers>
+available to receive a client request.  Each of
 these children will process up to C<max_requests> client
-connections.  This type is good for a heavily hit site, and
-should scale well for most applications.  (Multi port accept
-is accomplished using flock to serialize the children).
+connections.  This type is good for a heavily hit site that can
+keep C<max_servers> processes dedicated to the serving.
+(Multi port accept defaults to using flock to serialize the
+children).
 
 =head1 SAMPLE CODE
 
@@ -442,9 +440,6 @@ base class, Net::Server::PreFork contains several other
 configurable parameters.
 
   Key               Value                   Default
-  min_servers       \d+                     5
-  min_spare_servers \d+                     2
-  max_spare_servers \d+                     10
   max_servers       \d+                     50
   max_requests      \d+                     1000
 
@@ -453,33 +448,16 @@ configurable parameters.
   lock_file         "filename"              POSIX::tmpnam
                                             
   check_for_dead    \d+                     30
-  check_for_waiting \d+                     10
 
   max_dequeue       \d+                     undef
   check_for_dequeue \d+                     undef
 
 =over 4
 
-=item min_servers
-
-The minimum number of servers to keep running.
-
-=item min_spare_servers
-
-The minimum number of servers to have waiting for requests.
-Minimum and maximum numbers should not be set to close to
-each other or the server will fork and kill children too
-often.
-
-=item max_spare_servers
-
-The maximum number of servers to have waiting for requests.
-See I<min_spare_servers>.
-
 =item max_servers
 
-The maximum number of child servers to start.  This does not
-apply to dequeue processes.
+The maximum number of child servers to start and maintain.
+This does not apply to dequeue processes.
 
 =item max_requests
 
@@ -514,11 +492,6 @@ closes.
 Seconds to wait before checking to see if a child died
 without letting the parent know.
 
-=item check_for_waiting
-
-Seconds to wait before checking to see if we can kill
-off some waiting servers.
-
 =item max_dequeue
 
 The maximum number of dequeue processes to start.  If a
@@ -545,10 +518,7 @@ white space are ignored.
   #-------------- file test.conf --------------
 
   ### server information
-  min_servers   20
   max_servers   80
-  min_spare_servers 10
-  min_spare_servers 15
 
   max_requests  1000
 
@@ -582,16 +552,15 @@ white space are ignored.
 =head1 PROCESS FLOW
 
 Process flow follows Net::Server until the loop phase.  At
-this point C<min_servers> are forked and wait for
+this point C<max_servers> are forked and wait for
 connections.  When a child accepts a connection, finishs
 processing a client, or exits, it relays that information to
 the parent, which keeps track and makes sure there are
-enough children to fulfill C<min_servers>, C<spare_servers>,
-and C<max_servers>.
+always C<max_servers> running.
 
 =head1 HOOKS
 
-There are three additional hooks in the PreFork server.
+There are two additional hooks in the PreForkSimple server.
 
 =over 4
 
@@ -610,29 +579,11 @@ This hook takes place immediately before the child tells
 the parent that it is exiting.  It is intended for 
 saving out logged information or other general cleanup.
 
-=item C<$self-E<gt>parent_read_hook()>
-
-This hook occurs any time that the parent reads information
-from the child.  The line from the child is sent as an
-argument.
-
 =back
 
 =head1 TO DO
 
 See L<Net::Server>
-
-=head1 FILES
-
-  The following files are installed as part of this
-  distribution.
-
-  Net/Server.pm
-  Net/Server/Fork.pm
-  Net/Server/INET.pm
-  Net/Server/MultiType.pm
-  Net/Server/PreFork.pm
-  Net/Server/Single.pm
 
 =head1 AUTHOR
 
@@ -650,6 +601,9 @@ L<Net::Server::INET>,
 L<Net::Server::PreFork>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
+L<Net::Server::SIG>
+L<Net::Server::Daemonize>
+L<Net::Server::Proto>
 
 =cut
 
