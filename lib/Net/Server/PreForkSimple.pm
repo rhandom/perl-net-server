@@ -366,11 +366,15 @@ sub run_parent {
       }
     }
 
-
   }
 
   ### allow fall back to main run method
 
+}
+
+### Stub function in case check_for_dequeue is used.
+sub run_dequeue {
+  die "run_dequeue: virtual method not defined";
 }
 
 1;
@@ -480,10 +484,12 @@ be checked by the check_for_dead variable.
 
 =item check_for_dequeue
 
-Seconds to wait before forking off a dequeue process.  It
-is intended to use the dequeue process to take care of 
+Seconds to wait before forking off a dequeue process.  The
+run_dequeue hook must be defined when using this setting.
+It is intended to use the dequeue process to take care of 
 items such as mail queues.  If a value of undef is given,
 no dequeue processes will be started.
+
 
 =back
 
@@ -539,7 +545,9 @@ always C<max_servers> running.
 
 =head1 HOOKS
 
-There are two additional hooks in the PreForkSimple server.
+The PreForkSimple server has the following hooks in addition
+to the hooks provided by the Net::Server base class.
+See L<Net::Server>
 
 =over 4
 
@@ -557,6 +565,11 @@ the most shared memory possible is used.
 This hook takes place immediately before the child tells
 the parent that it is exiting.  It is intended for 
 saving out logged information or other general cleanup.
+
+=item C<$self-E<gt>run_dequeue()>
+
+This hook only gets called in conjuction with the
+check_for_dequeue setting.
 
 =back
 
