@@ -1206,6 +1206,7 @@ Visit http://seamons.com/ for the latest version.
  * Preforking Simple Mode (PreForkSimple)
  * Preforking Managed Mode (PreFork)
  * Forking Mode
+ * Multiplexing Mode using a single process
  * Multi port accepts on Single, Preforking, and Forking modes
  * Simultaneous accept/recv on tcp, udp, and unix sockets
  * User customizable hooks
@@ -1317,7 +1318,7 @@ features of Net::Server::Multiplex.
 Found in the module Net/Server/PreFork.pm (see
 L<Net::Server::PreFork>).  This server binds to one or more
 ports and then forks C<max_servers> child process.  The
-server will make sure that at any given time there always
+server will make sure that at any given time there are always
 C<max_servers> available to receive a client request.  Each
 of these children will process up to C<max_requests> client
 connections.  This type is good for a heavily hit site that
@@ -1836,7 +1837,7 @@ represents the program flow:
 
   $self->post_child_cleanup_hook;
 
-  # if( Restarting server ){
+  if( Restarting server ){
      $self->restart_close_hook();
      $self->hup_server;
   }
