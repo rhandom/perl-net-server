@@ -30,7 +30,9 @@ use POSIX ();
 use Fcntl ();
 use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file
-                              get_uid get_gid set_uid set_gid);
+                              get_uid get_gid set_uid set_gid
+                              safe_fork
+                              );
 
 $VERSION = '0.70';
 
