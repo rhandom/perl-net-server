@@ -137,7 +137,7 @@ Revision history for Perl extension Net::Server.
             Server can bind to all three types.
             Properties are determined according to type.
             Server can HUP on all three types.
- 
+
         - SSL type added, but experimental (read "extremely alpha")
 
 0.65  Jul 05 22:01 2001
@@ -150,7 +150,7 @@ Revision history for Perl extension Net::Server.
         - Allow fall back to main run method at server close
         - Clean up signal processing in PreFork server
         - Clean up child management in PreFork server
-        - Added run_dequeue and dequeue methods to the 
+        - Added run_dequeue and dequeue methods to the
                 PreFork server (intended to allow for
                 management of items such as mail queues)
 
@@ -167,7 +167,7 @@ Revision history for Perl extension Net::Server.
         - Added UDP_test.t for "make test".
         - Allow customization of udp recv parameters.
 
-0.61  Apr 30 06:32 2001 
+0.61  Apr 30 06:32 2001
         - Sig HUP with UDP now works.
         - Peer info is correctly accessed under UDP
         - Net::Server::INET will not allow one server
@@ -195,7 +195,7 @@ Revision history for Perl extension Net::Server.
         - Made appropriate changes in MultiType as well.
 
 0.58  Apr 06 12:29 2001
-        - SIG HUP is complete.  Fixed bug in SIG HUP'ing 
+        - SIG HUP is complete.  Fixed bug in SIG HUP'ing
                 PreFork mode.  Now effectively restarts.
         - Various clean ups in code.
         - More unification of code.
@@ -261,7 +261,7 @@ Revision history for Perl extension Net::Server.
         - Added serialize option to PreFork.
                 This allows for serialization to be turned on
                 even on non_multi port process - this is
-                done to get around some OS's which don't 
+                done to get around some OS's which don't
                 allow children to accept on the same socket
                 at the same time.
         - Added semaphore type to the serialize option
@@ -275,13 +275,13 @@ Revision history for Perl extension Net::Server.
         - Catch $SIG{HUP} (currently shuts down server, needs to
                 be able to restart server re-reading conf file)
         - Changed pid_file creation to after chroot, change of group
-                and change of user - making sure the server has 
+                and change of user - making sure the server has
                 permission to write out the pid file.
         - Remove use of "use subs" in PreFork.
 
 0.47  Mar 08 07:03 2001
-        - Fix reverse lookup bug - thanks to Jonathan J. Miner for 
-                pointing out the missing pieces.
+        - Fix reverse lookup bug - thanks to Jonathan J. Miner for
+          pointing out the missing pieces.
         - Cleaned up pod examples
         - Clarified some of the pod
 
