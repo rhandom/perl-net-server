@@ -134,6 +134,7 @@ sub configure {
   my $self = shift;
   my $prop = $self->{server};
   my $template = undef;
+  local @_ = @_; # fix some issues under old perls on alpha systems
 
   ### allow for a template to be passed
   if( $_[0] && ref($_[0]) ){
