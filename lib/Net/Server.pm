@@ -894,6 +894,10 @@ sub close_children {
     }
 
   }
+
+  ### need to wait off the children
+  ### eventually this should probably use &check_sigs
+  1 while (waitpid(-1,POSIX::WNOHANG()) > 0);
   
 }
 

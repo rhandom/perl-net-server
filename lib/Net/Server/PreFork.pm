@@ -44,7 +44,7 @@ sub options {
   foreach ( qw(min_servers max_servers
                min_spare_servers max_spare_servers
                spare_servers max_requests max_dequeue
-               check_for_dead check_for_dequeue
+               check_for_dead check_for_waiting check_for_dequeue
                lock_file serialize) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -74,12 +74,13 @@ information.
   $self->SUPER::post_configure;
 
   ### some default values to check for
-  my $d = {min_servers   => 5,      # min num of servers to always have running
-           max_servers   => 50,     # max num of servers to run
-           min_spare_servers => 2,  # min num of servers just sitting there
-           max_spare_servers => 10, # max num of servers just sitting there
+  my $d = {min_servers       => 5,    # min num of servers to always have running
+           max_servers       => 50,   # max num of servers to run
+           min_spare_servers => 2,    # min num of servers just sitting there
+           max_spare_servers => 10,   # max num of servers just sitting there
            max_requests      => 1000, # num of requests for each child to handle
-           check_for_dead    => 60,   # how often to see if children are alive
+           check_for_waiting => 10,   # how often to see we have to many servers
+           check_for_dead    => 30,   # how often to see if children are alive
            };
   foreach (keys %$d){
     $prop->{$_} = $d->{$_}
@@ -195,13 +196,20 @@ sub kill_n_children {
   my $self = shift;
   my $prop = $self->{server};
   my $n    = shift;
+  return unless $n > 0;
 
-  $self->log(4,"Killing \"$n\" children");
+  return unless time() - $prop->{last_kill} > 10;
+  $prop->{last_kill} = time();
+
+  $self->log(3,"Killing \"$n\" children");
 
   foreach (keys %{ $prop->{children} }){
     next unless $prop->{children}->{$_} eq 'waiting';
-    last unless $n--;
-    kill(1,$_);
+    if( ! kill('HUP',$_) ){
+      delete $prop->{children}->{$_};
+      next;
+    }
+    last if --$n <= 0;
   }
 }
 
@@ -210,8 +218,10 @@ sub run_n_children {
   my $self  = shift;
   my $prop  = $self->{server};
   my $n     = shift;
+  return unless $n > 0;
 
-  $self->log(4,"Starting \"$n\" children");
+  $self->log(3,"Starting \"$n\" children");
+  $prop->{last_start} = time();
   
   for( 1..$n ){
     my $pid = fork;
@@ -244,8 +254,8 @@ sub run_child {
     = $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
 
   $self->log(4,"Child Preforked ($$)\n");
-  delete $prop->{children};
-  delete $prop->{tally};
+
+  delete $prop->{$_} foreach qw(children tally last_start last_process);
 
   $self->child_init_hook;
 
@@ -365,7 +375,12 @@ sub run_parent {
   _WRITE->autoflush(1);
 
   ### set some waypoints
-  $prop->{last_checked_for_dead} = $prop->{last_checked_for_dequeue} = time();
+  $prop->{last_checked_for_dead}
+  = $prop->{last_checked_for_waiting}
+  = $prop->{last_checked_for_dequeue}
+  = $prop->{last_process}
+  = $prop->{last_kill}
+  = time();
 
   ### register some of the signals for safe handling
   register_sig(PIPE => 'IGNORE',
@@ -379,6 +394,11 @@ sub run_parent {
                    delete $prop->{children}->{$chld};
                  }
                },
+### uncomment this area to allow SIG USR1 to give some runtime debugging               
+#               USR1 => sub {
+#                 require "Data/Dumper.pm";
+#                 print Data::Dumper::Dumper($self);
+#               },
                );
 
   ### need a selection handle
@@ -421,11 +441,13 @@ sub run_parent {
     if( $status eq 'processing' ){
       $prop->{tally}->{processing} ++;
       $prop->{tally}->{waiting} --;
+      $prop->{last_process} = time();
     }elsif( $status eq 'waiting' ){
       $prop->{tally}->{processing} --;
       $prop->{tally}->{waiting} ++;
     }elsif( $status eq 'exiting' ){
       $prop->{tally}->{processing} --;
+      delete $prop->{children}->{$pid};
     }
 
     ### check up on the children
@@ -464,17 +486,6 @@ sub coordinate_children {
       if $p || $w;
   }
 
-  ### periodically check to see if we should clear the queue
-  if( defined $prop->{check_for_dequeue} ){
-    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
-      $prop->{last_checked_for_dequeue} = $time;
-      if( defined($prop->{max_dequeue})
-          && $prop->{tally}->{dequeue} < $prop->{max_dequeue} ){
-        $self->run_dequeue();
-      }
-    }
-  }
-
   my $total = $prop->{tally}->{waiting} + $prop->{tally}->{processing};
 
   ### need more min_servers
@@ -488,18 +499,29 @@ sub coordinate_children {
     my $n2 = $prop->{max_servers} - $total;
     $self->run_n_children( ($n2 > $n1) ? $n1 : $n2 );
 
-  ### need fewer max_spare_servers (down to min_servers)
-  }elsif( $prop->{tally}->{waiting} > $prop->{max_spare_servers}
-          && $total > $prop->{min_servers} ){
-    my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
-    my $n2 = $total - $prop->{min_servers};
-#    print "$n2 $n1\n";
-    $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-    
-  ### how did this happen?
-  }elsif( $total > $prop->{max_servers} ){
-    $self->kill_n_children( $total - $prop->{max_servers} );
+  }
 
+
+  ### check to see if we should kill off some children
+  if( $time - $prop->{last_checked_for_waiting} > $prop->{check_for_waiting} ){
+    $prop->{last_checked_for_waiting} = $time;
+
+    ### need fewer max_spare_servers (down to min_servers)
+    if( $prop->{tally}->{waiting} > $prop->{max_spare_servers}
+        && $total > $prop->{min_servers} ){
+
+      ### see if we haven't started any in the last ten seconds
+      if( $time - $prop->{last_start} > 10 ){
+        my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
+        my $n2 = $total - $prop->{min_servers};
+        $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
+      }      
+
+    ### how did this happen?
+    }elsif( $total > $prop->{max_servers} ){
+      $self->kill_n_children( $total - $prop->{max_servers} );
+      
+    }
   }
   
   ### periodically make sure children are alive
@@ -508,6 +530,24 @@ sub coordinate_children {
     foreach (keys %{ $prop->{children} }){
       ### see if the child can be killed
       kill(0,$_) or delete $prop->{children}->{$_};
+    }
+  }
+
+  ### take us down to min if we haven't had a request in a while
+  if( $time - $prop->{last_process} > 30 && $prop->{tally}->{waiting} > $prop->{min_spare_servers} ){
+    my $n1 = $prop->{tally}->{waiting} - $prop->{min_spare_servers};
+    my $n2 = $total - $prop->{min_servers};
+    $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
+  }
+
+  ### periodically check to see if we should clear the queue
+  if( defined $prop->{check_for_dequeue} ){
+    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
+      $prop->{last_checked_for_dequeue} = $time;
+      if( defined($prop->{max_dequeue})
+          && $prop->{tally}->{dequeue} < $prop->{max_dequeue} ){
+        $self->run_dequeue();
+      }
     }
   }
 
@@ -552,7 +592,7 @@ Net::Server::PreFork - Net::Server personality
      #...code...
   }
 
-  Net::Server::PreFork->run();
+  __PACKAGE__->run();
 
 =head1 DESCRIPTION
 
@@ -590,7 +630,8 @@ configurable parameters.
   # serialize defaults to flock on multi_port or on Solaris
   lock_file         "filename"              POSIX::tmpnam
                                             
-  check_for_dead    \d+                     60
+  check_for_dead    \d+                     30
+  check_for_waiting \d+                     10
 
   max_dequeue       \d+                     undef
   check_for_dequeue \d+                     undef
@@ -650,6 +691,11 @@ closes.
 
 Seconds to wait before checking to see if a child died
 without letting the parent know.
+
+=item check_for_waiting
+
+Seconds to wait before checking to see if we can kill
+off some waiting servers.
 
 =item max_dequeue
 
