@@ -81,7 +81,7 @@ if( $num_ports == @ports ){
 ### the server is ready to accept connections
 sub accept {
   my $self = shift;
-  
+
   print WRITE "ready!\n";
 
   return $self->SUPER::accept();
@@ -103,6 +103,7 @@ if( $fork && $pipe ){
     ### parent does the client
     if( $pid ){
 
+      close(WRITE);
       <READ>; ### wait until the child writes to us
 
       ### connect to child under unix
