@@ -15,6 +15,7 @@ lib/Net/Server/Proto/UDP.pm     Proto interface to IO::Socket::INET
 lib/Net/Server/Proto/SSL.pm     Proto interface to IO::Socket::SSL (experimental)
 lib/Net/Server/Proto/UNIX.pm    Proto interface to IO::Socket::UNIX
 lib/Net/Server/Daemonize.pm     Module for managing daemonization
+lib/Net/Server/SIG.pm           Module to make signals safer
 t/Server_BASE.t                 Test script for Net::Server
 t/Server_Fork.t                 Test script for Net::Server::Fork
 t/Server_INET.t                 Test script for Net::Server::INET
@@ -27,3 +28,4 @@ examples/httpd                  Sample http daemon
 examples/LoadTester.pl          Sample script to hit upon a running server
 examples/udp_server.pl          Sample UDP server
 examples/connection_test.pl     Sample connection on all protocols
+examples/sigtest.pl             Compare safe signals under Net::Server::SIG

@@ -936,7 +936,6 @@ sub sig_hup {
   }
 
   $ENV{BOUND_SOCKETS} = join("\n",@fd);
-  print $ENV{BOUND_SOCKETS},"\n";
 }
 
 ### restart the server using prebound sockets
