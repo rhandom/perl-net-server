@@ -1156,7 +1156,7 @@ sub process_conf {
   my @args = ();
 
   if( ! $self->{server}->{conf_file_args} ){
-    $file = ($file =~ m|^([\w\.\-/]+)$|)
+    $file = ($file =~ m|^([\w\.\-\/\\\:]+)$|)
       ? $1 : $self->fatal("Unsecure filename \"$file\"");
 
     if( not open(_CONF,"<$file") ){
