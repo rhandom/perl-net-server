@@ -55,6 +55,8 @@ sub run {
   $prop->{commandline} = [ $0, @ARGV ]
     unless defined $prop->{commandline};
 
+  $self->configure_hook;      # user customizable hook
+
   ### do the configuration now
   $self->configure(@_);
 
