@@ -1,20 +1,20 @@
 # -*- perl -*-
 #
 #  Net::Server::PreFork - Net::Server personality
-#  
+#
 #  $Id$
-#  
+#
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
-#  
+#
 #  This package may be distributed under the terms of either the
-#  GNU General Public License 
+#  GNU General Public License
 #    or the
 #  Perl Artistic License
 #
 #  All rights reserved.
-#  
+#
 ################################################################
 
 package Net::Server::PreFork;
@@ -130,7 +130,7 @@ sub loop {
 
   ### finish the parent routines
   $self->run_parent;
-  
+
 }
 
 ### sub to kill of a specified number of children
@@ -174,7 +174,7 @@ sub run_n_children {
   for( 1..$n ){
 
     if( $prop->{child_communication} ) {
-      ($parentsock, $childsock) = 
+      ($parentsock, $childsock) =
         IO::Socket::UNIX->socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
     }
 
@@ -195,7 +195,7 @@ sub run_n_children {
 	$prop->{child_select}->add($parentsock);
         $prop->{children}->{$pid}->{sock} = $parentsock;
       }
-      
+
       $prop->{children}->{$pid}->{status} = 'waiting';
       $prop->{tally}->{waiting} ++;
 
@@ -245,7 +245,7 @@ sub run_child {
 
   ### accept connections
   while( $self->accept() ){
-    
+
     $prop->{connected} = 1;
     print _WRITE "$$ processing\n";
 
@@ -257,7 +257,7 @@ sub run_child {
     print _WRITE "$$ waiting\n";
 
   }
-  
+
   $self->child_finish_hook;
 
   print _WRITE "$$ exiting\n";
@@ -273,7 +273,7 @@ sub run_parent {
   my $id;
 
   $self->log(4,"Parent ready for children.\n");
-  
+
   ### prepare to read from children
   local *_READ = $prop->{_READ};
   _READ->autoflush(1);
@@ -302,7 +302,7 @@ sub run_parent {
 		   $self->delete_child( $chld );
                  }
                },
-### uncomment this area to allow SIG USR1 to give some runtime debugging               
+### uncomment this area to allow SIG USR1 to give some runtime debugging
 #               USR1 => sub {
 #                 require "Data/Dumper.pm";
 #                 print Data::Dumper::Dumper($self);
@@ -330,7 +330,7 @@ sub run_parent {
 
       ### preforking server data
       if ($fh == \*_READ) {
-	
+
         ### read a line
         my $line = <$fh>;
         next if not defined $line;
@@ -400,9 +400,9 @@ sub coordinate_children {
   ### need more min_servers
   if( $total < $prop->{min_servers} ){
     $self->run_n_children( $prop->{min_servers} - $total );
-    
+
   ### need more min_spare_servers (up to max_servers)
-  }elsif( $prop->{tally}->{waiting} < $prop->{min_spare_servers} 
+  }elsif( $prop->{tally}->{waiting} < $prop->{min_spare_servers}
           && $total < $prop->{max_servers} ){
     my $n1 = $prop->{min_spare_servers} - $prop->{tally}->{waiting};
     my $n2 = $prop->{max_servers} - $total;
@@ -424,15 +424,15 @@ sub coordinate_children {
         my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
         my $n2 = $total - $prop->{min_servers};
         $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-      }      
+      }
 
     ### how did this happen?
     }elsif( $total > $prop->{max_servers} ){
       $self->kill_n_children( $total - $prop->{max_servers} );
-      
+
     }
   }
-  
+
   ### periodically make sure children are alive
   if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
     $prop->{last_checked_for_dead} = $time;
@@ -527,7 +527,7 @@ L<Net::Server::PreForkSimple>.
   serialize           (flock|semaphore|pipe)  undef
   # serialize defaults to flock on multi_port or on Solaris
   lock_file           "filename"              POSIX::tmpnam
-                                            
+
   check_for_dead      \d+                     30
   check_for_waiting   \d+                     10
 
@@ -619,7 +619,7 @@ white space are ignored.
 
   ### enable child communication ?
   # child_communication
- 
+
   #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
@@ -634,8 +634,9 @@ C<max_spare_servers>, and C<max_servers>.
 
 =head1 HOOKS
 
-There is one additional hook in the PreFork server.
-See L<Net::Server::PreForkSimple> for other hooks.
+The PreFork server has the following hooks in addition
+to the hooks provided by PreForkSimple.
+See L<Net::Server::PreForkSimple>.
 
 =over 4
 
