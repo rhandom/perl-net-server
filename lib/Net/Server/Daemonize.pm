@@ -426,6 +426,7 @@ Program flow, concepts and initial work.
 Paul Seamons <perl@seamons.com>
 
 Code rework and componentization.
+Ongoing maintainer.
 
 =head1 LICENSE
 

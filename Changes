@@ -1,5 +1,38 @@
 Revision history for Perl extension Net::Server.
 
+0.70  Aug 17 10:34 2001
+
+        - Added support for different protocols to Net::Server.
+            This implemented via Net::Server::Proto and its classes.
+            Included Net::Server::Proto::TCP,
+                Net::Server::Proto::UDP,
+                Net::Server::Proto::UNIX,
+                and experimental Net::Server::Proto::SSL.
+            TCP, UDP, and UNIX are fully tested.
+
+        - Added Net::Server::Daemonize.
+        - Allows for modular daemonization/forking routines.
+
+        - Allowed for configure to be called multiple times.
+            Configure method can be called at later times during
+            server startup.  Arguments are cached.  This allows
+            new protocols to add arguments without modification
+            to Net::Server base class.
+
+        - Updated perldocs.
+            No more protocol specific information in central perldoc.
+            More information on new protocol layout.
+
+        - Added t/UNIX_test.t
+        - Added examples/connection_test.pl
+
+        - UNIX, UDP, and TCP types are fully operational.
+            Server can bind to all three types.
+            Properties are determined according to type.
+            Server can HUP on all three types.
+ 
+        - SSL type added, but experimental (read "extremely alpha")
+
 0.65  Jul 05 22:01 2001
         - Modified test suite to no longer depend upon
                 hard coded ports.  Improves test reliability
