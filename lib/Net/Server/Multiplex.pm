@@ -21,7 +21,7 @@ use strict;
 use vars qw($VERSION @ISA);
 use Net::Server;
 use Net::Server::SIG qw(register_sig check_sigs);
-use IO::Multiplex 1.01;
+use IO::Multiplex 1.02;
 use Carp qw(confess);
 
 $VERSION = $Net::Server::VERSION;
@@ -476,7 +476,7 @@ you find.
 
 =head1 AUTHOR
 
-Copyright (C) 2001, Rob Brown <rob@roobik.com>
+Copyright (C) 2001, Rob Brown <bbb@cpan.org>
 
 This package may be distributed under the terms of either the
 GNU General Public License
@@ -490,5 +490,6 @@ All rights reserved.
 L<Net::Server> by Paul Seamons <paul@seamons.com>,
 
 L<IO::Multiplex> by Bruce Keeler <bruce@gridpoint.com>
+and Liraz Siri <liraz_siri@usa.net>.
 
 =cut
