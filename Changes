@@ -1,6 +1,7 @@
 Revision history for Perl extension Net::Server.
 
 0.86  Nov 06 2003
+        - Changed maintainer to bbb@cpan.org (Rob Brown).
         - Patch to fix Net::Server::Daemonize setuid bug:
           http://www.ijs.si/software/amavisd/net-server.patch
         - Add a fix in the argument handling of configure
