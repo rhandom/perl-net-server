@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.71';
+$VERSION = '0.72';
 
 ### program flow
 sub run {
@@ -278,7 +278,12 @@ sub pre_bind {
   my $self = shift;
   my $prop = $self->{server};
 
-  $self->log(2,$self->log_time ." ". ref($self) ." starting! pid($$)");
+  my $ref   = ref($self);
+  no strict 'refs';
+  my $super = ${"${ref}::ISA"}[0];
+  use strict 'refs';
+  my $ns_type = $ref eq $super ? '' : " (type $super)";
+  $self->log(2,$self->log_time ." ". ref($self) .$ns_type. " starting! pid($$)");
 
   ### set a default port, host, and proto
   if( ! defined( $prop->{port} )
@@ -363,7 +368,7 @@ sub bind {
   }
 
   ### if more than one port we'll need to select on it
-  if( @{ $prop->{port} } > 1 ){
+  if( @{ $prop->{port} } > 1 || $prop->{multi_port} ){
     $prop->{multi_port} = 1;
     $prop->{select} = IO::Select->new();
     foreach ( @{ $prop->{sock} } ){
@@ -518,9 +523,10 @@ sub accept {
 
     ### with more than one port, use select to get the next one
     if( defined $prop->{multi_port} ){
-
+      
       ### anything server type specific
       $sock = $self->accept_multi_port;
+      next unless $sock; # keep trying for the rest of retries
       
       ### last one if HUPed
       return 0 if defined $prop->{_HUP};
@@ -534,7 +540,7 @@ sub accept {
 
     ### make sure we got a good sock
     if( not defined $sock ){
-      $self->fatal("Recieved a bad sock!");
+      $self->fatal("Received a bad sock!");
     }
 
     ### receive a udp packet
@@ -580,6 +586,9 @@ sub accept_multi_port {
 
   ### this will block until a client arrives
   my @waiting = $prop->{select}->can_read();
+
+  ### if no sockets, return failure
+  return undef unless @waiting;
 
   ### choose a socket
   return $waiting[ rand(@waiting) ];

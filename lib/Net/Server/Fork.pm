@@ -21,13 +21,29 @@ package Net::Server::Fork;
 
 use strict;
 use vars qw($VERSION @ISA);
-use Net::Server;
+use Net::Server ();
+use IO::Select ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
 ### fall back to parent methods
 @ISA = qw(Net::Server);
 
+
+### override-able options for this package
+sub options {
+  my $self = shift;
+  my $prop = $self->{server};
+  my $ref  = shift;
+
+  $self->SUPER::options($ref);
+
+  foreach ( qw(max_servers check_for_dead) ){
+    $prop->{$_} = undef unless exists $prop->{$_};
+    $ref->{$_} = \$prop->{$_};
+  }
+  
+}
 
 ### make sure some defaults are set
 sub post_configure {
@@ -41,11 +57,14 @@ sub post_configure {
   $prop->{check_for_dead} = 30
     unless defined $prop->{check_for_dead};
 
+  ### what are the max number of processes
+  $prop->{max_servers} = 25
+    unless defined $prop->{max_servers};
+
   ### I need to know who is the parent
   $prop->{ppid} = $$;
 
 }
-
 
 ### loop, fork, and process connections
 sub loop {
@@ -58,27 +77,27 @@ sub loop {
   my $last_checked_for_dead = time;
 
   ### this is the main loop
-  while( $self->accept ){
-
+  while( 1 ){
+    
+    $self->accept;
+    
     my $pid = fork;
-      
+
     ### trouble
     if( not defined $pid ){
       $self->log(1,"Bad fork [$!]");
       sleep(5);
-        
+      
     ### parent
     }elsif( $pid ){
-
       close($prop->{client});
       $prop->{children}->{$pid} = time;
-        
+      
     ### child
     }else{
-
       $self->run_client_connection;
       exit;
-
+      
     }
 
     ### periodically see which children are alive
