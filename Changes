@@ -2,9 +2,10 @@ Revision history for Perl extension Net::Server.
 
 0.81  Nov 19 12:39 2001
         - Fix Net::Server::Fork - Bug in forking server
-          once parent has reached max_servers caused
+          once parent has reached max_servers caused.
           slow infinite loop and no processing of connections.
         - Some perldoc cleanups
+        - Don't require IO::Multiplex for base test.
 
 0.80  Nov 14 09:30 2001
         - Fix Net::Server::Multiplex::MUX::mux_eof
