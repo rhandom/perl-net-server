@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.82';
+$VERSION = '0.83';
 
 ### program flow
 sub run {
@@ -467,8 +467,13 @@ sub post_bind {
       set_uid( $prop->{user} );
     }
   };
-  $self->fatal( $@ ) if $@;
-
+  if( $@ ){
+    if( $< == 0 || $> == 0 ){
+      $self->fatal( $@ );
+    }else{
+      $self->log(2,$@);
+    }
+  }
 
   ### record number of request
   $prop->{requests} = 0;
