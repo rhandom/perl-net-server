@@ -225,7 +225,7 @@ sub mux_timeout {
   my $fh   = shift;
 
   if ( my $check = $self->{net_server}->{server}->{check_for_dequeue} ) {
-    $self->run_dequeue();
+    $self->{net_server}->run_dequeue();
     $mux->set_timeout( $fh, $check );
   } else {
     $self->_link_stdout($mux, $fh);
