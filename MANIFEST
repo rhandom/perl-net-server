@@ -21,6 +21,7 @@ t/Server_MultiType.t            Test script for Net::Server::MultiType
 t/Server_PreFork.t              Test script for Net::Server::PreFork
 t/Server_Single.t               Test script for Net::Server::Single
 t/UDP_test.t                    Test script for UDP connection
+t/UNIX_test.t                   Test script for UNIX Socket connections
 examples/httpd                  Sample http daemon
 examples/LoadTester.pl          Sample script to hit upon a running server
 examples/udp_server.pl          Sample UDP server
