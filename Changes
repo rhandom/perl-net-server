@@ -8,6 +8,7 @@ Revision history for Perl extension Net::Server.
                   off of Net::Server::PreForkSimple.  No
                   functional changes.
                 - Fixed a bug in Net::Server::Daemonize::set_user.
+                - Fixed syntax bug on 5.005_03 in Proto's
 
 0.75  Aug 23 10:49
         - Both Net::Server::Fork and Net::Server::PreFork are

@@ -172,8 +172,8 @@ sub hup_string {
 sub show {
   my $sock = shift;
   my $t = "Ref = \"" .ref($sock) . "\"\n";
-  foreach ( qw(NS_proto NS_unix_path NS_unix_type) ){
-    $t .= "  $_ = \"" .$sock->$_."\"\n";
+  foreach my $prop ( qw(NS_proto NS_unix_path NS_unix_type) ){
+    $t .= "  $prop = \"" .$sock->$prop()."\"\n";
   }
   $t =~ s/"1"/SOCK_STREAM/;
   $t =~ s/"2"/SOCK_DGRAM/;

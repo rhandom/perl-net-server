@@ -677,8 +677,8 @@ THANKS
     me in the right direction for determining the protocol used on a socket
     connection.
 
-    Thanks to Jeremy Howard <jhoward@optimal-decisions.com> for numerous
-    suggestions and for work on Net::Server::Daemonize.
+    Thanks to Jeremy Howard <j+daemonize@howard.fm> for numerous suggestions
+    and for work on Net::Server::Daemonize.
 
 SEE ALSO
     Please see also the Net::Server::Fork manpage, the Net::Server::INET
