@@ -428,12 +428,12 @@ sub post_bind {
       push @chown_files, $sock->NS_unix_path
         if$sock->NS_proto eq 'UNIX';
     }
-    if( $prop->{pid_file_unlink} ){
+#    if( $prop->{pid_file_unlink} ){
       push @chown_files, $prop->{pid_file};
-    }
-    if( $prop->{log_file_unlink} ){
+#    }
+#    if( $prop->{log_file_unlink} ){
       push @chown_files, $prop->{log_file};
-    }
+#    }
     my $uid = $prop->{user};
     my $gid = (split(/\ /,$prop->{group}))[0];
     foreach my $file (@chown_files){
