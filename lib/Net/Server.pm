@@ -846,6 +846,9 @@ sub server_close{
   my $self = shift;
   my $prop = $self->{server};
 
+  ### allow for customizable closing
+  $self->pre_server_close_hook();
+
   $SIG{INT} = 'DEFAULT';
 
   $self->log(2,$self->log_time . " Server closing!");
