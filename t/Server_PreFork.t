@@ -144,6 +144,7 @@ if( $fork && $pipe){
                              min_servers  => 1,
                              min_spare_servers => 0,
                              max_requests => 2,
+                             child_communication => 1,
                              );
 
       exit;

@@ -45,6 +45,7 @@ sub options {
                min_spare_servers max_spare_servers
                spare_servers
                check_for_waiting
+               child_communication
                ) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -147,11 +148,14 @@ sub kill_n_children {
 
   foreach (keys %{ $prop->{children} }){
     next unless $prop->{children}->{$_}->{status} eq 'waiting';
-    if( ! kill('HUP',$_) ){
-      $self->delete_child( $_ );
-      next;
-    }
-    last if --$n <= 0;
+
+    $n --;
+    $prop->{tally}->{waiting} --;
+
+    ### try to kill the child
+    kill('HUP',$_) or $self->delete_child( $_ );
+
+    last if $n <= 0;
   }
 }
 
@@ -197,7 +201,7 @@ sub run_n_children {
     ### child
     }else{
       if( $prop->{unix_sockets} ){
-        $self->{server_sock} = $childsock;
+        $prop->{parent_sock} = $childsock;
       }
       $self->run_child;
 
@@ -307,7 +311,7 @@ sub run_parent {
     ## Normally it is not good to do selects with
     ## getline or <$fh> but this is controlled output
     ## where everything that comes through came from us.
-    my @fh = $prop->{child_select}->can_read(10);
+    my @fh = $prop->{child_select}->can_read($prop->{check_for_waiting});
     if( &check_sigs() ){
       last if $prop->{_HUP};
     }
@@ -349,7 +353,7 @@ sub run_parent {
 
       ### user defined handler
       }else{
-        $self->child_is_talking($fh);
+        $self->child_is_talking_hook($fh);
       }
     }
 
@@ -429,7 +433,10 @@ sub coordinate_children {
     $prop->{last_checked_for_dead} = $time;
     foreach (keys %{ $prop->{children} }){
       ### see if the child can be killed
-      kill(0,$_) or $self->delete_child($_);
+      if( ! kill(0,$_) ){
+        $self->delete_child($_);
+        $prop->{tally}->{ $prop->{children}->{status} } --;
+      }
     }
   }
 
@@ -456,7 +463,7 @@ sub coordinate_children {
 ### allow for other process to tie in to the parent read
 sub parent_read_hook {}
 
-sub child_is_talking {}
+sub child_is_talking_hook {}
 
 1;
 
@@ -505,22 +512,24 @@ Net::Server::PreFork contains several other configurable
 parameters.  You really should also see
 L<Net::Server::PreForkSimple>.
 
-  Key               Value                   Default
-  min_servers       \d+                     5
-  min_spare_servers \d+                     2
-  max_spare_servers \d+                     10
-  max_servers       \d+                     50
-  max_requests      \d+                     1000
+  Key                 Value                   Default
+  min_servers         \d+                     5
+  min_spare_servers   \d+                     2
+  max_spare_servers   \d+                     10
+  max_servers         \d+                     50
+  max_requests        \d+                     1000
 
-  serialize         (flock|semaphore|pipe)  undef
+  serialize           (flock|semaphore|pipe)  undef
   # serialize defaults to flock on multi_port or on Solaris
-  lock_file         "filename"              POSIX::tmpnam
+  lock_file           "filename"              POSIX::tmpnam
                                             
-  check_for_dead    \d+                     30
-  check_for_waiting \d+                     10
+  check_for_dead      \d+                     30
+  check_for_waiting   \d+                     10
 
-  max_dequeue       \d+                     undef
-  check_for_dequeue \d+                     undef
+  max_dequeue         \d+                     undef
+  check_for_dequeue   \d+                     undef
+
+  child_communication 1                       undef
 
 =over 4
 
@@ -549,6 +558,15 @@ apply to dequeue processes.
 
 Seconds to wait before checking to see if we can kill
 off some waiting servers.
+
+=item child_communication
+
+Enable child communication to parent via unix sockets.  If set
+to true, will let children write to the socket contained in
+$self->{server}->{parent_sock}.  The parent will be notified through
+child_is_talking_hook where the first argument is the socket
+to the child.  The child's socket is stored in
+$self->{server}->{children}->{$child_pid}->{sock}.
 
 =back
 
@@ -593,6 +611,9 @@ white space are ignored.
 
   ### reverse lookups ?
   # reverse_lookups on
+
+  ### enable child communication ?
+  # child_communication
  
   #-------------- file test.conf --------------
 
@@ -618,6 +639,12 @@ See L<Net::Server::PreForkSimple> for other hooks.
 This hook occurs any time that the parent reads information
 from the child.  The line from the child is sent as an
 argument.
+
+=item C<$self-E<gt>child_is_talking_hook()>
+
+This hook occurs if child_communication is true and the child
+has written to $self->{server}->{parent_sock}.  The first argument
+will be the open socket to the child.
 
 =back
 

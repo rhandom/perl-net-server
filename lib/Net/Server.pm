@@ -5,7 +5,7 @@
 #  $Id$
 #
 #  Copyright (C) 2001, Paul T Seamons
-#                      paul@seamons.com
+#                      paul at seamons.com
 #                      http://seamons.com/
 #
 #  This package may be distributed under the terms of either the
@@ -1172,8 +1172,9 @@ sub delete_child {
   my $pid  = shift;
   my $prop = $self->{server};
 
-  if( $prop->{unix_sockets} ){
-    $prop->{chld_select}->remove( $prop->{children}->{$pid}->{sock} );
+  ### prefork server check to clear child communication
+  if( $prop->{child_communication} ){
+    $prop->{child_select}->remove( $prop->{children}->{$pid}->{sock} );
     $prop->{children}->{$pid}->{sock}->close();
   }
   
@@ -2026,11 +2027,11 @@ servers to user Net::Server as a base layer.
 
 =head1 AUTHOR
 
-Paul T. Seamons paul@seamons.com
+Paul T. Seamons <paul at seamons.com>
 
 =head1 THANKS
 
-Thanks to Rob Brown <rbrown@about-inc.com> for help with
+Thanks to Rob Brown <rbrown at about-inc.com> for help with
 miscellaneous concepts such as tracking down the
 serialized select via flock ala Apache and the reference
 to IO::Select making multiport servers possible.  And for
@@ -2040,7 +2041,7 @@ exec (making HUP possible).
 Thanks to Jonathan J. Miner <miner@doit.wisc.edu> for
 patching a blatant problem in the reverse lookups.
 
-Thanks to Bennett Todd <bet@rahul.net> for
+Thanks to Bennett Todd <bet at rahul.net> for
 pointing out a problem in Solaris 2.5.1 which does not
 allow multiple children to accept on the same port at
 the same time.  Also for showing some sample code
@@ -2051,8 +2052,11 @@ Thanks to I<traveler> and I<merlyn> from http://perlmonks.org
 for pointing me in the right direction for determining
 the protocol used on a socket connection.
 
-Thanks to Jeremy Howard <j+daemonize@howard.fm> for
+Thanks to Jeremy Howard <j+daemonize at howard.fm> for
 numerous suggestions and for work on Net::Server::Daemonize.
+
+Thanks to Vadim <vadim at hardison.net> for patches to 
+implement parent/child communication on PreFork.pm.
 
 =head1 SEE ALSO
 
@@ -2067,7 +2071,7 @@ L<Net::Server::Single>
 =head1 COPYRIGHT
 
   Copyright (C) 2001, Paul T Seamons
-                      paul@seamons.com
+                      paul at seamons.com
                       http://seamons.com/
 
   This package may be distributed under the terms of either the
