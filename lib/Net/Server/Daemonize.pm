@@ -258,29 +258,40 @@ sub daemonize ($$$) {
 
   check_pid_file( $pid_file );
 
-  set_user($user, $group);
+
+  my $uid = get_uid( $user );
+  my $gid = get_gid( $group ); # returns list of groups
+  $gid = (split(/\ /,$gid))[0];
+
 
   my $pid = safe_fork();
+
 
   ### parent process should do the pid file and exit
   if( $pid ){
 
-    # Record child pid for killing later
-    create_pid_file( $pid_file );
-
-    # Kill the parent process
     $pid && exit(0);
 
 
-  ### child should close all input/output and separate
-  ### from the parent process group
+  ### child process will continue on
   }else{
+
+    create_pid_file( $pid_file );
   
+    ### make sure we can remove the file later
+    chown($uid,$gid,$pid_file);
+
+    ### become another user and group
+    set_user($uid, $gid);
+
+    ### close all input/output and separate
+    ### from the parent process group
     open STDIN,  '</dev/null' or die "Can't open STDIN from /dev/null: [$!]\n";
     open STDOUT, '>/dev/null' or die "Can't open STDOUT to /dev/null: [$!]\n";
     open STDERR, '>&STDOUT'   or die "Can't open STDERR to STDOUT: [$!]\n";
 
     ### Change to root dir to avoid locking a mounted file system
+    ### does this mean to be chroot ?
     chdir '/'                 or die "Can't chdir to \"/\": [$!]";
 
     ### Turn process into session leader, and ensure no controlling terminal
@@ -306,24 +317,130 @@ sub HUNTSMAN {
 }
 
 
-
-
 1;
 
 __END__
 
+=head1 NAME
+
+Net::Server::Daemonize - bdpf Safe fork and daemonization utilities
+
+=head1 SYNOPSIS
+
+  use Net::Server::Daemonize qw(daemonize);
+
+  daemonize(
+    'nobody',                 # User
+    'nobody',                 # Group 
+    '/var/state/mydaemon.pid' # Path to PID file
+  );
+
+=head1 DESCRIPTION
+
+This module is intended to let you simply and safely daemonize
+your server on systems supporting the POSIX module. This means
+that your Perl script runs in the background, and it's process ID
+is stored in a file so you can easily stop it later.
+
+=head1 EXPORTED FUNCTIONS
+
+=over 4
+
+=item daemonize
+
+Main routine.  Arguments are user (or userid), group (or group id
+or space delimited list of groups), and pid_file (path to file).
+This routine will check on the pid file, safely fork, create the 
+pid file (storing the pid in the file), become another user and
+group, close STDIN, STDOUT and STDERR, separate from the process
+group (become session leader), and install $SIG{INT} to remove
+the pid file.  In otherwords - daemonize.  All errors result in
+a die.
+
+=item safe_fork
+
+Block SIGINT during fork.  No arguments.  Returns pid of forked
+child.  All errors result in a die.
+
+=item set_user
+
+Become another user and group.  Arguments are user (or userid)
+and group (or group id or space delimited list of groups).
+
+=item set_uid
+
+Become another user.  Argument is user (or userid).  All errors die.
+
+=item set_gid
+
+Become another group.  Arguments are groups (or group ids or space
+delimited list of groups or group ids).  All errors die.
+
+=item get_uid
+
+Find the uid.  Argument is user (userid returns userid).  Returns
+userid.  All errors die.
+
+=item get_gid
+
+Find the gids.  Arguments are groups or space delimited list of groups.
+All errors die.
+
+=item is_root_user
+
+Determine if the process is running as root.  Returns 1 or undef.
+
+=item check_pid_file
+
+Arguments are pid_file (full path to pid_file).  Checks for existance of
+pid_file.  If file exists, open it and determine if the process
+that created it is still running.  This is done first by checking for
+a /proc file system and second using a "ps" command (BSD syntax).  (If
+neither of these options exist it assumed that the process has ended)
+If the process is still running, it aborts.  Otherwise, returns true.
+All errors die.
+
+=item create_pid_file.
+
+Arguments are pid_file (full path to pid_file).  Calls check_pid_file.
+If it is successful (no pid_file exists), creates a pid file and stores
+$$ in the file.
+
+=item unlink_pid_file
+
+Does just that.
+
 =back
-
-=head1 AUTHOR
-
-(c) 2001 Jeremy Howard <j+daemonize@howard.fm>
-
-=head1 LICENSE
-
-This module is licensed under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
+L<Net::Server>.
 L<Net::Daemon>, The Perl Cookbook Recipe 17.15.
+
+=head1 AUTHORS
+
+Jeremy Howard <j+daemonize@howard.fm>
+
+Program flow, concepts and initial work.
+
+Paul Seamons <perl@seamons.com>
+
+Code rework and componentization.
+
+=head1 LICENSE
+
+  Copyright (C) 2001, Jeremy Howard
+                      j+daemonize@howard.fm
+
+                      Paul T Seamons
+                      perl@seamons.com
+                      http://seamons.com/
+  
+  This package may be distributed under the terms of either the
+  GNU General Public License 
+    or the
+  Perl Artistic License
+
+  All rights reserved.
 
 =cut
