@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+0.71  Aug 17 10:34 2001
+        - Die on failed change to another user or group.
+            WARNING: No longer defaults to nobody.nobody.
+            Defaults to currently running user and group.
+        - Various cleanups with file removal.
+        - All files to be removed are now chowned.
+
 0.70  Aug 17 10:34 2001
 
         - Added support for different protocols to Net::Server.

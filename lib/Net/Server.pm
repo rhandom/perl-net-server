@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.70';
+$VERSION = '0.71';
 
 ### program flow
 sub run {
@@ -218,9 +218,7 @@ sub post_configure {
 
   }
 
-  ### check for an existing pid_file
-  ### This check is inconsistant with the chroot option,
-  ### however it doesn't interfere either.
+  ### see if a daemon is already running
   if( defined $prop->{pid_file} ){
     if( ! eval{ check_pid_file( $prop->{pid_file} ) } ){
       $self->fatal( $@ );
@@ -243,7 +241,7 @@ sub post_configure {
 
   ### completely remove myself from parent process
   if( defined($prop->{setsid}) ){
-    POSIX::setsid();
+    &POSIX::setsid();
   }
 
   ### completetly daemonize by closing STDERR (should be done after fork)
@@ -251,6 +249,17 @@ sub post_configure {
     open STDERR, '>&_SERVER_LOG' || die "Can't open STDERR to _SERVER_LOG [$!]";
   }elsif( defined($prop->{setsid}) ){
     open STDERR, '>&STDOUT' || die "Can't open STDERR to STDOUT [$!]";
+  }
+
+  ### allow for a pid file (must be done after backgrounding and chrooting)
+  ### Remove of this pid may fail after a chroot to another location...
+  ### however it doesn't interfere either.
+  if( defined $prop->{pid_file} ){
+    if( eval{ create_pid_file( $prop->{pid_file} ) } ){
+      $prop->{pid_file_unlink} = 1;
+    }else{
+      $self->fatal( $@ );
+    }
   }
 
   ### make sure that allow and deny look like array refs
@@ -380,45 +389,57 @@ sub post_bind {
 
   ### figure out the group(s) to run as
   if( ! defined $prop->{group} ){
-    $self->log(1,"Group Not Defined.  Defaulting to 'nobody'\n");
-    $prop->{group}  = 'nobody';
-  }
-  if( $prop->{group} =~ /^(\w+( \w+)*)$/ ){
-    $self->log(2,"Setting group to $1\n");
-    $prop->{group} = eval{ get_gid( $1 ) };
-    $self->fatal( $@ ) if $@;
+    $self->log(1,"Group Not Defined.  Defaulting to EGID '$)'\n");
+    $prop->{group}  = $);
   }else{
-    $self->fatal("Invalid group \"$prop->{group}\"");
+    if( $prop->{group} =~ /^(\w+( \w+)*)$/ ){
+      $prop->{group} = eval{ get_gid( $1 ) };
+      $self->fatal( $@ ) if $@;
+    }else{
+      $self->fatal("Invalid group \"$prop->{group}\"");
+    }
   }
 
 
   ### figure out the user to run as
   if( ! defined $prop->{user} ){
-    $self->log(1,"User Not Defined.  Defaulting to 'nobody'\n");
-    $prop->{user}  = 'nobody';
-  }
-  if( $prop->{user} =~ /^(\w+)$/ ){
-    $self->log(2,"Setting user to $1\n");
-    $prop->{user} = eval{ get_uid( $1 ) };
-    $self->fatal( $@ ) if $@;
+    $self->log(1,"User Not Defined.  Defaulting to EUID '$>'\n");
+    $prop->{user}  = $>;
   }else{
-    $self->fatal("Invalid user \"$prop->{user}\"");
+    if( $prop->{user} =~ /^(\w+)$/ ){
+      $prop->{user} = eval{ get_uid( $1 ) };
+      $self->fatal( $@ ) if $@;
+    }else{
+      $self->fatal("Invalid user \"$prop->{user}\"");
+    }
   }
 
 
   ### chown any files or sockets that we need to
-  my $uid = $prop->{user};
-  my $gid = (split(/\ /,$prop->{group}))[0];
-  foreach my $sock ( @{ $prop->{sock} } ){
-    next unless $sock->NS_proto eq 'UNIX';
-    chown($uid,$gid,$sock->NS_unix_path)
-      or $self->fatal("Couldn't chown ".$sock->NS_unix_path." [$!]\n");
+  if( $prop->{group} ne $) || $prop->{user} ne $> ){
+    my @chown_files = ();
+    foreach my $sock ( @{ $prop->{sock} } ){
+      push @chown_files, $sock->NS_unix_path
+        if$sock->NS_proto eq 'UNIX';
+    }
+    if( $prop->{pid_file_unlink} ){
+      push @chown_files, $prop->{pid_file};
+    }
+    if( $prop->{log_file_unlink} ){
+      push @chown_files, $prop->{log_file};
+    }
+    my $uid = $prop->{user};
+    my $gid = (split(/\ /,$prop->{group}))[0];
+    foreach my $file (@chown_files){
+      chown($uid,$gid,$file)
+        or $self->fatal("Couldn't chown \"$file\" [$!]\n");
+    }
   }
-  
 
+  
   ### perform the chroot operation
-    if( defined $prop->{chroot} ){
-      if( ! -d $prop->{chroot} ){
+  if( defined $prop->{chroot} ){
+    if( ! -d $prop->{chroot} ){
       $self->fatal("Specified chroot \"$prop->{chroot}\" doesn't exist.\n");
     }else{
       $self->log(2,"Chrooting to $prop->{chroot}\n");
@@ -430,20 +451,16 @@ sub post_bind {
   
   ### drop privileges
   eval{
-    set_gid( $prop->{group} );
-    set_uid( $prop->{user} );
+    if( $prop->{group} ne $) ){
+      $self->log(2,"Setting gid to \"$prop->{group}\"");
+      set_gid( $prop->{group} );
+    }
+    if( $prop->{user} ne $> ){
+      $self->log(2,"Setting uid to \"$prop->{user}\"");
+      set_uid( $prop->{user} );
+    }
   };
   $self->fatal( $@ ) if $@;
-
-
-  ### allow for a pid file (must be done after backgrounding and chrooting)
-  if( defined $prop->{pid_file} ){
-    if( eval{ create_pid_file( $prop->{pid_file} ) } ){
-      $prop->{pid_file_unlink} = 1;
-    }else{
-      $self->fatal( $@ );
-    }
-  }
 
 
   ### record number of request
@@ -831,12 +848,12 @@ sub server_close{
   if( defined $prop->{lock_file}
       && -e $prop->{lock_file}
       && defined $prop->{lock_file_unlink} ){
-    unlink $prop->{lock_file};
+    unlink $prop->{lock_file} || warn "Couldn't unlink \"$prop->{lock_file}\" [$!]";
   }
   if( defined $prop->{pid_file}
       && -e $prop->{pid_file} 
       && defined $prop->{pid_file_unlink} ){
-    unlink $prop->{pid_file};
+    unlink $prop->{pid_file} || warn "Couldn't unlink \"$prop->{pid_file}\" [$!]";
   }
 
   ### HUP process

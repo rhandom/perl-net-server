@@ -29,7 +29,7 @@ use vars qw( @ISA @EXPORT_OK $VERSION );
 use Exporter ();
 use POSIX qw(SIGINT SIG_BLOCK SIG_UNBLOCK);
 
-$VERSION = "0.03";
+$VERSION = "0.04";
 
 @ISA = qw(Exporter);
 
@@ -200,6 +200,9 @@ sub get_gid {
 sub set_uid {
   my $uid = get_uid( shift() );
   $< = $> = $uid;
+  if( $< != $uid ){
+    die "Couldn't become uid \"$uid\"\n";
+  }
   POSIX::setuid( $uid ) || die "Couldn't POSIX::setuid to \"$uid\" [$!]\n";
   return 1;
 }
@@ -211,6 +214,10 @@ sub set_gid {
   my $gid  = (split(/\s+/,$gids))[0];
   $) = $gids;
   $( = $gid;
+  my $result = (split(/\s+/,$())[0];
+  if( $result != $gid ){
+    die "Couldn't become gid \"$gid\" ($result)\n";
+  }
   POSIX::setgid( $gid ) || die "Couldn't POSIX::setgid to \"$gid\" [$!]\n";
   return 1;
 }
