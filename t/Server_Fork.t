@@ -113,7 +113,9 @@ if( $fork && $pipe ){
     }else{
 
       close STDERR;
-      Net::Server::Test->run(port => $ports[0]);
+      Net::Server::Test->run(port => $ports[0],
+                             setsid => 1,
+                             );
       exit;
 
     }

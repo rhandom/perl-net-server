@@ -137,8 +137,11 @@ if( $fork && $pipe){
       close STDERR;
       Net::Server::Test->run(port => "localhost:$ports[0]",
                              port => $ports[1],
+                             setsid => 1,
                              min_servers  => 1,
-                             max_requests => 1);
+                             min_spare_servers => 0,
+                             max_requests => 2);
+
       exit;
 
     }
