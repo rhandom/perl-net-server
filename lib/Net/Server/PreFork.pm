@@ -41,8 +41,10 @@ sub options {
 
   $self->SUPER::options($ref);
 
-  foreach ( qw(min_servers max_servers spare_servers max_requests max_dequeue
-               check_for_dead check_for_waiting check_for_dequeue
+  foreach ( qw(min_servers max_servers
+               min_spare_servers max_spare_servers
+               spare_servers max_requests max_dequeue
+               check_for_dead check_for_dequeue
                lock_file serialize) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -55,21 +57,48 @@ sub post_configure {
   my $self = shift;
   my $prop = $self->{server};
 
+  ### legacy check
+  if( defined($prop->{spare_servers}) ){
+    die "The Net::Server::PreFork argument \"spare_servers\" has been
+deprecated as of version '0.75' in order to implement greater child
+control.  The new arguments to take \"spare_servers\" place are
+\"min_spare_servers\" and \"max_spare_servers\".  The defaults are 5
+and 15 respectively.  Please remove \"spare_servers\" from your
+argument list.  See the Perldoc Net::Server::PreFork for more
+information.
+";
+  }
+
   ### let the parent do the rest
   ### must do this first so that ppid reflects backgrounded process
   $self->SUPER::post_configure;
 
   ### some default values to check for
   my $d = {min_servers   => 5,      # min num of servers to always have running
-           max_servers   => 10,     # max num of servers to run
-           spare_servers => 1,      # num of extra servers to have lying around
-           max_requests  => 1000,   # num of requests for each child to handle
-           check_for_dead    => 30, # how often to see if children are alive
-           check_for_waiting => 20, # how often to see if extra children exist
+           max_servers   => 50,     # max num of servers to run
+           min_spare_servers => 2,  # min num of servers just sitting there
+           max_spare_servers => 10, # max num of servers just sitting there
+           max_requests      => 1000, # num of requests for each child to handle
+           check_for_dead    => 60,   # how often to see if children are alive
            };
   foreach (keys %$d){
     $prop->{$_} = $d->{$_}
     unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
+  }
+
+  if( $prop->{min_spare_servers} > $prop->{max_spare_servers} ){
+    $self->fatal("Error: \"min_spare_servers\" must be less than "
+                 ."\"max_spare_servers\"");
+  }
+
+  if( $prop->{min_spare_servers} >= $prop->{min_servers} ){
+    $self->fatal("Error: \"min_spare_servers\" must be less than "
+                 ."\"min_servers\"");
+  }
+
+  if( $prop->{max_spare_servers} >= $prop->{max_servers} ){
+    $self->fatal("Error: \"max_spare_servers\" must be less than "
+                 ."\"max_servers\"");
   }
 
   ### we will need to force a select handle
@@ -147,6 +176,12 @@ sub loop {
 
   $self->log(3,"Beginning prefork ($prop->{min_servers} processes)\n");
 
+  ### keep track of the status
+  $prop->{tally} = {time       => time(),
+                    waiting    => 0,
+                    processing => 0,
+                    dequeue    => 0};
+
   ### start up the children
   $self->run_n_children( $prop->{min_servers} );
 
@@ -155,18 +190,29 @@ sub loop {
   
 }
 
+### sub to kill of a specified number of children
+sub kill_n_children {
+  my $self = shift;
+  my $prop = $self->{server};
+  my $n    = shift;
+
+  $self->log(4,"Killing \"$n\" children");
+
+  foreach (keys %{ $prop->{children} }){
+    next unless $prop->{children}->{$_} eq 'waiting';
+    last unless $n--;
+    kill(1,$_);
+  }
+}
+
 ### subroutine to start up a specified number of children
 sub run_n_children {
   my $self  = shift;
   my $prop  = $self->{server};
   my $n     = shift;
-  my $total = scalar keys %{ $prop->{children} };
-  
-  ### don't start more than we're allowed
-  if( $n > $prop->{max_servers} - $total ){
-    $n = $prop->{max_servers} - $total;
-  }
 
+  $self->log(4,"Starting \"$n\" children");
+  
   for( 1..$n ){
     my $pid = fork;
 
@@ -177,6 +223,7 @@ sub run_n_children {
     ### parent
     }elsif( $pid ){
       $prop->{children}->{$pid} = 'waiting';
+      $prop->{tally}->{waiting} ++;
 
     ### child
     }else{
@@ -198,20 +245,15 @@ sub run_child {
 
   $self->log(4,"Child Preforked ($$)\n");
   delete $prop->{children};
+  delete $prop->{tally};
 
   $self->child_init_hook;
-
-  ### tell the parent that we are waiting
-  *_WRITE = $prop->{_WRITE};
-  _WRITE->autoflush(1);
-  print _WRITE "$$ waiting\n";
 
   ### let the parent shut me down
   $prop->{connected} = 0;
   $prop->{SigHUPed}  = 0;
   $SIG{HUP} = sub {
     unless( $prop->{connected} ){
-      print _WRITE "$$ exiting\n";
       exit;
     }
     $prop->{SigHUPed} = 1;
@@ -313,7 +355,7 @@ sub run_parent {
   my $prop = $self->{server};
 
   $self->log(4,"Parent ready for children.\n");
-
+  
   ### prepare to read from children
   local *_READ = $prop->{_READ};
   _READ->autoflush(1);
@@ -323,10 +365,7 @@ sub run_parent {
   _WRITE->autoflush(1);
 
   ### set some waypoints
-  $prop->{last_checked_for_dead}
-  = $prop->{last_checked_for_waiting}
-  = $prop->{last_checked_for_dequeue}
-  = time();
+  $prop->{last_checked_for_dead} = $prop->{last_checked_for_dequeue} = time();
 
   ### register some of the signals for safe handling
   register_sig(PIPE => 'IGNORE',
@@ -357,7 +396,12 @@ sub run_parent {
     if( &check_sigs() ){
       last if $prop->{_HUP};
     }
-    next unless @fh;
+    if( ! @fh ){
+      $self->coordinate_children();
+      next;
+    }
+
+    ### get the filehandle
     my $fh = shift(@fh);
     next unless defined $fh;
     
@@ -368,21 +412,24 @@ sub run_parent {
     ### optional test by user hook
     last if $self->parent_read_hook($line);
 
-    ### child should say "$pid waiting\n"
-    next unless $line =~ /^(\d+)\ +(.+)$/;
+    ### child should say "$pid status\n"
+    next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
     my ($pid,$status) = ($1,$2);
 
     ### record the status
-    if( $status eq 'exiting' ){
-      delete($prop->{children}->{$pid});
-    }else{
-      $prop->{children}->{$pid} = $status;
+    $prop->{children}->{$pid} = $status;
+    if( $status eq 'processing' ){
+      $prop->{tally}->{processing} ++;
+      $prop->{tally}->{waiting} --;
+    }elsif( $status eq 'waiting' ){
+      $prop->{tally}->{processing} --;
+      $prop->{tally}->{waiting} ++;
+    }elsif( $status eq 'exiting' ){
+      $prop->{tally}->{processing} --;
     }
-    
+
     ### check up on the children
-    if( $status eq 'processing' || $status eq 'exiting' ){
-      $self->coordinate_children();
-    }
+    $self->coordinate_children();
 
   }
 
@@ -399,6 +446,62 @@ sub coordinate_children {
   my $prop = $self->{server};
   my $time = time();
 
+  ### re-tally the possible types (only once a minute)
+  ### this might not be even necessary but is a nice sanity check
+  if( $time - $prop->{tally}->{time} > 6 ){
+    my $w = $prop->{tally}->{waiting};
+    my $p = $prop->{tally}->{processing};
+    $prop->{tally} = {time       => $time,
+                      waiting    => 0,
+                      processing => 0,
+                      dequeue    => 0};
+    foreach (values %{ $prop->{children} }){
+      $prop->{tally}->{$_} ++;
+    }
+    $w -= $prop->{tally}->{waiting};
+    $p -= $prop->{tally}->{processing};
+    $self->log(3,"Processing diff ($p), Waiting diff ($w)")
+      if $p || $w;
+  }
+
+  ### periodically check to see if we should clear the queue
+  if( defined $prop->{check_for_dequeue} ){
+    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
+      $prop->{last_checked_for_dequeue} = $time;
+      if( defined($prop->{max_dequeue})
+          && $prop->{tally}->{dequeue} < $prop->{max_dequeue} ){
+        $self->run_dequeue();
+      }
+    }
+  }
+
+  my $total = $prop->{tally}->{waiting} + $prop->{tally}->{processing};
+
+  ### need more min_servers
+  if( $total < $prop->{min_servers} ){
+    $self->run_n_children( $prop->{min_servers} - $total );
+    
+  ### need more min_spare_servers (up to max_servers)
+  }elsif( $prop->{tally}->{waiting} < $prop->{min_spare_servers} 
+          && $total < $prop->{max_servers} ){
+    my $n1 = $prop->{min_spare_servers} - $prop->{tally}->{waiting};
+    my $n2 = $prop->{max_servers} - $total;
+    $self->run_n_children( ($n2 > $n1) ? $n1 : $n2 );
+
+  ### need fewer max_spare_servers (down to min_servers)
+  }elsif( $prop->{tally}->{waiting} > $prop->{max_spare_servers}
+          && $total > $prop->{min_servers} ){
+    my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
+    my $n2 = $total - $prop->{min_servers};
+#    print "$n2 $n1\n";
+    $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
+    
+  ### how did this happen?
+  }elsif( $total > $prop->{max_servers} ){
+    $self->kill_n_children( $total - $prop->{max_servers} );
+
+  }
+  
   ### periodically make sure children are alive
   if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
     $prop->{last_checked_for_dead} = $time;
@@ -408,48 +511,6 @@ sub coordinate_children {
     }
   }
 
-  ### tally the possible types
-  my %num = (waiting=>0, processing=>0, dequeue=>0);
-  $num{$_} ++ foreach (values %{ $prop->{children} });
-  my $total = $num{waiting} + $num{processing};
-  
-  ### periodically check to see if we should clear the queue
-  if( defined $prop->{check_for_dequeue} ){
-    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
-      $prop->{last_checked_for_dequeue} = $time;
-      if( defined($prop->{max_dequeue})
-          && $num{dequeue} < $prop->{max_dequeue} ){
-        $self->run_dequeue();
-      }
-    }
-  }
-
-  ### need more min_servers
-  if( $total < $prop->{min_servers} ){
-    $self->run_n_children( $prop->{min_servers} - $total );
-    
-  ### need more spare_servers
-  }elsif( $num{waiting} < $prop->{spare_servers} 
-          && $total < $prop->{max_servers} ){
-    $self->run_n_children( $prop->{spare_servers} - $num{waiting} );
-    
-  ### need to remove some extra waiting servers
-  }elsif( $num{waiting} > $prop->{spare_servers} 
-          && $num{waiting} + $num{processing} > $prop->{min_servers} ){
-    if( $time - $prop->{last_checked_for_waiting} > $prop->{check_for_waiting} ){
-      $prop->{last_checked_for_waiting} = $time;
-      my $n = $num{waiting} + $num{processing} - $prop->{min_servers};
-      if( $n > $num{waiting} - $prop->{spare_servers} ){
-        $n = $num{waiting} - $prop->{spare_servers};
-      }
-      foreach (keys %{ $prop->{children} }){
-        next unless $prop->{children}->{$_} eq 'waiting';
-        last unless $n--;
-        kill(1,$_);
-      }
-    }
-    
-  }
 }
 
 
@@ -501,7 +562,7 @@ Net::Server module.
 
 This personality binds to one or more ports and then forks
 C<min_servers> child process.  The server will make sure
-that at any given time there are C<spare_servers> available
+that at any given time there are C<min_spare_servers> available
 to receive a client request, up to C<max_servers>.  Each of
 these children will process up to C<max_requests> client
 connections.  This type is good for a heavily hit site, and
@@ -520,16 +581,16 @@ configurable parameters.
 
   Key               Value                   Default
   min_servers       \d+                     5
-  spare_servers     \d+                     1
-  max_servers       \d+                     10
+  min_spare_servers \d+                     2
+  max_spare_servers \d+                     10
+  max_servers       \d+                     50
   max_requests      \d+                     1000
 
   serialize         (flock|semaphore|pipe)  undef
   # serialize defaults to flock on multi_port or on Solaris
   lock_file         "filename"              POSIX::tmpnam
                                             
-  check_for_dead    \d+                     30
-  check_for_waiting \d+                     20
+  check_for_dead    \d+                     60
 
   max_dequeue       \d+                     undef
   check_for_dequeue \d+                     undef
@@ -540,13 +601,22 @@ configurable parameters.
 
 The minimum number of servers to keep running.
 
-=item spare_servers
+=item min_spare_servers
 
 The minimum number of servers to have waiting for requests.
+Minimum and maximum numbers should not be set to close to
+each other or the server will fork and kill children too
+often.
+
+=item max_spare_servers
+
+The maximum number of servers to have waiting for requests.
+See I<min_spare_servers>.
 
 =item max_servers
 
-The maximum number of child servers to start.
+The maximum number of child servers to start.  This does not
+apply to dequeue processes.
 
 =item max_requests
 
@@ -581,15 +651,6 @@ closes.
 Seconds to wait before checking to see if a child died
 without letting the parent know.
 
-=item check_for_waiting
-
-Seconds to wait before checking to see if there are too
-many waiting child processes.  Extra processes are killed.
-A time period is used rather than min_spare_servers and
-max_spare_server parameters to avoid constant forking and 
-killing when client requests are coming in close to the 
-spare server thresholds.
-
 =item max_dequeue
 
 The maximum number of dequeue processes to start.  If a
@@ -618,7 +679,8 @@ white space are ignored.
   ### server information
   min_servers   20
   max_servers   80
-  spare_servers 10
+  min_spare_servers 10
+  min_spare_servers 15
 
   max_requests  1000
 

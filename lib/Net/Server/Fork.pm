@@ -240,7 +240,7 @@ Net::Server::Fork - Net::Server personality
      #...code...
   }
 
-  Net::Server::Fork->run();
+  __PACKAGE__->run();
 
 =head1 DESCRIPTION
 
@@ -268,6 +268,8 @@ This only takes place if the maximum number of child processes
 The maximum number of children to fork.  The server will
 not accept connections until there are free children. Default
 is 256 children.
+
+=back
 
 =head1 CONFIGURATION FILE
 
