@@ -7,12 +7,8 @@ use Test;
 BEGIN {
   if( ! eval{ require IO::Multiplex; } ){
     $| = 1;
-    print "1..1\n";
-    my $str = "IO::Multiplex not installed.";
-    warn $str ."\n";
-    warn "Net::Server::Multiplex requires IO::Multiplex\n";
-    skip $str,1;
-    exit;
+    print "1..0\n";
+    exit 0;
   }
 }
 
