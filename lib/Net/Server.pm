@@ -1955,7 +1955,7 @@ Thanks to I<traveler> and I<merlyn> from http://perlmonks.org
 for pointing me in the right direction for determining
 the protocol used on a socket connection.
 
-Thanks to Jeremy Howard <jhoward@optimal-decisions.com> for
+Thanks to Jeremy Howard <j+daemonize@howard.fm> for
 numerous suggestions and for work on Net::Server::Daemonize.
 
 =head1 SEE ALSO
