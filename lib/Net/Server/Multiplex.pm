@@ -192,8 +192,9 @@ sub mux_eof {
   my $self = shift;
   my $mux  = shift;
   my $fh   = shift;
+  my $in_ref = shift;  # Scalar reference to the input
   $self->_link_stdout($mux, $fh);
-  $self->SUPER::mux_eof($mux, $fh);
+  $self->SUPER::mux_eof($mux, $fh, $in_ref);
   $self->_unlink_stdout();
   $mux->shutdown($fh, 1);
   return;
