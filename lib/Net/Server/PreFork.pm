@@ -603,7 +603,7 @@ See L<Net::Server>
 Please see also
 L<Net::Server::Fork>,
 L<Net::Server::INET>,
-L<Net::Server::PreForkSingle>,
+L<Net::Server::PreForkSimple>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
 L<Net::Server::SIG>

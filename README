@@ -646,8 +646,13 @@ FILES
       Net/Server/Fork.pm
       Net/Server/INET.pm
       Net/Server/MultiType.pm
+      Net/Server/PreForkSimple.pm
       Net/Server/PreFork.pm
       Net/Server/Single.pm
+      Net/Server/Daemonize.pm
+      Net/Server/SIG.pm
+      Net/Server/Proto.pm
+      Net/Server/Proto/*.pm
 
 AUTHOR
     Paul T. Seamons paul@seamons.com
@@ -672,10 +677,14 @@ THANKS
     me in the right direction for determining the protocol used on a socket
     connection.
 
+    Thanks to Jeremy Howard <jhoward@optimal-decisions.com> for numerous
+    suggestions and for work on Net::Server::Daemonize.
+
 SEE ALSO
     Please see also the Net::Server::Fork manpage, the Net::Server::INET
-    manpage, the Net::Server::PreFork manpage, the Net::Server::MultiType
-    manpage, the Net::Server::Single manpage
+    manpage, the Net::Server::PreForkSimple manpage, the
+    Net::Server::PreFork manpage, the Net::Server::MultiType manpage, the
+    Net::Server::Single manpage
 
 COPYRIGHT
       Copyright (C) 2001, Paul T Seamons
