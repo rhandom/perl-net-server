@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Server.
 
+0.80  Nov 14 09:30 2001
+        - Fix Net::Server::Multiplex::MUX::mux_eof
+          to pass a ref to the remaining data.
+
 0.79  Oct 23 12:00 2001
         - Added Net::Server::Multiplex
         - NOTE: IO::Multiplex >= 1.01 is required
