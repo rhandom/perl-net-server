@@ -203,7 +203,11 @@ sub set_uid {
   if( $< != $uid ){
     die "Couldn't become uid \"$uid\"\n";
   }
-  POSIX::setuid( $uid ) || die "Couldn't POSIX::setuid to \"$uid\" [$!]\n";
+  my $result = POSIX::setuid( $uid );
+  if( ! defined($result)
+      || $result != $uid ){ # assuming this is true for all systems
+    die "Couldn't POSIX::setuid to \"$uid\" [$!]\n";
+  }
   return 1;
 }
 
