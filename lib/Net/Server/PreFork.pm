@@ -110,6 +110,7 @@ sub loop {
 
   ### get ready for child->parent communication
   pipe(_READ,_WRITE);
+  _WRITE->autoflush(1); # ASAP, before first child is ever forked
   $prop->{_READ}  = *_READ;
   $prop->{_WRITE} = *_WRITE;
 
