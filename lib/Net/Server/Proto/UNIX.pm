@@ -44,7 +44,7 @@ sub object {
   my $u_path = $prop->{unix_path} || undef;
 
   ### allow for things like "/tmp/myfile.sock|SOCK_STREAM"
-  if( $port =~ m/^([\w\.\-\*\/]+)\|(\d+)$/ ){
+  if( $port =~ m/^([\w\.\-\*\/]+)\|(\w+)$/ ){
     ($u_path,$u_type) = ($1,$2);
 
   ### allow for things like "/tmp/myfile.sock"
@@ -56,6 +56,12 @@ sub object {
     $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
   }
 
+  ### allow for the string rather than the function
+  if( $u_type eq 'SOCK_STREAM' ){
+    $u_type = SOCK_STREAM;
+  }elsif( $u_type eq 'SOCK_DGRAM' ){
+    $u_type = SOCK_DGRAM;
+  }
 
   ### create a blank socket
   my $sock = $class->SUPER::new();
