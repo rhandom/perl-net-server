@@ -25,7 +25,7 @@ use vars qw($VERSION $AUTOLOAD);
 $VERSION = $Net::Server::VERSION; # done until separated
 
 
-sub new {
+sub object {
   my $type  = shift;
   my $class = ref($type) || $type || __PACKAGE__;
 
@@ -59,7 +59,6 @@ sub new {
   ### get the module filename
   my $proto_class_file = $proto_class .".pm";
   $proto_class_file =~ s|::|/|g;
-
   
   ### try to load the module (this is before any forking so this is still shared)
   if( ! eval{ require $proto_class_file } ){
@@ -68,7 +67,7 @@ sub new {
 
 
   ### return an object of that procol class
-  return $proto_class->new($default_host,$port,$server);
+  return $proto_class->object($default_host,$port,$server);
 
 }
 
@@ -82,7 +81,7 @@ sub AUTOLOAD {
     die "No property called.";
   }
 
-  if( $prop =~ /^(proto|port|host|sock|fd)$/ ){
+  if( $prop =~ /^(proto|port|host|sock|fileno)$/ ){
     no strict 'refs';
     * { __PACKAGE__ ."::". $prop } = sub {
       my $self = shift;

@@ -21,11 +21,13 @@ package Net::Server::Proto::TCP;
 
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
+use IO::Socket::INET ();
+use Symbol qw(gensym);
 
 $VERSION = $Net::Server::VERSION; # done until separated
-@ISA = qw(Net::Server::Proto);
+@ISA = qw(IO::Socket::INET);
 
-sub new {
+sub object {
   my $type  = shift;
   my $class = ref($type) || $type || __PACKAGE__;
 
@@ -37,24 +39,105 @@ sub new {
     ($host,$port) = ($1,$2);
 
   ### allow for things like "80"
-  }elsif( /^(\w+)$/ ){
+  }elsif( $port =~ /^(\w+)$/ ){
     ($host,$port) = ($default_host,$1);
 
   ### don't know that style of port
   }else{
-    $server->fatal("Undeterminate port \"$port\" under TCP");
+    $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
   }
 
-  my $self = bless {}, $class;
+  ### create the handle under this package
+  my $sock = $class->SUPER::new();
 
   ### store some properties
-  $self->host($host);
-  $self->port($port);
-  $self->proto('TCP');
+  $sock->NS_host($host);
+  $sock->NS_port($port);
+  $sock->NS_proto('TCP');
 
-  return $self;
+  return $sock;
 }
 
+### connect the first time
+sub connect {
+  my $sock   = shift;
+  my $server = shift;
+  my $prop   = $server->{server};
+
+  my $host  = $sock->NS_host;
+  my $port  = $sock->NS_port;
+
+  $server->log(2,"Binding to TCP port $port on host $host\n");
+      
+  my %args = ();
+  $args{LocalPort} = $port;                  # what port to bind on
+  $args{Proto}     = 'tcp';                  # what procol to use
+  $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
+  $args{Listen}    = $prop->{listen};        # how many connections for kernel to queue
+  $args{Reuse}     = 1;  # allow us to rebind the port on a restart
+  
+  ### connect to the sock
+  $sock->SUPER::configure(\%args)
+    or $server->fatal("Can't connect to TCP port $port on $host [$!]");
+
+  $server->fatal("Back sock [$!]!".caller())
+    unless $sock;
+
+}
+
+### connect on a sig -HUP
+sub reconnect {
+  my $sock = shift;
+  my $fd   = shift;
+  my $server = shift;
+
+  $sock->fdopen( $fd, 'w' )
+    or $server->fatal("Error opening to file descriptor ($fd) [$!]");
+
+}
+
+### a string containing any information necessary for restarting the server
+### via a -HUP signal
+### a newline is not allowed
+### the hup_string must be a unique identifier based on configuration info
+sub hup_string {
+  my $sock = shift;
+  return join("|",
+              $sock->NS_host,
+              $sock->NS_port,
+              $sock->NS_proto,
+              );
+}
+
+
+### self installer
+sub AUTOLOAD {
+  my $sock = shift;
+
+  my ($prop) = $AUTOLOAD =~ /::([^:]+)$/ ? $1 : '';
+  if( ! $prop ){
+    die "No property called.";
+  }
+
+  if( $prop =~ /^(NS_proto|NS_port|NS_host)$/ ){
+    no strict 'refs';
+    * { __PACKAGE__ ."::". $prop } = sub {
+      my $sock = shift;
+      if( @_ ){
+        ${*$sock}{$prop} = shift;
+        delete ${*$sock}{$prop} unless defined ${*$sock}{$prop};
+      }else{
+        return ${*$sock}{$prop};
+      }
+    };
+    use strict 'refs';
+
+    $sock->$prop(@_);
+
+  }else{
+    die "What method is that? [$prop]";
+  }
+}
 
 1;
 

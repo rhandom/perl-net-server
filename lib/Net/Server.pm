@@ -29,7 +29,7 @@ use POSIX ();
 use Fcntl ();
 use Net::Server::Proto ();
 
-$VERSION = '0.65';
+$VERSION = '0.70';
 
 ### program flow
 sub run {
@@ -253,27 +253,28 @@ sub pre_bind {
   ### loop through the passed ports
   ### set up parallel arrays of hosts, ports, and protos
   ### port can be any of many types (tcp,udp,unix, etc)
+  ### see perldoc Net::Server::Proto for more information
   foreach my $port ( @{ $prop->{port} } ){
-    my $obj = $self->proto_type($prop->{host},
-                                $port,
-                                $prop->{proto},
-                                ) || next;
-    push @{ $prop->{sockets} }, $obj;
+    my $obj = $self->proto_object($prop->{host},
+                                  $port,
+                                  $prop->{proto},
+                                  ) || next;
+    push @{ $prop->{sock} }, $obj;
   }
-  if( @{ $prop->{sockets} } < 1 ){
+  if( @{ $prop->{sock} } < 1 ){
     $self->fatal("No valid socket parameters found");
   }
 
   $prop->{listen} = Socket::SOMAXCONN()
     unless defined($prop->{listen}) && $prop->{listen} =~ /^\d{1,3}$/;
 
-  use Data::Dumper qw(Dumper);
-  print Dumper $self;
-  exit;
+#  use Data::Dumper qw(Dumper);
+#  print Dumper $self;
+#  exit;
 
   ### do udp properties if any port is udp
-  foreach( @{ $prop->{port} } ){
-    next unless $_->proto eq 'udp';
+  foreach( @{ $prop->{sock} } ){
+    next unless $_->NS_proto eq 'UDP';
 
     $prop->{udp_recv_len} = 4096
       unless defined($prop->{udp_recv_len})
@@ -288,18 +289,16 @@ sub pre_bind {
 }
 
 ### method for invoking procol specific bindings
-sub proto_type {
+sub proto_object {
   my $self = shift;
   my ($host,$port,$proto) = @_;
-  return Net::Server::Proto->new($host,$port,$proto,$self);
+  return Net::Server::Proto->object($host,$port,$proto,$self);
 }
 
 ### bind to the port (This should serve all but INET)
 sub bind {
   my $self = shift;
   my $prop = $self->{server};
-
-  ### connect to any ports
 
   ### connect to previously bound ports
   if( exists $ENV{BOUND_SOCKETS} ){
@@ -308,54 +307,33 @@ sub bind {
 
     $self->log(2,"Binding open file descriptors");
 
-    my $i = 0;
-    foreach my $fd ( split(/\|/, $ENV{BOUND_SOCKETS}) ){
+    ### loop through the past information and match things up
+    foreach my $info ( split(/\n/, $ENV{BOUND_SOCKETS}) ){
+      my ($fd,$hup_string) = split(/\|/,$info,2);
       $self->fatal("Bad file descriptor")
         unless $fd =~ /^(\d+)$/;
       $fd = $1;
 
-      $prop->{sock}->[$i] = IO::Socket::INET->new();
-      $prop->{sock}->[$i]->fdopen( $fd, 'w' )
-        or $self->fatal("Error opening to file descriptor ($fd) [$!]");
-      $i++;
+      foreach ( @{ $prop->{sock} } ){
+        if( $hup_string eq $_->hup_string() ){
+          $_->reconnect( $fd, $self );
+          last;
+        }
+      }
     }
     delete $ENV{BOUND_SOCKETS};
 
   ### connect to fresh ports
   }else{
 
-    my $i = 0;
-    foreach ( @{ $prop->{port} } ){
-      my ($host,$port,$proto) = split /:/;
-      $self->log(2,"Binding to $proto port $port on host $host\n");
-      
-      my %args = ();
-      $args{LocalPort} = $port;
-      $args{Proto}     = $proto;
-      $args{LocalAddr} = $host if $host !~ /\*/;
-
-      if( $proto ne 'udp' ){
-        $args{Listen} = $prop->{listen};
-        $args{Reuse}  = 1;
-      }
-
-      $prop->{sock}->[$i] = IO::Socket::INET->new( %args )
-        or $self->fatal("Can't connect to $proto port $port on $host [$!]");
-
-      $self->fatal("Back sock [$i]!")
-        unless $prop->{sock}->[$i];
-
-      $i++;
+    foreach my $sock ( @{ $prop->{sock} } ){
+      $sock->connect( $self );
     }
-  }
 
-  ### make sure we had at least one
-  if( @{ $prop->{sock} } < 1 ){
-    $self->fatal("No valid sockets found");
   }
 
   ### if more than one port we'll need to select on it
-  if( @{ $prop->{sock} } > 1 ){
+  if( @{ $prop->{port} } > 1 ){
     $prop->{multi_port} = 1;
     require "IO/Select.pm";
     $prop->{select} = IO::Select->new();
@@ -506,17 +484,16 @@ sub accept {
       $self->fatal("Recieved a bad sock!");
     }
 
-    ### determine the sock protcol
-    $self->get_sock_protocol( $sock );
-
     ### receive a udp packet
-    if( $prop->{udp_true} ){
+    if( $sock->NS_proto eq 'UDP' ){
       $prop->{client}   = $sock;
+      $prop->{udp_true} = 1;
       $prop->{udp_peer} = $sock->recv($prop->{udp_data},
                                       $prop->{udp_recv_len},
                                       $prop->{udp_recv_flags});
     ### blocking accept per proto
     }else{
+      delete $prop->{udp_true};
       $prop->{client} = $sock->accept();
 
     }
@@ -535,30 +512,6 @@ sub accept {
   return undef;
 }
 
-### routine to get the protocol of the socket
-sub get_sock_protocol {
-  my $self = shift;
-  my $sock = shift;
-  my $prop = $self->{server};
-
-  ### need to know what protocol (cache the result)
-  my $fileno = $sock->fileno();
-  if( ! exists $prop->{fn_proto}->{$fileno} ){
-    my $type_no = $sock->getsockopt(Socket::SOL_SOCKET(),Socket::SO_TYPE());
-    if( $type_no == Socket::SOCK_STREAM() ){
-      $prop->{fn_proto}->{$fileno} = 'tcp';
-    }elsif( $type_no == Socket::SOCK_DGRAM() ){
-      $prop->{fn_proto}->{$fileno} = 'udp';
-    }else{
-      ### other socket types (such as unix)
-      ### not sure what we would like to do here
-      ### most of the time, a socket type unix
-      ### will not also be binding tcp or udp
-      $prop->{fn_proto}->{$fileno} = undef;
-    }
-  }
-  $prop->{udp_true} = ($prop->{fn_proto}->{$fileno} eq 'udp');
-}
 
 ### server specific hook for multi port applications
 ### this actually applies to all but INET
@@ -891,7 +844,7 @@ sub sig_hup {
     $prop->{_HUP}->[$i]->fcntl( Fcntl::F_SETFD(), my $flags = "" );
 
     ### save host,port,proto, and file descriptor
-    push @fd, $fd;
+    push @fd, $fd .'|'. $sock->hup_string;
 
     ### remove anything that may be blocking
     $sock->close();
@@ -904,7 +857,8 @@ sub sig_hup {
     delete $prop->{select};
   }
 
-  $ENV{BOUND_SOCKETS} = join("|",@fd);
+  $ENV{BOUND_SOCKETS} = join("\n",@fd);
+  print $ENV{BOUND_SOCKETS},"\n";
 }
 
 ### restart the server using prebound sockets

@@ -39,16 +39,16 @@ sub accept {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### need to determine how to pass this
-#  $self->get_sock_protocol( *STDIN );
-
+  ### Net::Server::INET will not do any determination of TCP,UDP,Unix
+  ### it is up to the programmer to keep these as separate processes
+  delete $prop->{udp_true};
   ### receive a udp packet
-  if( $prop->{udp_true} ){
-    $prop->{client}   = *STDIN;
-    $prop->{udp_peer} = STDIN->recv($prop->{udp_data},
-                                    $prop->{udp_packet_size},
-                                    $prop->{udp_packet_offset});
-  }
+#  if( $prop->{udp_true} ){
+#    $prop->{client}   = *STDIN;
+#    $prop->{udp_peer} = STDIN->recv($prop->{udp_data},
+#                                    $prop->{udp_packet_size},
+#                                    $prop->{udp_packet_offset});
+#  }
 
   1;
 }
