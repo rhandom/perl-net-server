@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Server.
 
+0.84  May 22 08:00 2002
+        - Safer peername check in get_client_info to
+          avoid crashing under certain conditions.
+        - Create noarch RPM since Net::Server is pure perl.
+
 0.83  Mar 26 15:33 2002
         - Prevent race condition warning between accept on socket
           and assigning client to STDIN
