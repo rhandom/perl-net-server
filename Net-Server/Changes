@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::Server.
 
+0.65  Aug 06 22:53 2001
+	- First attempt at getting Net::Server on sourceforge.
+
 0.65  Jul 05 22:01 2001
         - Modified test suite to no longer depend upon
                 hard coded ports.  Improves test reliability
