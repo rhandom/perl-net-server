@@ -161,7 +161,7 @@ that personality
 
 =head1 CONFIGURATION FILE
 
-C<Net::Server::PreFork> allows for the use of a
+C<Net::Server::MultiType> allows for the use of a
 configuration file to read in server parameters.  The format
 of this conf file is simple key value pairs.  Comments and
 white space are ignored.

@@ -1180,7 +1180,8 @@ Visit http://seamons.com/ for the latest version.
 
  * Single Server Mode
  * Inetd Server Mode
- * Preforking Mode
+ * Preforking Simple Mode (PreForkSimple)
+ * Preforking Managed Mode (PreFork)
  * Forking Mode
  * Multi port accepts on Single, Preforking, and Forking modes
  * Simultaneous accept/recv on tcp, udp, and unix sockets
@@ -1209,10 +1210,12 @@ C<Net::Daemon> and C<NetServer::Generic>.  It includes with
 it the ability to run as an inetd process
 (C<Net::Server::INET>), a single connection server
 (C<Net::Server> or C<Net::Server::Single>), a forking server
-(C<Net::Server::Fork>), or as a preforking server
-(C<Net::Server::PreFork>).  In all but the inetd type, the
-server provides the ability to connect to one or to multiple
-server ports.
+(C<Net::Server::Fork>), a preforking server which maintains
+a constant number of preforked children (C<Net::Server::PreForkSimple>),
+or as a managed preforking server which maintains the number
+of children based on server load (C<Net::Server::PreFork>).
+In all but the inetd type, the server provides the ability to
+connect to one or to multiple server ports.
 
 C<Net::Server> uses ideologies of C<Net::FTPServer> in order
 to provide extensibility.  The additional server types are
@@ -1272,13 +1275,31 @@ personalities.  Multiple C<server_type> parameters may be
 given and Net::Server::MultiType will cycle through until it
 finds a class that it can use.
 
+=item PreForkSimple
+
+Found in the module Net/Server/PreFork.pm (see
+L<Net::Server::PreFork>).  This server binds to one or more
+ports and then forks C<max_servers> child process.  The
+server will make sure that at any given time there always
+C<max_servers> available to receive a client request.  Each
+of these children will process up to C<max_requests> client
+connections.  This type is good for a heavily hit site that
+can dedicate max_server processes no matter what the load.
+It should scale well for most applications.  Multi port accept
+is accomplished using either flock, IPC::Semaphore, or pipe to serialize the
+children.  Serialization may also be switched on for single
+port in order to get around an OS that does not allow multiple
+children to accept at the same time.  For a further 
+discussion of serialization see L<Net::Server::PreFork>.
+
 =item PreFork
 
 Found in the module Net/Server/PreFork.pm (see
 L<Net::Server::PreFork>).  This server binds to one or more
 ports and then forks C<min_servers> child process.  The
 server will make sure that at any given time there are
-C<spare_servers> available to receive a client request, up
+at least C<min_spare_servers> but not more than C<max_spare_servers>
+available to receive a client request, up
 to C<max_servers>.  Each of these children will process up
 to C<max_requests> client connections.  This type is good
 for a heavily hit site, and should scale well for most
@@ -1899,8 +1920,13 @@ servers to user Net::Server as a base layer.
   Net/Server/Fork.pm
   Net/Server/INET.pm
   Net/Server/MultiType.pm
+  Net/Server/PreForkSimple.pm
   Net/Server/PreFork.pm
   Net/Server/Single.pm
+  Net/Server/Daemonize.pm
+  Net/Server/SIG.pm
+  Net/Server/Proto.pm
+  Net/Server/Proto/*.pm
 
 =head1 AUTHOR
 
@@ -1929,11 +1955,15 @@ Thanks to I<traveler> and I<merlyn> from http://perlmonks.org
 for pointing me in the right direction for determining
 the protocol used on a socket connection.
 
+Thanks to Jeremy Howard <jhoward@optimal-decisions.com> for
+numerous suggestions and for work on Net::Server::Daemonize.
+
 =head1 SEE ALSO
 
 Please see also
 L<Net::Server::Fork>,
 L<Net::Server::INET>,
+L<Net::Server::PreForkSingle>,
 L<Net::Server::PreFork>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
