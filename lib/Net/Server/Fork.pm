@@ -1,20 +1,20 @@
 # -*- perl -*-
 #
 #  Net::Server::Fork - Net::Server personality
-#  
+#
 #  $Id$
-#  
+#
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
-#  
+#
 #  This package may be distributed under the terms of either the
-#  GNU General Public License 
+#  GNU General Public License
 #    or the
 #  Perl Artistic License
 #
 #  All rights reserved.
-#  
+#
 ################################################################
 
 package Net::Server::Fork;
@@ -99,7 +99,7 @@ sub loop {
 
   ### this is the main loop
   while( 1 ){
-    
+
     ### make sure we don't use too many processes
     my $n_children = grep { $_->{status} !~ /dequeue/ } (values %{ $prop->{children} });
     while ($n_children > $prop->{max_servers}){
@@ -142,27 +142,27 @@ sub loop {
       last if $prop->{_HUP};
       next;
     }
-    
+
     ### fork a child so the parent can go back to listening
     my $pid = fork;
-    
+
     ### trouble
     if( not defined $pid ){
       $self->log(1,"Bad fork [$!]");
       sleep(5);
-      
+
     ### parent
     }elsif( $pid ){
       close($prop->{client}) if ! $prop->{udp_true};
       $prop->{children}->{$pid}->{status} = 'processing';
-      
+
     ### child
     }else{
       $self->run_client_connection;
       exit;
-      
+
     }
-    
+
   }
 
   ### fall back to the main run routine
@@ -176,7 +176,7 @@ sub accept {
 
   ### block on trying to get a handle, timeout on 10 seconds
   my(@socks) = $prop->{select}->can_read(10);
-  
+
   ### see if any sigs occured
   if( &check_sigs() ){
     return undef if $prop->{_HUP};
@@ -186,7 +186,7 @@ sub accept {
   ### choose one at random (probably only one)
   my $sock = $socks[rand @socks];
   return undef unless defined $sock;
-  
+
   ### check if this is UDP
   if( SOCK_DGRAM == $sock->getsockopt(SOL_SOCKET,SO_TYPE) ){
     $prop->{udp_true} = 1;
@@ -195,7 +195,7 @@ sub accept {
     $prop->{udp_peer} = $sock->recv($prop->{udp_data},
                                     $sock->NS_recv_len,
                                     $sock->NS_recv_flags);
-    
+
   ### Receive a SOCK_STREAM (TCP or UNIX) packet
   }else{
     delete $prop->{udp_true};
@@ -219,6 +219,11 @@ sub run_client_connection {
 
   $self->SUPER::run_client_connection;
 
+}
+
+### Stub function in case check_for_dequeue is used.
+sub run_dequeue {
+  die "run_dequeue: virtual method not defined";
 }
 
 1;
@@ -277,7 +282,7 @@ be checked by the check_for_dead variable.
 =item check_for_dequeue
 
 Seconds to wait before forking off a dequeue process.  It
-is intended to use the dequeue process to take care of 
+is intended to use the dequeue process to take care of
 items such as mail queues.  If a value of undef is given,
 no dequeue processes will be started.
 
@@ -291,12 +296,23 @@ See L<Net::Server>.
 
 Process flow follows Net::Server until the post_accept phase.
 At this point a child is forked.  The parent is immediately
-able to wait for another request.  The child handles the 
+able to wait for another request.  The child handles the
 request and then exits.
 
 =head1 HOOKS
 
-There are no additional hooks in Net::Server::Fork.
+The Fork server has the following hooks in addition to
+the hooks provided by the Net::Server base class.
+See L<Net::Server>
+
+=over 4
+
+=item C<$self-E<gt>run_dequeue()>
+
+This hook only gets called in conjuction with the
+check_for_dequeue setting.
+
+=back
 
 =head1 TO DO
 

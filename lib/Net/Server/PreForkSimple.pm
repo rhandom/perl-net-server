@@ -7,14 +7,14 @@
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
-#  
+#
 #  This package may be distributed under the terms of either the
-#  GNU General Public License 
+#  GNU General Public License
 #    or the
 #  Perl Artistic License
 #
 #  All rights reserved.
-#  
+#
 ################################################################
 
 package Net::Server::PreForkSimple;
@@ -81,7 +81,7 @@ sub post_bind {
   $self->SUPER::post_bind;
 
   ### clean up method to use for serialization
-  if( ! defined($prop->{serialize}) 
+  if( ! defined($prop->{serialize})
       || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/i ){
     $prop->{serialize} = 'flock';
   }
@@ -108,7 +108,7 @@ sub post_bind {
                                 ) || $self->fatal("Semaphore error [$!]");
     $s->setall(1) || $self->fatal("Semaphore create error [$!]");
     $prop->{sem} = $s;
-    
+
   ### set up pipe
   }elsif( $prop->{serialize} eq 'pipe' ){
     pipe( _WAITING, _READY );
@@ -117,7 +117,7 @@ sub post_bind {
     $prop->{_READY}   = *_READY;
     $prop->{_WAITING} = *_WAITING;
     print _READY "First\n";
-    
+
   }else{
     $self->fatal("Unknown serialization type \"$prop->{serialize}\"");
   }
@@ -139,7 +139,7 @@ sub loop {
 
   ### finish the parent routines
   $self->run_parent;
-  
+
 }
 
 ### subroutine to start up a specified number of children
@@ -150,7 +150,7 @@ sub run_n_children {
   return unless $n > 0;
 
   $self->log(3,"Starting \"$n\" children");
-  
+
   for( 1..$n ){
     my $pid = fork;
 
@@ -199,7 +199,7 @@ sub run_child {
 
   ### accept connections
   while( $self->accept() ){
-    
+
     $prop->{connected} = 1;
 
     $self->run_client_connection;
@@ -209,7 +209,7 @@ sub run_child {
     $prop->{connected} = 0;
 
   }
-  
+
   $self->child_finish_hook;
 
   $self->log(4,"Child leaving ($prop->{max_requests})");
@@ -291,7 +291,7 @@ sub run_parent {
   my $prop = $self->{server};
 
   $self->log(4,"Parent ready for children.\n");
-  
+
   ### set some waypoints
   $prop->{last_checked_for_dead}
   = $prop->{last_checked_for_dequeue}
@@ -309,7 +309,7 @@ sub run_parent {
                    $self->delete_child($chld);
                  }
                },
-### uncomment this area to allow SIG USR1 to give some runtime debugging               
+### uncomment this area to allow SIG USR1 to give some runtime debugging
 #               USR1 => sub {
 #                 require "Data/Dumper.pm";
 #                 print Data::Dumper::Dumper($self);
@@ -419,7 +419,7 @@ Please see the sample listed in Net::Server.
 =head1 COMMAND LINE ARGUMENTS
 
 In addition to the command line arguments of the Net::Server
-base class, Net::Server::PreFork contains several other 
+base class, Net::Server::PreFork contains several other
 configurable parameters.
 
   Key               Value                   Default
@@ -429,7 +429,7 @@ configurable parameters.
   serialize         (flock|semaphore|pipe)  undef
   # serialize defaults to flock on multi_port or on Solaris
   lock_file         "filename"              POSIX::tmpnam
-                                            
+
   check_for_dead    \d+                     30
 
   max_dequeue       \d+                     undef
@@ -455,7 +455,7 @@ On multi_port servers or on servers running on Solaris, the
 default is flock.  The flock option uses blocking exclusive
 flock on the file specified in I<lock_file> (see below).
 The semaphore option uses IPC::Semaphore (thanks to Bennett
-Todd) for giving some sample code.  The pipe option reads on a 
+Todd) for giving some sample code.  The pipe option reads on a
 pipe to choose the next.  the flock option should be the
 most bulletproof while the pipe option should be the most
 portable.  (Flock is able to reliquish the block if the
@@ -486,7 +486,7 @@ be checked by the check_for_dead variable.
 
 Seconds to wait before forking off a dequeue process.  The
 run_dequeue hook must be defined when using this setting.
-It is intended to use the dequeue process to take care of 
+It is intended to use the dequeue process to take care of
 items such as mail queues.  If a value of undef is given,
 no dequeue processes will be started.
 
@@ -531,7 +531,7 @@ white space are ignored.
 
   ### reverse lookups ?
   # reverse_lookups on
- 
+
   #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
@@ -563,7 +563,7 @@ the most shared memory possible is used.
 =item C<$self-E<gt>child_finish_hook()>
 
 This hook takes place immediately before the child tells
-the parent that it is exiting.  It is intended for 
+the parent that it is exiting.  It is intended for
 saving out logged information or other general cleanup.
 
 =item C<$self-E<gt>run_dequeue()>
