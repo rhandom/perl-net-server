@@ -25,7 +25,7 @@ package Net::Server::Test;
 @ISA = qw(Net::Server);
 use IO::Socket;
 local $SIG{ALRM} = sub { die };
-my $alarm = 15;
+my $alarm = 5;
 
 
 ### find some open ports
@@ -39,6 +39,7 @@ my @ports      = ();
 for my $i (0..99){
   my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
 				   PeerPort => ($start_port + $i),
+                                   Timeout  => 2,
 				   Proto    => 'tcp');
   push @ports, ($start_port + $i) if ! defined $sock;
   last if $num_ports == @ports;

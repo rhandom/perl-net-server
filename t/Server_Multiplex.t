@@ -22,7 +22,7 @@ ok 1;
 
 @ISA = qw(Net::Server::Multiplex);
 local $SIG{ALRM} = sub { die };
-my $alarm = 15;
+my $alarm = 5;
 alarm $alarm;
 
 local *READ;
@@ -85,6 +85,7 @@ my @ports      = ();
 for my $i (0..99){
   my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
 				   PeerPort => ($start_port + $i),
+                                   Timeout  => 2,
 				   Proto    => 'tcp');
   push @ports, ($start_port + $i) if ! defined $sock;
   last if $num_ports == @ports;
