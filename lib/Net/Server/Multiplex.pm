@@ -22,7 +22,7 @@ use vars qw($VERSION @ISA);
 use Net::Server;
 use Net::Server::SIG qw(register_sig check_sigs);
 use Carp qw(confess);
-eval { require IO::Multiplex; import IO::Multiplex 1.02; };
+eval { require IO::Multiplex; import IO::Multiplex 1.05; };
 $@ && warn "Module IO::Multiplex is required for Multiplex.";
 
 $VERSION = $Net::Server::VERSION;
@@ -372,7 +372,7 @@ The following represents the client processing program flow:
     $self->mux_connection; # IO::Multiplex style
 
     for (every packet received) {
-      $self->mux_input;  # MOTE: Multiplexed with accept() above
+      $self->mux_input;  # NOTE: Multiplexed with accept() above
     }
 
   }else{
