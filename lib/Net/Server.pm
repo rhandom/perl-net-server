@@ -927,7 +927,7 @@ sub close_children {
     my $pid = each %{ $prop->{children} };
 
     ### if it is killable, kill it
-    if( not defined($pid) or kill(2,$pid) or not kill(0,$pid) ){
+    if( ! defined($pid) || kill(15,$pid) || ! kill(0,$pid) ){
       $self->delete_child( $pid );
     }
 
