@@ -140,8 +140,30 @@ __END__
 
 Net::Server::Proto is an intermediate module which returns
 IO::Socket style objects blessed into its own set of classes
-(ie Net::Server::Proto::TCP).  These classes should contain
-as a minimum, the following methods:
+(ie Net::Server::Proto::TCP, Net::Server::Proto::UNIX).
+
+Only three or four protocols come bundled with Net::Server.
+TCP, UDP, UNIX, and eventually SSL.  TCP is an implementation
+of SOCK_STREAM across an INET socket.  UDP is an implementation
+of SOCK_DGRAM across an INET socket.  UNIX uses a unix style
+socket file and lets the user choose between SOCK_STREAM and
+SOCK_DGRAM (the default is SOCK_STREAM).  SSL is actually just
+a layer on top of TCP.
+
+The protocol that is passed to Net::Server can be the name of
+another module which contains the protocol bindings.  If
+a protocol of MyServer::MyTCP was passed, the socket would
+be blessed into that class.  If Net::Server::Proto::TCP was
+passed, it would get that class.  If a bareword, such as
+tcp, udp, unix or ssl, is passed, the word is uppercased, and
+post pended to "Net::Server::Proto::" (ie tcp = 
+Net::Server::Proto::TCP).
+
+=head1 METHODS
+
+Protocol names used by the Net::Server::Proto should be sub
+classes of IO::Socket.  These classes should also contain, as
+a minimum, the following methods:
 
 =over 4
 
@@ -158,6 +180,8 @@ style server object.
 
 Log that a connection is about to occur.
 Use the facilities of the passed Net::Server object.
+This should be an informative string explaining
+which properties are being used.
 
 =item connect
 
@@ -186,13 +210,35 @@ Net::Server protocol.  Return the protocol that is being
 used by this module.  This does not have to be a registered
 or known protocol.
 
+=item show
+
+Similar to log_connect, but simply shows a listing of which
+properties were found.  Can be used at any time.
+
 =back
 
 =head1 PORT
 
 The port is the most important argument passed to the sub
-module classes and to Net::Server::Proto itself.  It is 
-easier to show results and then explain.
+module classes and to Net::Server::Proto itself.  For tcp,
+udp, and ssl style ports, the form is generally
+host:port/protocol, host|port|protocol, host/port, or port.
+For unix the form is generally socket_file|type|unix or 
+socket_file.  
+
+You can see what Net::Server::Proto parsed out by looking at
+the logs to see what log_connect said.  You could also include
+a post_bind_hook similar to the following to debug what happened:
+
+  sub post_bind_hook {
+    my $self = shift;
+    foreach my $sock ( @{ $self->{server}->{sock} } ){
+      $self->log(2,$sock->show);
+    }
+  }
+
+Rather than try to explain further, please look
+at the following examples:
 
   # example 1 ###################################
 
@@ -296,23 +342,8 @@ easier to show results and then explain.
   # NS_unix_type = SOCK_DGRAM
   # NS_proto = UNIX
 
-Local port/socket on which to bind.  If low port, process must
-start as root.  If multiple ports are given, all will be
-bound at server startup.  May be of the form
-C<host:port/proto>, C<host:port>, C<port/proto>, or C<port>,
-where I<host> represents a hostname residing on the local
-box, where I<port> represents either the number of the port
-(eg. "80") or the service designation (eg.  "http"), and
-where I<proto> represents the protocol to be used.  See
-L<Net::Server::Proto>.  If you are working with unix sockets,
-you may also specify C<socket_file|unix> or
-C<socket_file|type|unix> where type is SOCK_DGRAM or
-SOCK_STREAM.  If the protocol is not specified, I<proto> will
-default to the C<proto> specified in the arguments.  If C<proto> is not
-specified there it will default to "tcp".  If I<host> is not
-specified, I<host> will default to C<host> specified in the
-arguments.  If C<host> is not specified there it will
-default to "*".  Default port is 20203.
+=head1 LICENCE
 
+Distributed under the same terms as Net::Server
 
 =cut

@@ -80,3 +80,23 @@ sub connect {
 
 1;
 
+__END__
+
+=head1 NAME
+
+  Net::Server::Proto::UDP - adp0 - Net::Server UDP protocol.
+
+=head1 SYNOPSIS
+
+See L<Net::Server::Proto>.
+
+=head1 DESCRIPTION
+
+See L<Net::Server::Proto>.
+
+=head1 LICENCE
+
+Distributed under the same terms as Net::Server
+
+=cut
+

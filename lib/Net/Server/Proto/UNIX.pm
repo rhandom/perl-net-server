@@ -143,6 +143,7 @@ sub accept {
   if( defined($client) ){
     $client->NS_proto(     $sock->NS_proto );
     $client->NS_unix_path( $sock->NS_unix_path );
+    $client->NS_unix_type( $sock->NS_unix_type );
   }
 
   return $client;
@@ -159,6 +160,18 @@ sub hup_string {
               $sock->NS_unix_type,
               $sock->NS_proto,
               );
+}
+
+### short routine to show what we think we are
+sub show {
+  my $sock = shift;
+  my $t = "Ref = \"" .ref($sock) . "\"\n";
+  foreach ( qw(NS_proto NS_unix_path NS_unix_type) ){
+    $t .= "  $_ = \"" .$sock->$_."\"\n";
+  }
+  $t =~ s/"1"/SOCK_STREAM/;
+  $t =~ s/"2"/SOCK_DGRAM/;
+  return $t;
 }
 
 ### self installer
@@ -193,4 +206,24 @@ sub AUTOLOAD {
 
 
 1;
+
+__END__
+
+=head1 NAME
+
+  Net::Server::Proto::TCP - adp0 - Net::Server TCP protocol.
+
+=head1 SYNOPSIS
+
+See L<Net::Server::Proto>.
+
+=head1 DESCRIPTION
+
+See L<Net::Server::Proto>.
+
+=head1 LICENCE
+
+Distributed under the same terms as Net::Server
+
+=cut
 

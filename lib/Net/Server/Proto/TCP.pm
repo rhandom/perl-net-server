@@ -128,6 +128,15 @@ sub hup_string {
               );
 }
 
+### short routine to show what we think we are
+sub show {
+  my $sock = shift;
+  my $t = "Ref = \"" .ref($sock) . "\"\n";
+  foreach ( qw(NS_proto NS_port NS_host) ){
+    $t .= "  $_ = \"" .$sock->$_."\"\n";
+  }
+  return $t;
+}
 
 ### self installer
 sub AUTOLOAD {
@@ -159,4 +168,24 @@ sub AUTOLOAD {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+  Net::Server::Proto::TCP - adp0 - Net::Server TCP protocol.
+
+=head1 SYNOPSIS
+
+See L<Net::Server::Proto>.
+
+=head1 DESCRIPTION
+
+See L<Net::Server::Proto>.
+
+=head1 LICENCE
+
+Distributed under the same terms as Net::Server
+
+=cut
 
