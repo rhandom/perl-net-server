@@ -98,7 +98,37 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
+Protocol module for Net::Server.  This module implements the
+SOCK_DGRAM socket type under INET (also known as UDP).
 See L<Net::Server::Proto>.
+
+=head1 PARAMETERS
+
+The following paramaters may be specified in addition to
+normal command line parameters for a Net::Server.  See
+L<Net::Server> for more information on reading arguments.
+
+=over 4
+
+=item udp_recv_len
+
+Specifies the number of bytes to read from the UDP connection
+handle.  Data will be read into $self->{server}->{udp_data}.
+Default is 4096.  See L<IO::Socket::INET> and L<recv>.
+
+=item udp_recv_flags
+
+See L<recv>.  Default is 0.
+
+=back
+
+=head1 QUICK PARAMETER LIST
+
+  Key               Value                    Default
+
+  ## UDP protocol parameters
+  udp_recv_len      \d+                      4096
+  udp_recv_flags    \d+                      0
 
 =head1 LICENCE
 

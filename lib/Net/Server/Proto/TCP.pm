@@ -181,7 +181,14 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
+Protocol module for Net::Server.  This module implements the
+SOCK_STREAM socket type under INET (also known as TCP).
 See L<Net::Server::Proto>.
+
+=head1 PARAMETERS
+
+There are no additional parameters that can be specified.
+See L<Net::Server> for more information on reading arguments.
 
 =head1 LICENCE
 

@@ -1426,13 +1426,8 @@ parameters from the base class.)
   background        1                        undef
   setsid            1                        undef
 
-  ## UDP protocol parameters
-  udp_recv_len      \d+                      4096
-  udp_recv_flags    \d+                      0
-
-  ## UNIX socket parameters
-  unix_type         (SOCK_STREAM|SOCK_DGRAM) SOCK_STREAM
-  unix_path         "filename"               undef
+  ## See Net::Server::Proto::(TCP|UDP|UNIX|etc)
+  ## for more sample parameters.
 
 =over 4
 
@@ -1582,16 +1577,6 @@ C<setsid> is set, STDIN and STDOUT will automatically be
 opened to /dev/null and STDERR will be opened to STDOUT.
 This will prevent any output from ending up at the terminal.
 
-=item udp_recv_len
-
-Specifies the number of bytes to read from the UDP connection
-handle.  Data will be read into $self->{server}->{udp_data}.
-Default is 4096.  See L<IO::Socket::INET> and L<recv>.
-
-=item udp_recv_flags
-
-See L<recv>.  Default is 0.
-
 =back
 
 =head1 PROPERTIES
@@ -1668,6 +1653,7 @@ ignored.
 
   ### ports to bind (this should bind
   ### 127.0.0.1:20205 and localhost:20204)
+  ### See Net::Server::Proto
   host        127.0.0.1
   port        localhost:20204
   port        20205
