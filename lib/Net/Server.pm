@@ -216,6 +216,7 @@ sub post_configure {
     open(_SERVER_LOG, ">>$prop->{log_file}")
       or die "Couldn't open log file \"$prop->{log_file}\" [$!].";
     _SERVER_LOG->autoflush(1);
+    $prop->{chown_log_file} = 1;
 
   }
 
@@ -428,12 +429,16 @@ sub post_bind {
       push @chown_files, $sock->NS_unix_path
         if$sock->NS_proto eq 'UNIX';
     }
-#    if( $prop->{pid_file_unlink} ){
+    if( $prop->{pid_file_unlink} ){
       push @chown_files, $prop->{pid_file};
-#    }
-#    if( $prop->{log_file_unlink} ){
-      push @chown_files, $prop->{log_file};
-#    }
+    }
+    if( $prop->{lock_file_unlink} ){
+      push @chown_files, $prop->{lock_file};
+    }
+    if( $prop->{chown_log_file} ){
+      delete $prop->{chown_log_file};
+      push @chown_files, $prop->{log_file};      
+    }
     my $uid = $prop->{user};
     my $gid = (split(/\ /,$prop->{group}))[0];
     foreach my $file (@chown_files){
