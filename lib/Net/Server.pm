@@ -29,6 +29,8 @@ use IO::Select ();
 use POSIX ();
 use Fcntl ();
 use Net::Server::Proto ();
+use Net::Server::Daemonize qw(check_pid_file create_pid_file
+                              get_uid get_gid set_uid set_gid);
 
 $VERSION = '0.70';
 
@@ -194,6 +196,8 @@ sub post_configure {
   }
 
   ### check for an existing pid_file
+  ### This check is inconsistant with the chroot option,
+  ### however it doesn't interfere either.
   if( defined $prop->{pid_file} ){
     if( ! eval{ check_pid_file( $prop->{pid_file} ) } ){
       $self->fatal( $@ );
@@ -350,9 +354,48 @@ sub post_bind {
   my $self = shift;
   my $prop = $self->{server};
 
+
+  ### figure out the group(s) to run as
+  if( ! defined $prop->{group} ){
+    $self->log(1,"Group Not Defined.  Defaulting to 'nobody'\n");
+    $prop->{group}  = 'nobody';
+  }
+  if( $prop->{group} =~ /^(\w+( \w+)*)$/ ){
+    $self->log(2,"Setting group to $1\n");
+    $prop->{group} = eval{ get_gid( $1 ) };
+    $self->fatal( $@ ) if $@;
+  }else{
+    $self->fatal("Invalid group \"$prop->{group}\"");
+  }
+
+
+  ### figure out the user to run as
+  if( ! defined $prop->{user} ){
+    $self->log(1,"User Not Defined.  Defaulting to 'nobody'\n");
+    $prop->{user}  = 'nobody';
+  }
+  if( $prop->{user} =~ /^(\w+)$/ ){
+    $self->log(2,"Setting user to $1\n");
+    $prop->{user} = eval{ get_uid( $1 ) };
+    $self->fatal( $@ ) if $@;
+  }else{
+    $self->fatal("Invalid user \"$prop->{user}\"");
+  }
+
+
+  ### chown any files or sockets that we need to
+  my $uid = $prop->{user};
+  my $gid = (split(/\ /,$prop->{group}))[0];
+  foreach my $sock ( @{ $prop->{sock} } ){
+    next unless $sock->NS_proto eq 'UNIX';
+    chown($uid,$gid,$sock->NS_unix_path)
+      or $self->fatal("Couldn't chown ".$sock->NS_unix_path." [$!]\n");
+  }
+  
+
   ### perform the chroot operation
-  if( defined $prop->{chroot} ){
-    if( ! -d $prop->{chroot} ){
+    if( defined $prop->{chroot} ){
+      if( ! -d $prop->{chroot} ){
       $self->fatal("Specified chroot \"$prop->{chroot}\" doesn't exist.\n");
     }else{
       $self->log(2,"Chrooting to $prop->{chroot}\n");
@@ -360,35 +403,25 @@ sub post_bind {
         or $self->fatal("Couldn't chroot to \"$prop->{chroot}\"");
     }
   }
+
   
-  ### become another group
-  if( !defined $prop->{group} ){
-    $self->log(1,"Group Not Defined.  Defaulting to 'nobody'\n");
-    $prop->{group}  = 'nobody';
-  }
-  $self->log(2,"Setting group to $prop->{group}\n");
-  $prop->{group} = getgrnam( $prop->{group} )
-    if $prop->{group} =~ /\D/;
-  $( = $) = $prop->{group};
+  ### drop privileges
+  eval{
+    set_gid( $prop->{group} );
+    set_uid( $prop->{user} );
+  };
+  $self->fatal( $@ ) if $@;
 
-  ### become another user
-  if( !defined $prop->{user} ){
-    $self->log(1,"User Not Defined.  Defaulting to 'nobody'\n");
-    $prop->{user}  = 'nobody';
-  }
-  $self->log(2,"Setting user to $prop->{user}\n");
-  $prop->{user}  = getpwnam( $prop->{user} )
-    if $prop->{user}  =~ /\D/;
-  $< = $> = $prop->{user};
 
-  ### allow for a pid file (must be done after backgrounding)
+  ### allow for a pid file (must be done after backgrounding and chrooting)
   if( defined $prop->{pid_file} ){
-    if( eval{ create_pid_file( $prop->{pid_file}, $$ ) } ){
+    if( eval{ create_pid_file( $prop->{pid_file} ) } ){
       $prop->{pid_file_unlink} = 1;
     }else{
       $self->fatal( $@ );
     }
   }
+
 
   ### record number of request
   $prop->{requests} = 0;

@@ -26,6 +26,7 @@ package Net::Server::Test;
 
 use IO::Socket ();
 use POSIX qw(tmpnam);
+use English qw($UID $GID);
 
 local $SIG{ALRM} = sub { die "timeout"; };
 my $alarm = 15;
@@ -131,8 +132,14 @@ if( $fork && $pipe ){
 
       ### start the server
       close STDERR;
-      Net::Server::Test->run(port => "$ports[0]/tcp",
-                             port => "$socket_file|unix");
+      Net::Server::Test->run(port  => "$ports[0]/tcp",
+                             port  => "$socket_file|unix",
+                             user  => $UID, # user  accepts id as well
+                             group => $GID, # group accepts id as well
+                             );
+      # we need to set the user and group to ourself so that
+      # the parent process can connect to the socket we opened
+
       unlink $socket_file;
       exit;
 

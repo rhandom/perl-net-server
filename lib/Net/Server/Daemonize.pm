@@ -1,10 +1,13 @@
 # -*- perl -*-
 #
-#  Net::Server::Daemonize - adpf - Daemonization utilities.
+#  Net::Server::Daemonize - bdpf - Daemonization utilities.
 #  
 #  $Id$
 #  
-#  Copyright (C) 2001, Paul T Seamons
+#  Copyright (C) 2001, Jeremy Howard
+#                      j+daemonize@howard.fm
+#
+#                      Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
 #  
@@ -26,28 +29,27 @@ use vars qw( @ISA @EXPORT_OK $VERSION );
 use Exporter ();
 use POSIX qw(SIGINT SIG_BLOCK SIG_UNBLOCK);
 
-$VERSION = "0.02";
+$VERSION = "0.03";
 
+@ISA = qw(Exporter);
 
 @EXPORT_OK = qw(check_pid_file
                 create_pid_file
-                daemonize
+                unlink_pid_file
+                is_root_user
+                get_uid get_gid
+                set_uid set_gid
+                set_user
                 safe_fork
+                daemonize
                 );
-@ISA = qw(Exporter);
+
+###----------------------------------------------------------------###
 
 ### check for existance of pid_file
 ### if the file exists, check for a running process
 sub check_pid_file ($) {
   my $pid_file = shift;
-
-  ### untaint the filename (doesn't mean that
-  ### somebody couldn't pass /etc/passwd and cause
-  ### a lot of trouble)
-  unless( $pid_file =~ m|^([\w\.\-/]+)$| ){
-    die "Unsecure filename \"$prop->{pid_file}\"\n";
-  }
-  $pid_file = $1;
 
   ### no pid_file = return success
   return 1 unless -e $pid_file;
@@ -76,22 +78,32 @@ sub check_pid_file ($) {
     
   ### try ps
   #}elsif( -x '/bin/ps' ){ # not as portable
-  }elsif( `ps h -p $$` ){ # can I play ps on myself ?
-    $exists = `ps h -p $current_pid`;
+  # the ps command itself really isn't portable
+  # this follows BSD syntax ps (BSD's and linux)
+  # this will fail on Unix98 syntax ps (Solaris, etc)
+  }elsif( `ps h o pid p $$` =~ /^\s*$$\s*$/ ){ # can I play ps on myself ?
+    $exists = `ps h o pid p $current_pid`;
     
   }
 
   ### running process exists, ouch
   if( $exists ){
-    die "pid_file already exists for running process ($current_pid)... aborting\n";
     
-  }
+    if( $current_pid == $$ ){
+      warn "Pid_file created by this same process. Doing nothing.\n";
+      return 1;
+    }else{
+      die "Pid_file already exists for running process ($current_pid)... aborting\n";
+    }    
 
   ### remove the pid_file
-  warn "pid_file \"$pid_file\" already exists.  Overwriting.\n";
-  unlink $pid_file;
+  }else{
 
-  return 1;
+    warn "Pid_file \"$pid_file\" already exists.  Overwriting!\n";
+    unlink $pid_file || die "Couldn't remove pid_file \"$pid_file\" [$!]\n";
+    return 1;
+
+  }
 }
 
 ### actually create the pid_file, calls check_pid_file
@@ -99,28 +111,142 @@ sub check_pid_file ($) {
 sub create_pid_file ($) {
   my $pid_file = shift;
 
-  ### untaint the filename (doesn't mean that
-  ### somebody couldn't pass /etc/passwd and cause
-  ### a lot of trouble)
-  unless( $pid_file =~ m|^([\w\.\-/]+)$| ){
-    die "Unsecure filename \"$prop->{pid_file}\"\n";
-  }
-  $pid_file = $1;
-
   ### see if the pid_file is already there
   check_pid_file( $pid_file );
-
   
-  if( ! open(PID, ">$prop->{pid_file}") ){
-    die "Couldn't open pid file \"$prop->{pid_file}\" [$!].\n";
+  if( ! open(PID, ">$pid_file") ){
+    die "Couldn't open pid file \"$pid_file\" [$!].\n";
   }
-
 
   ### save out the pid and exit
   print PID "$$\n";
   close PID;
 
+  die "Pid_file \"$pid_file\" not created.\n" unless -e $pid_file;
   return 1;
+}
+
+### Allow for safe removal of the pid_file.
+### Make sure this process owns it.
+sub unlink_pid_file ($) {
+  my $pid_file = shift;
+
+  ### no pid_file = return success
+  return 1 unless -e $pid_file;
+
+  ### get the currently listed pid
+  if( ! open(_PID,$pid_file) ){
+    die "Couldn't open existant pid_file \"$pid_file\" [$!]\n";
+  }
+  my $current_pid = <_PID>;
+  close _PID;
+  chomp($current_pid);
+
+
+  if( $current_pid == $$ ){
+    unlink($pid_file) || die "Couldn't unlink pid_file \"$pid_file\" [$!]\n";
+    return 1;
+
+  }else{
+    die "Process $$ doesn't own pid_file \"$pid_file\". Can't remove it.\n";
+    
+  }
+
+}
+
+###----------------------------------------------------------------###
+
+sub is_root_user () {
+  my $id = get_uid('root');
+  return ( ! defined($id) || $< == $id || $> == $id );
+}
+
+### get the uid for the passed user
+sub get_uid ($) {
+  my $user = shift;
+  my $uid  = undef;
+
+  if( $user =~ /^\d+$/ ){
+    $uid = $user;
+  }else{
+    $uid = getpwnam($user);
+  }
+  
+  die "No such user \"$user\"\n" unless defined $uid;
+
+  return $uid;
+}
+
+### get all of the gids that this group is (space delimited)
+sub get_gid {
+  my @gid  = ();
+
+  foreach my $group ( split( /[, ]+/, join(" ",@_) ) ){
+    if( $group =~ /^\d+$/ ){
+      push @gid, $group;
+    }else{
+      my $id = getgrnam($group);
+      die "No such group \"$group\"\n" unless defined $id;
+      push @gid, $id;
+    }
+  }
+
+  die "No group found in arguments.\n" unless @gid;
+
+  return join(" ",$gid[0],@gid);
+}
+
+### change the process to run as this uid
+sub set_uid {
+  my $uid = get_uid( shift() );
+  $< = $> = $uid;
+  POSIX::setuid( $uid ) || die "Couldn't POSIX::setuid to \"$uid\" [$!]\n";
+  return 1;
+}
+
+### change the process to run as this gid(s)
+### multiple groups must be space or comma delimited
+sub set_gid {
+  my $gids = get_gid( @_ );
+  my $gid  = (split(/\s+/,$gids))[0];
+  $) = $gids;
+  $( = $gid;
+  POSIX::setgid( $gid ) || die "Couldn't POSIX::setgid to \"$gid\" [$!]\n";
+  return 1;
+}
+
+### backward compatibility sub
+sub set_user {
+  my ($user, @group) = @_;
+  set_uid( $user )  || return undef;
+  set_gid( @group ) || return undef;
+  return 1;
+}
+
+###----------------------------------------------------------------###
+
+### routine to protect process during fork
+sub safe_fork () {
+  
+  ### block signal for fork
+  my $sigset = POSIX::SigSet->new(SIGINT);
+  POSIX::sigprocmask(SIG_BLOCK, $sigset)
+    or die "Can't block SIGINT for fork: [$!]\n";
+  
+  ### fork off a child
+  my $pid = fork;
+  unless( defined $pid ){
+    die "Couldn't fork: [$!]\n";
+  }
+
+  ### make SIGINT kill us as it did before
+  $SIG{INT} = 'DEFAULT';
+
+  ### put back to normal
+  POSIX::sigprocmask(SIG_UNBLOCK, $sigset)
+    or die "Can't unblock SIGINT for fork: [$!]\n";
+
+  return $pid;
 }
 
 ###----------------------------------------------------------------###
@@ -168,46 +294,15 @@ sub daemonize ($$$) {
   }
 }
 
-sub set_user {
-  my ($user, $group) = @_;
-  my $UserId = getpwnam($user);
-  my $GroupId = getgrnam($group);
-  $> = $< = $UserId;
-  $) = $( = $GroupId;
-  POSIX::setuid $UserId;
-  POSIX::setgid $GroupId;
-  return 1;
-}
-
-
-sub safe_fork () {
-  
-  ### block signal for fork
-  my $sigset = POSIX::SigSet->new(SIGINT);
-  POSIX::sigprocmask(SIG_BLOCK, $sigset)
-    or die "Can't block SIGINT for fork: [$!]\n";
-  
-  ### fork off a child
-  my $pid = fork;
-  unless( defined $pid ){
-    die "Couldn't fork: [$!]\n";
-  }
-
-  ### make SIGINT kill us as it did before
-  $SIG{INT} = 'DEFAULT';
-
-  ### put back to normal
-  POSIX::sigprocmask(SIG_UNBLOCK, $sigset)
-    or die "Can't unblock SIGINT for fork: [$!]\n";
-
-  return $pid;
-}
-
+### SIGINT routine that will remove the pid_file
 sub HUNTSMAN {                      
   my ($path) = @_;
   unlink ($path);
-  Unix::Syslog::syslog LOG_ERR, "Exiting on INT signal.";
-  exit;                           # clean up with dignity
+
+  require "Unix/Syslog.pm";
+  Unix::Syslog::syslog(Unix::Syslog::LOG_ERR(), "Exiting on INT signal.");
+
+  exit;
 }
 
 
