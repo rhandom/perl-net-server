@@ -10,6 +10,7 @@ Revision history for Perl extension Net::Server.
         - Add parent/child communication code to PreFork.pm based of
           code submitted by Vadim.  Allows children to speak to parent.
         - Improved accounting of child processes in PreFork.
+        - Add spec file for rpm.
 
 0.82  Jan 29 16:20 2002
         - Add changes pointed out by Vadim to make sure

@@ -3,6 +3,8 @@ MANIFEST			This file
 MANIFEST.SKIP			Files to skip when making the dist
 Makefile.PL			Makefile script
 README                          What it says
+Net-Server.spec                 Usage: rpm -ba *.spec
+Net-Server.spec.PL              Generates Net-Server.spec
 lib/Net/Server.pm		Base Module containing core functionality
 lib/Net/Server/Fork.pm		Sub class allowing for fork upon accept
 lib/Net/Server/INET.pm		Sub class allowing for inetd process
@@ -32,3 +34,4 @@ examples/LoadTester.pl          Sample script to hit upon a running server
 examples/udp_server.pl          Sample UDP server
 examples/connection_test.pl     Sample connection on all protocols
 examples/sigtest.pl             Compare safe signals under Net::Server::SIG
+examples/samplechat.pl          Demonstrates some Net::Server::Multiplex features
