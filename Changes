@@ -4,6 +4,8 @@ Revision history for Perl extension Net::Server.
         - Safer peername check in get_client_info to
           avoid crashing under certain conditions.
         - Create noarch RPM since Net::Server is pure perl.
+        - Always chown log and pid files when started as root
+          but running as non-root.
 
 0.83  Mar 26 15:33 2002
         - Prevent race condition warning between accept on socket
