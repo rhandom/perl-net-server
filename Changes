@@ -6,6 +6,14 @@ Revision history for Perl extension Net::Server.
         - Create noarch RPM since Net::Server is pure perl.
         - Always chown log and pid files when started as root
           but running as non-root.
+        - More graceful exit of children in PreFork
+        - Kill children with a kill 15 rather than kill 2 -
+          Fixes on Tru64 UNIX (Marco Sbodio)
+        - Allow for SOCK_STREAM and SOCK_DGRAM to be passed
+          as strings to proto (ie "/tmp/path/|SOCK_STREAM|unix") (Andrzej Filip)
+        - Backward compatibility fix for IO::Socket usage (Matt Sergeant)
+        - Avoid reopening STDIN and STDOUT in INET mode. (Bernard Quatermass)
+
 
 0.83  Mar 26 15:33 2002
         - Prevent race condition warning between accept on socket
