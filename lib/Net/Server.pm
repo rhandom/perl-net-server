@@ -609,11 +609,13 @@ sub post_accept {
 
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
-  *STDIN  = \*{ $prop->{client} };
-  *STDOUT = \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
-  STDIN->autoflush(1);
-  STDOUT->autoflush(1);
-  select(STDOUT);
+  if( defined $prop->{client} ){
+    *STDIN  = \*{ $prop->{client} };
+    *STDOUT = \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+    STDIN->autoflush(1);
+    STDOUT->autoflush(1);
+    select(STDOUT);
+  }
 
 }
 
