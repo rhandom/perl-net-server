@@ -2028,6 +2028,22 @@ servers to user Net::Server as a base layer.
   Net/Server/Proto.pm
   Net/Server/Proto/*.pm
 
+=head1 INSTALL
+
+Download and extract tarball before running
+these commands in its base directory:
+
+  perl Makefile.PL
+  make
+  make test
+  make install
+
+For RPM installation, download tarball before
+running these commands in your _topdir:
+
+  rpm -ta SOURCES/Net-Server-*.tar.gz
+  rpm -ih RPMS/noarch/perl-Net-Server-*.rpm
+
 =head1 AUTHOR
 
 Paul T. Seamons <paul at seamons.com>
