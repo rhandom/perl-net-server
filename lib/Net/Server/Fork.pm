@@ -218,27 +218,6 @@ sub run_client_connection {
 
 }
 
-### routine to shut down the server (and all forked children)
-sub server_close {
-  my $self = shift;
-  my $prop = $self->{server};
-
-  ### if a parent, fork off cleanup sub and close
-  if( ! defined $prop->{ppid} || $prop->{ppid} == $$ ){
-
-    $self->SUPER::server_close();
-
-  ### if a child, signal the parent and close
-  ### normally the child shouldn't, but if they do...
-  }else{
-
-    kill(2,$prop->{ppid});
-
-  }
-  
-  exit;
-}
-
 1;
 
 __END__

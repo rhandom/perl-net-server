@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.77';
+$VERSION = '0.78';
 
 ### program flow
 sub run {
@@ -85,9 +85,11 @@ sub run {
   # $self->run_client_connection # process client
   # $self->done               # indicate if connection is done
 
-  $self->pre_server_close_hook;  # user customizable hook
-
   $self->server_close;        # close the server and release the port
+                              # this will run pre_server_close_hook
+                              #               close_children
+                              #               post_child_cleanup_hook
+                              # and either exit or run restart_close_hook
 
   exit;
 }
@@ -848,10 +850,25 @@ sub server_close{
 
   $self->log(2,$self->log_time . " Server closing!");
 
-  ### remove children (only applies to Fork and PreFork
+  ### if this is a child process, signal the parent and close
+  ### normally the child shouldn't, but if they do...
+  ### otherwise the parent continues with the shutdown
+  ### this is safe for non standard forked child processes
+  ### as they will not have server_close as a handler
+  if( defined($prop->{ppid}) && $prop->{ppid} != $$ ){
+    if( ! defined $prop->{no_close_by_child} ){
+      kill(2,$prop->{ppid});
+      exit;
+    }
+  }
+
+  ### shut down children if any
   if( defined $prop->{children} ){
     $self->close_children();
   }
+
+  ### allow for additional cleanup phase
+  $self->post_child_cleanup_hook();
 
   ### remove files
   if( defined $prop->{lock_file}
@@ -900,6 +917,8 @@ sub close_children {
   1 while (waitpid(-1,POSIX::WNOHANG()) > 0);
   
 }
+
+sub post_child_cleanup_hook {}
 
 ### handle sig hup
 ### this will prepare the server for a restart via exec
@@ -1056,6 +1075,7 @@ sub options {
                host proto listen reverse_lookups
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
+               no_close_by_child
                ) ){
     $ref->{$_} = \$prop->{$_};
   }
@@ -1479,6 +1499,8 @@ parameters from the base class.)
   background        1                        undef
   setsid            1                        undef
 
+  no_close_by_child (1|undef)                undef
+
   ## See Net::Server::Proto::(TCP|UDP|UNIX|etc)
   ## for more sample parameters.
 
@@ -1629,6 +1651,13 @@ Defaults to undef.  If a C<log_file> is given or if
 C<setsid> is set, STDIN and STDOUT will automatically be
 opened to /dev/null and STDERR will be opened to STDOUT.
 This will prevent any output from ending up at the terminal.
+
+=item no_close_by_child
+
+Specifies whether or not a forked child process has permission
+or not to shutdown the entire server process.  If set to 1, the
+child may signal the parent to shutdown all children.  Default
+is undef (not set).
 
 =back
 
@@ -1783,6 +1812,20 @@ The process then loops and waits for the next
 connection.  For a more in depth discussion, please
 read the code.
 
+During the server shutdown phase
+(C<$self-E<gt>server_close>), the following
+represents the program flow:
+
+  $self->close_children;  # if any
+  
+  $self->post_child_cleanup_hook;
+
+  # if( Restarting server ){
+     $self->restart_close_hook();
+     $self->hup_server;
+  }
+
+  exit;
 
 =head1 HOOKS
 
@@ -1865,12 +1908,22 @@ message, the package, file, and line number.  The hook
 may close the server, but it is suggested that it simply
 return and use the built in shut down features.
 
+=item C<$self-E<gt>post_child_cleanup_hook>
+
+This hook occurs in the parent server process after all
+children have been shut down and just before the server
+either restarts or exits.  It is intended for additional
+cleanup of information.  At this point pid_files and 
+lockfiles still exist.
+
 =item C<$self-E<gt>restart_open_hook>
+
 This hook occurs if a server has been HUPed (restarted
 via the HUP signal.  It occurs just before reopening to
 the filenos of the sockets that were already opened.
 
 =item C<$self-E<gt>restart_close_hook>
+
 This hook occurs if a server has been HUPed (restarted
 via the HUP signal.  It occurs just before restarting the
 server via exec.

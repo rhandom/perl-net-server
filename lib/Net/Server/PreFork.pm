@@ -422,6 +422,8 @@ sub coordinate_children {
 
 }
 
+### allow for other process to tie in to the parent read
+sub parent_read_hook {}
 
 1;
 

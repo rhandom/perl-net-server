@@ -1,5 +1,11 @@
 Revision history for Perl extension Net::Server.
 
+0.78  Sep 28 9:13
+        - Added post_child_cleanup_hook to server_close
+        - Moved pre_server_close_hook inside server_close
+        - Various small cleanups
+        - Added no_close_by_child flag (see perldoc)
+
 0.77  Aug 27 10:00
         - Added dequeuing ability to Fork mode server.
         - All Fork and PreFork modes now have dequeue ability.

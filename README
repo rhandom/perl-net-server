@@ -32,6 +32,7 @@ FEATURES
      * Basic allow/deny access control
      * Customized logging (choose Syslog, log_file, or STDERR)
      * HUP able server (clean restarts via sig HUP)
+     * Dequeue ability in all Fork and PreFork modes.
      * Taint clean
      * Written in Perl
      * Protection against buffer overflow
@@ -284,6 +285,8 @@ ARGUMENTS
       background        1                        undef
       setsid            1                        undef
 
+      no_close_by_child (1|undef)                undef
+
       ## See Net::Server::Proto::(TCP|UDP|UNIX|etc)
       ## for more sample parameters.
 
@@ -404,6 +407,12 @@ ARGUMENTS
         a `log_file' is given or if `setsid' is set, STDIN and STDOUT will
         automatically be opened to /dev/null and STDERR will be opened to
         STDOUT. This will prevent any output from ending up at the terminal.
+
+    no_close_by_child
+        Specifies whether or not a forked child process has permission or
+        not to shutdown the entire server process. If set to 1, the child
+        may signal the parent to shutdown all children. Default is undef
+        (not set).
 
 PROPERTIES
     All of the `ARGUMENTS' listed above become properties of the server
@@ -545,6 +554,20 @@ PROCESS FLOW
     The process then loops and waits for the next connection. For a more in
     depth discussion, please read the code.
 
+    During the server shutdown phase (`$self->server_close'), the following
+    represents the program flow:
+
+      $self->close_children;  # if any
+  
+      $self->post_child_cleanup_hook;
+
+      # if( Restarting server ){
+         $self->restart_close_hook();
+         $self->hup_server;
+      }
+
+      exit;
+
 HOOKS
     `Net::Server' provides a number of "hooks" allowing for servers layered
     on top of `Net::Server' to respond at different levels of execution.
@@ -607,12 +630,21 @@ HOOKS
         and line number. The hook may close the server, but it is suggested
         that it simply return and use the built in shut down features.
 
-    `$self->restart_open_hook' This hook occurs if a server has been HUPed
-    (restarted via the HUP signal. It occurs just before reopening to the
-    filenos of the sockets that were already opened.
-    `$self->restart_close_hook' This hook occurs if a server has been HUPed
-    (restarted via the HUP signal. It occurs just before restarting the
-    server via exec.
+    `$self->post_child_cleanup_hook'
+        This hook occurs in the parent server process after all children
+        have been shut down and just before the server either restarts or
+        exits. It is intended for additional cleanup of information. At this
+        point pid_files and lockfiles still exist.
+
+    `$self->restart_open_hook'
+        This hook occurs if a server has been HUPed (restarted via the HUP
+        signal. It occurs just before reopening to the filenos of the
+        sockets that were already opened.
+
+    `$self->restart_close_hook'
+        This hook occurs if a server has been HUPed (restarted via the HUP
+        signal. It occurs just before restarting the server via exec.
+
 RESTARTING
     Each of the server personalities (except for INET), support restarting
     via a HUP signal (see "kill -l"). When a HUP is received, the server
