@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Server.
 
+0.81  Jan 29 16:20 2002
+        - Add changes pointed out by Vadim to make sure
+          that SSL client handle is blessed into correct class.
+
+
 0.81  Nov 19 12:39 2001
         - Fix Net::Server::Fork - Bug in forking server
           once parent has reached max_servers caused.

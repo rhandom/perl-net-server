@@ -1,6 +1,6 @@
 # -*- perl -*-
 #
-#  Net::Server - adpO - Extensible Perl internet server
+#  Net::Server - bdpO - Extensible Perl internet server
 #
 #  $Id$
 #
@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.81';
+$VERSION = '0.82';
 
 ### program flow
 sub run {
@@ -610,7 +610,7 @@ sub post_accept {
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   *STDIN  = \*{ $prop->{client} };
-  *STDOUT = \*{ $prop->{client} };
+  *STDOUT = \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
   STDIN->autoflush(1);
   STDOUT->autoflush(1);
   select(STDOUT);
