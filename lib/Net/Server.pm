@@ -1883,7 +1883,7 @@ high hit site.
 
 Explore any other personalities
 
-=item Net::HTTPServer, etc
+=item Net::Server::HTTP, etc
 
 Create various types of servers.  Possibly, port exising
 servers to user Net::Server as a base layer.

@@ -1,6 +1,36 @@
 Revision history for Perl extension Net::Server.
 
-0.71  Aug 17 10:34 2001
+0.75  Aug 23 10:49
+        - Both Net::Server::Fork and Net::Server::PreFork are
+                using safe signals via Net::Server::SIG.
+        - Net::Server::PreFork has new child managment model.
+                NOTE: spare_servers is no longer used.  It
+                has been replaced by min_spare_servers and
+                max_spare_servers.  This is a major change.
+                The server will die if these parameters are
+                not properly set.
+                - operates better under high loads
+                - provides better clean up of waiting servers.
+                - more configurable.
+                - Read the perldoc for updates.
+        - Net::Server::Fork and Net::Server::PreFork HUP
+                properly again.
+        - t/Server_PreFork.t and t/Server_Fork.t execute
+                properly.
+        - Fix in Multiport accept with signals.
+        - Updated perldocs
+                
+
+0.73  Aug 21 17:06
+        - Net::Server::PreFork is on safe signals.
+
+0.72  Aug 21 16:22 2001
+        - Beginning work on Safe signals
+        - Net::Server::Fork is on safe signals.
+        - Added Net::Server::SIG
+        - Added examples/sigtest.pl
+
+0.71  Aug 17 15:51 2001
         - Die on failed change to another user or group.
             WARNING: No longer defaults to nobody.nobody.
             Defaults to currently running user and group.
