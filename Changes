@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+0.87  Feb 14 2004
+        - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
+          that fixes RT Bug #3671
+        - Patch by chris@dyndns.org (Chris Reinhardt)
+          Integrate pre_accept_hook and post_accept_hook
+          into Net::Server::Fork
+
 0.86  Nov 06 2003
         - Changed maintainer to bbb@cpan.org (Rob Brown).
         - Patch to fix Net::Server::Daemonize setuid bug:
