@@ -101,6 +101,17 @@ PERSONALITIES
         Net::Server::MultiType will cycle through until it finds a class
         that it can use.
 
+    Multiplex
+        Found in the module Net/Server/Multiplex.pm (see the
+        Net::Server::Multiplex manpage). This server binds to one or more
+        ports. It uses IO::Multiplex to multiplex between waiting for new
+        connections and waiting for input on currently established
+        connections. This personality is designed to run as one process
+        without forking. The `process_request' method is never used but the
+        `mux_input' callback is used instead (see also the IO::Multiplex
+        manpage). See examples/samplechat.pl for an example using most of
+        the features of Net::Server::Multiplex.
+
     PreForkSimple
         Found in the module Net/Server/PreFork.pm (see the
         Net::Server::PreFork manpage). This server binds to one or more
@@ -488,7 +499,7 @@ CONFIGURATION FILE
 
       ### reverse lookups ?
       # reverse_lookups on
- 
+
       #-------------- file test.conf --------------
 
 PROCESS FLOW
@@ -538,7 +549,7 @@ PROCESS FLOW
       if( $self->allow_deny
 
           && $self->allow_deny_hook ){
-    
+
         $self->process_request;
 
       }else{
@@ -558,7 +569,7 @@ PROCESS FLOW
     represents the program flow:
 
       $self->close_children;  # if any
-  
+
       $self->post_child_cleanup_hook;
 
       # if( Restarting server ){
@@ -722,9 +733,9 @@ COPYRIGHT
       Copyright (C) 2001, Paul T Seamons
                           paul@seamons.com
                           http://seamons.com/
-  
+
       This package may be distributed under the terms of either the
-      GNU General Public License 
+      GNU General Public License
         or the
       Perl Artistic License
 

@@ -1,20 +1,20 @@
 # -*- perl -*-
 #
 #  Net::Server - adpO - Extensible Perl internet server
-#  
+#
 #  $Id$
-#  
+#
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
-#  
+#
 #  This package may be distributed under the terms of either the
-#  GNU General Public License 
+#  GNU General Public License
 #    or the
 #  Perl Artistic License
 #
 #  All rights reserved.
-#  
+#
 #  Please read the perldoc Net::Server
 #
 ################################################################
@@ -34,7 +34,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.78';
+$VERSION = '0.79';
 
 ### program flow
 sub run {
@@ -106,7 +106,7 @@ sub run_client_connection {
 
   if( $self->allow_deny             # do allow/deny check on client info
       && $self->allow_deny_hook ){  # user customizable hook
-    
+
     $self->process_request;   # This is where the core functionality
                               # of a Net::Server should be.  This is the
                               # only method necessary to override.
@@ -173,24 +173,24 @@ sub post_configure {
   }
   $prop->{log_level} = 4 if $prop->{log_level} > 4;
 
-    
+
   ### log to STDERR
   if( ! defined($prop->{log_file}) ){
     $prop->{log_file} = '';
 
   ### log to syslog
   }elsif( $prop->{log_file} eq 'Sys::Syslog' ){
-    
+
     my $logsock = defined($prop->{syslog_logsock})
       ? $prop->{syslog_logsock} : 'unix';
     $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet)$/)
       ? $1 : 'unix';
-    
+
     my $ident = defined($prop->{syslog_ident})
       ? $prop->{syslog_ident} : 'net_server';
     $prop->{syslog_ident} = ($ident =~ /^(\w+)$/)
       ? $1 : 'net_server';
-    
+
     my $opt = defined($prop->{syslog_logopt})
       ? $prop->{syslog_logopt} : 'pid';
     $prop->{syslog_logopt} = ($opt =~ /^((cons|ndelay|nowait|pid)($|\|))*/)
@@ -226,7 +226,7 @@ sub post_configure {
       $self->fatal( $@ );
     }
   }
-  
+
   ### completetly daemonize by closing STDIN, STDOUT (should be done before fork)
   if( defined($prop->{setsid}) || length($prop->{log_file}) ){
     open STDIN,  '</dev/null' || die "Can't read /dev/null  [$!]";
@@ -443,7 +443,7 @@ sub post_bind {
     }
   }
 
-  
+
   ### perform the chroot operation
   if( defined $prop->{chroot} ){
     if( ! -d $prop->{chroot} ){
@@ -455,7 +455,7 @@ sub post_bind {
     }
   }
 
-  
+
   ### drop privileges
   eval{
     if( $prop->{group} ne $) ){
@@ -525,11 +525,11 @@ sub accept {
 
     ### with more than one port, use select to get the next one
     if( defined $prop->{multi_port} ){
-      
+
       ### anything server type specific
       $sock = $self->accept_multi_port;
       next unless $sock; # keep trying for the rest of retries
-      
+
       ### last one if HUPed
       return 0 if defined $prop->{_HUP};
 
@@ -563,7 +563,7 @@ sub accept {
 
     ### last one if HUPed
     return 0 if defined $prop->{_HUP};
-    
+
     ### success
     return 1 if defined $prop->{client};
 
@@ -645,7 +645,7 @@ sub get_client_info {
     $prop->{sockhost} = 'inet.test';
     $prop->{sockport} = 0;
   }
-  
+
   ### try to get some info about the remote host
   my $proto_type = 'TCP';
   if( $prop->{udp_true} ){
@@ -657,7 +657,7 @@ sub get_client_info {
     ($prop->{peerport}, $prop->{peeraddr})
       = Socket::unpack_sockaddr_in( $prop->{peername} );
   }
-  
+
   if( $prop->{peername} || $prop->{udp_true} ){
     $prop->{peeraddr} = inet_ntoa( $prop->{peeraddr} );
 
@@ -751,14 +751,14 @@ sub process_request {
   eval {
 
     local $SIG{ALRM} = sub { die "Timed Out!\n" };
-    
+
     while( <STDIN> ){
-      
+
       s/\r?\n$//;
-      
+
       print ref($self),":$$: You said \"$_\"\r\n";
       $self->log(5,$_); # very verbose log
-      
+
       if( /get (\w+)/ ){
         print "$1: $self->{server}->{$1}\r\n";
       }
@@ -767,11 +767,11 @@ sub process_request {
         require "Data/Dumper.pm";
         print Data::Dumper::Dumper( $self );
       }
-      
+
       if( /quit/ ){ last }
-      
+
       if( /exit/ ){ $self->server_close }
-      
+
       alarm($timeout);
     }
     alarm($previous_alarm);
@@ -819,7 +819,7 @@ sub run_dequeue {
   ### trouble
   if( not defined $pid ){
     $self->fatal("Bad fork [$!]");
-    
+
   ### parent
   }elsif( $pid ){
     $self->{server}->{children}->{$pid} = 'dequeue';
@@ -880,7 +880,7 @@ sub server_close{
     unlink $prop->{lock_file} || warn "Couldn't unlink \"$prop->{lock_file}\" [$!]";
   }
   if( defined $prop->{pid_file}
-      && -e $prop->{pid_file} 
+      && -e $prop->{pid_file}
       && defined $prop->{pid_file_unlink} ){
     unlink $prop->{pid_file} || warn "Couldn't unlink \"$prop->{pid_file}\" [$!]";
   }
@@ -918,7 +918,7 @@ sub close_children {
   ### need to wait off the children
   ### eventually this should probably use &check_sigs
   1 while (waitpid(-1,POSIX::WNOHANG()) > 0);
-  
+
 }
 
 sub post_child_cleanup_hook {}
@@ -952,10 +952,10 @@ sub sig_hup {
 
     ### remove anything that may be blocking
     $sock->close();
-    
+
     $i++;
   }
-  
+
   ### remove any blocking obstacle
   if( defined $prop->{select} ){
     delete $prop->{select};
@@ -1038,7 +1038,7 @@ sub write_to_log_hook {
   local $_  = shift || '';
   chomp;
   s/([^\n\ -\~])/sprintf("%%%02X",ord($1))/eg;
-  
+
   if( $prop->{log_file} ){
     print _SERVER_LOG $_, "\n";
   }elsif( defined($prop->{setsid}) ){
@@ -1096,10 +1096,10 @@ sub process_args {
 
   ### if no template is passed, obtain our own
   if( ! $template || ! ref($template) ){
-    $template = {}; 
+    $template = {};
     $self->options( $template );
   }
-  
+
   foreach (my $i=0 ; $i < @$ref ; $i++ ){
 
     if( $ref->[$i] =~ /^(?:--)?(\w+)([=\ ](\S+))?$/
@@ -1138,15 +1138,15 @@ sub process_conf {
   if( ! $self->{server}->{conf_file_args} ){
     $file = ($file =~ m|^([\w\.\-/]+)$|)
       ? $1 : $self->fatal("Unsecure filename \"$file\"");
-    
+
     if( not open(_CONF,"<$file") ){
       $self->fatal("Couldn't open conf \"$file\" [$!]");
     }
-    
+
     while(<_CONF>){
       push( @args, "$1=$2") if m/^\s*((?:--)?\w+)[=:]?\s*(\S+)/;
     }
-    
+
     close(_CONF);
 
     $self->{server}->{conf_file_args} = \@args;
@@ -1299,6 +1299,19 @@ personalities.  Multiple C<server_type> parameters may be
 given and Net::Server::MultiType will cycle through until it
 finds a class that it can use.
 
+=item Multiplex
+
+Found in the module Net/Server/Multiplex.pm (see
+L<Net::Server::Multiplex>).  This server binds to one or more
+ports.  It uses IO::Multiplex to multiplex between waiting
+for new connections and waiting for input on currently
+established connections.  This personality is designed to
+run as one process without forking.  The C<process_request>
+method is never used but the C<mux_input> callback is used
+instead (see also L<IO::Multiplex>).  See
+examples/samplechat.pl for an example using most of the
+features of Net::Server::Multiplex.
+
 =item PreForkSimple
 
 Found in the module Net/Server/PreFork.pm (see
@@ -1313,7 +1326,7 @@ It should scale well for most applications.  Multi port accept
 is accomplished using either flock, IPC::Semaphore, or pipe to serialize the
 children.  Serialization may also be switched on for single
 port in order to get around an OS that does not allow multiple
-children to accept at the same time.  For a further 
+children to accept at the same time.  For a further
 discussion of serialization see L<Net::Server::PreFork>.
 
 =item PreFork
@@ -1331,7 +1344,7 @@ applications.  Multi port accept is accomplished using
 either flock, IPC::Semaphore, or pipe to serialize the
 children.  Serialization may also be switched on for single
 port in order to get around an OS that does not allow multiple
-children to accept at the same time.  For a further 
+children to accept at the same time.  For a further
 discussion of serialization see L<Net::Server::PreFork>.
 
 =item Single
@@ -1352,8 +1365,8 @@ the core module.
 Once started, the Net::Server will take care of binding to
 port and waiting for connections.  Once a connection is
 received, the Net::Server will accept on the socket and
-will store the result (the client connection) in 
-$self-E<gt>{server}-E<gt>{client}.  This property is a 
+will store the result (the client connection) in
+$self-E<gt>{server}-E<gt>{client}.  This property is a
 Socket blessed into the the IO::Socket classes.  UDP
 servers are slightly different in that they will perform
 a B<recv> instead of an B<accept>.
@@ -1370,7 +1383,7 @@ The following is a very simple server.  The main
 functionality occurs in the process_request method call as
 shown below.  Notice the use of timeouts to prevent Denial
 of Service while reading.  (Other examples of using
-C<Net::Server> can, or will, be included with this distribution).  
+C<Net::Server> can, or will, be included with this distribution).
 
   #!/usr/bin/perl -w -T
   #--------------- file test.pl ---------------
@@ -1456,7 +1469,7 @@ a prebuilt object can best be shown in the following code:
 All five methods for passing arguments may be used at the
 same time.  Once an argument has been set, it is not over
 written if another method passes the same argument.  C<Net::Server>
-will look for arguments in the following order: 
+will look for arguments in the following order:
 
   1) Arguments contained in the prebuilt object.
   2) Arguments passed on command line.
@@ -1520,12 +1533,12 @@ Ranges from 0 to 4 in level.  Specifies what level of error
 will be logged.  "O" means logging is off.  "4" means very
 verbose.  These levels should be able to correlate to syslog
 levels.  Default is 2.  These levels correlate to syslog levels
-as defined by the following key/value pairs: 0=>'err', 
+as defined by the following key/value pairs: 0=>'err',
 1=>'warning', 2=>'notice', 3=>'info', 4=>'debug'.
 
 =item log_file
 
-Name of log file to be written to.  If no name is given and 
+Name of log file to be written to.  If no name is given and
 hook is not overridden, log goes to STDERR.  Default is undef.
 If the magic name "Sys::Syslog" is used, all logging will
 take place via the Sys::Syslog module.  If syslog is used
@@ -1533,7 +1546,7 @@ the parameters C<syslog_logsock>, C<syslog_ident>, and
 C<syslog_logopt>,and C<syslog_facility> may also be defined.
 If a C<log_file> is given or if C<setsid> is set, STDIN and
 STDOUT will automatically be opened to /dev/null and STDERR
-will be opened to STDOUT.  This will prevent any output 
+will be opened to STDOUT.  This will prevent any output
 from ending up at the terminal.
 
 =item pid_file
@@ -1544,19 +1557,19 @@ only to forking servers.  Default is none (undef).
 =item syslog_logsock
 
 Only available if C<log_file> is equal to "Sys::Syslog".  May
-be either "unix" of "inet".  Default is "unix".  
+be either "unix" of "inet".  Default is "unix".
 See L<Sys::Syslog>.
 
 =item syslog_ident
 
-Only available if C<log_file> is equal to "Sys::Syslog".  Id 
+Only available if C<log_file> is equal to "Sys::Syslog".  Id
 to prepend on syslog entries.  Default is "net_server".
 See L<Sys::Syslog>.
 
 =item syslog_logopt
 
 Only available if C<log_file> is equal to "Sys::Syslog".  May
-be either zero or more of "pid","cons","ndelay","nowait".  
+be either zero or more of "pid","cons","ndelay","nowait".
 Default is "pid".  See L<Sys::Syslog>.
 
 =item syslog_facility
@@ -1621,7 +1634,7 @@ array refs.
 =item chroot
 
 Directory to chroot to after bind process has taken place
-and the server is still running as root.  Defaults to 
+and the server is still running as root.  Defaults to
 undef.
 
 =item user
@@ -1745,7 +1758,7 @@ ignored.
 
   ### reverse lookups ?
   # reverse_lookups on
- 
+
   #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
@@ -1798,7 +1811,7 @@ represents the program flow:
   if( $self->allow_deny
 
       && $self->allow_deny_hook ){
-    
+
     $self->process_request;
 
   }else{
@@ -1820,7 +1833,7 @@ During the server shutdown phase
 represents the program flow:
 
   $self->close_children;  # if any
-  
+
   $self->post_child_cleanup_hook;
 
   # if( Restarting server ){
@@ -1842,7 +1855,7 @@ different levels of execution.
 
 This hook takes place immediately after the C<-E<gt>run()>
 method is called.  This hook allows for setting up the
-object before any built in configuration takes place. 
+object before any built in configuration takes place.
 This allows for custom configurability.
 
 =item C<$self-E<gt>post_configure_hook()>
@@ -1916,7 +1929,7 @@ return and use the built in shut down features.
 This hook occurs in the parent server process after all
 children have been shut down and just before the server
 either restarts or exits.  It is intended for additional
-cleanup of information.  At this point pid_files and 
+cleanup of information.  At this point pid_files and
 lockfiles still exist.
 
 =item C<$self-E<gt>restart_open_hook>
@@ -2002,7 +2015,7 @@ Thanks to Jonathan J. Miner <miner@doit.wisc.edu> for
 patching a blatant problem in the reverse lookups.
 
 Thanks to Bennett Todd <bet@rahul.net> for
-pointing out a problem in Solaris 2.5.1 which does not 
+pointing out a problem in Solaris 2.5.1 which does not
 allow multiple children to accept on the same port at
 the same time.  Also for showing some sample code
 from Viktor Duchovni which now represents the semaphore
@@ -2030,9 +2043,9 @@ L<Net::Server::Single>
   Copyright (C) 2001, Paul T Seamons
                       paul@seamons.com
                       http://seamons.com/
-  
+
   This package may be distributed under the terms of either the
-  GNU General Public License 
+  GNU General Public License
     or the
   Perl Artistic License
 

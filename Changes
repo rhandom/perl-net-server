@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Server.
 
+0.79  Oct 23 12:00 2001
+        - Added Net::Server::Multiplex
+        - NOTE: IO::Multiplex >= 1.01 is required
+          to use this personality.
+
 0.78  Sep 28 9:13
         - Added post_child_cleanup_hook to server_close
         - Moved pre_server_close_hook inside server_close
