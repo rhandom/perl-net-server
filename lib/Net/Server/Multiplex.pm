@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2002, Rob Brown <bbb@cpan.org>
+#  Copyright (C) 2001-2003, Rob Brown <bbb@cpan.org>
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
@@ -53,6 +53,10 @@ sub loop {
                CHLD => sub { $self->sig_chld() },
                );
 
+  if ( defined $prop->{check_for_dequeue} ) {
+    $mux->set_timeout( $prop->{check_for_dequeue} );
+  }
+
   $mux->loop(sub {
     my ($rdready, $wrready) = @_;
     &check_sigs();
@@ -96,9 +100,14 @@ sub setup_client_connection {
   return 1;
 }
 
+# Compatibility interface for Net::Server
+sub run_dequeue {
+  confess "&$Net::Server::Multiplex::MUX::ISA[0]\::run_dequeue never defined";
+}
+
 sub mux_connection {}
 sub mux_input {
-  confess "virtual function never defined";
+  confess "&$Net::Server::Multiplex::MUX::ISA[0]\::mux_input never defined";
 }
 sub mux_eof {}
 sub mux_close {}
@@ -213,9 +222,16 @@ sub mux_timeout {
   my $self = shift;
   my $mux  = shift;
   my $fh   = shift;
-  $self->_link_stdout($mux, $fh);
-  $self->SUPER::mux_timeout($mux, $fh);
-  $self->_unlink_stdout();
+
+  $self->{net_server}->{server}->{peerport};
+  if ( my $check = $self->{net_server}->{server}->{check_for_dequeue} ) {
+    $self->run_dequeue();
+    $mux->set_timeout( $check );
+  } else {
+    $self->_link_stdout($mux, $fh);
+    $self->SUPER::mux_timeout($mux, $fh);
+    $self->_unlink_stdout();
+  }
   return;
 }
 
@@ -253,8 +269,7 @@ Net::Server::Multiplex - Multiplex several connections within one process
 
   package MyPlexer;
 
-  use Net::Server::Multiplex;
-  @ISA = qw(Net::Server::Multiplex);
+  use base 'Net::Server::Multiplex';
 
   sub mux_input {
      #...code...
@@ -335,6 +350,10 @@ The following represents the client processing program flow:
 
   $self->{server}->{client} = Net::Server::Proto::TCP->accept();  # NOTE: Multiplexed with mux_input() below
 
+  if (check_for_dequeue seconds have passed) {
+    $self->run_dequeue();
+  }
+
   $self->get_client_info;
 
   $self->post_accept_hook; # Net::Server style
@@ -394,6 +413,17 @@ The process_request() method is never used with this personality.
 
 The other Net::Server hooks and methods should work the same.
 
+=over 4
+
+=item C<$self-E<gt>run_dequeue()>
+
+This hook only gets called in conjuction with the check_for_dequeue
+setting.  It will run every check_for_dequeue seconds.  Since no
+forking is done, this hook should run fast in order to prevent
+blocking the rest of the processing.
+
+=back
+
 =head1 TIMEOUTS
 
 =head2 set_timeout
@@ -427,7 +457,6 @@ the corresponding client socket handle for your convenience and to more
 closely emulate the Net::Server model.  However, unlike some other
 Net::Server personalities, you should never read directly from STDIN
 yourself.   You should define one or more of the following methods:
-
 
 =head2 mux_connection ($mux,$fh)
 
@@ -471,12 +500,20 @@ explained above.
 
 This is only known to work with TCP servers.
 
+If you need to use the IO::Multiplex style set_timeout / mux_timeout
+interface, you cannot use the Net::Server style check_for_dequeue
+/ run_dequeue interface.  It will not work if the check_for_dequeue
+option is specified.  The run_dequeue method is just a compatibility
+interface to comply with the Net::Server::Fork style run_dequeue but
+is implemented in terms of the IO::Multiplex style set_timeout and
+mux_timeout methods.
+
 Please notify me, the author, of any other problems or issues
 you find.
 
 =head1 AUTHOR
 
-Copyright (C) 2001, Rob Brown <bbb@cpan.org>
+Copyright (C) 2001-2003, Rob Brown <bbb@cpan.org>
 
 This package may be distributed under the terms of either the
 GNU General Public License
@@ -489,7 +526,6 @@ All rights reserved.
 
 L<Net::Server> by Paul Seamons <paul@seamons.com>,
 
-L<IO::Multiplex> by Bruce Keeler <bruce@gridpoint.com>
-and Liraz Siri <liraz_siri@usa.net>.
+L<IO::Multiplex> by Bruce Keeler <bruce@gridpoint.com>.
 
 =cut
