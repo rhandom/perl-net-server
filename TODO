@@ -1,4 +1,4 @@
-Make sure log_file is chowned
+Make sure log_file is chowned.
 Clean up signal handling in the parent of Fork and PreFork.
 Revise parent of PreFork to use max_spare_servers and min_spare_servers.
 Allow for check to see if change of group and user actually occured.
