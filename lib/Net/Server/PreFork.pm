@@ -25,6 +25,7 @@ use POSIX qw(WNOHANG);
 use Net::Server::PreForkSimple;
 use Net::Server::SIG qw(register_sig check_sigs);
 use IO::Select ();
+use IO::Socket::UNIX;
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -113,6 +114,7 @@ sub loop {
 
   ### get ready for children
   $prop->{children} = {};
+  $prop->{child_select} = IO::Select->new(\*_READ);
 
   $self->log(3,"Beginning prefork ($prop->{min_servers} processes)\n");
 
@@ -144,9 +146,9 @@ sub kill_n_children {
   $self->log(3,"Killing \"$n\" children");
 
   foreach (keys %{ $prop->{children} }){
-    next unless $prop->{children}->{$_} eq 'waiting';
+    next unless $prop->{children}->{$_}->{status} eq 'waiting';
     if( ! kill('HUP',$_) ){
-      delete $prop->{children}->{$_};
+      $self->delete_child( $_ );
       next;
     }
     last if --$n <= 0;
@@ -160,23 +162,43 @@ sub run_n_children {
   my $n     = shift;
   return unless $n > 0;
 
+  my ($parentsock, $childsock);
+
   $self->log(3,"Starting \"$n\" children");
   $prop->{last_start} = time();
   
+  if( $prop->{unix_sockets} ) {
+    ($parentsock, $childsock) = 
+      IO::Socket::UNIX->socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+  }
+
   for( 1..$n ){
     my $pid = fork;
 
     ### trouble
     if( not defined $pid ){
+      if( $prop->{unix_sockets} ){
+        $parentsock->close();
+        $childsock->close();
+      }
+
       $self->fatal("Bad fork [$!]");
 
     ### parent
     }elsif( $pid ){
-      $prop->{children}->{$pid} = 'waiting';
+      if( $prop->{unix_sockets} ){
+	$prop->{child_select}->add($parentsock);
+        $prop->{children}->{$pid}->{sock} = $parentsock;
+      }
+      
+      $prop->{children}->{$pid}->{status} = 'waiting';
       $prop->{tally}->{waiting} ++;
 
     ### child
     }else{
+      if( $prop->{unix_sockets} ){
+        $self->{server_sock} = $childsock;
+      }
       $self->run_child;
 
     }
@@ -239,6 +261,7 @@ sub run_child {
 sub run_parent {
   my $self=shift;
   my $prop = $self->{server};
+  my $id;
 
   $self->log(4,"Parent ready for children.\n");
   
@@ -267,8 +290,7 @@ sub run_parent {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
-                   $prop->{children}->{$chld} = "gracias";
-#                   delete $prop->{children}->{$chld};
+		   $self->delete_child( $chld );
                  }
                },
 ### uncomment this area to allow SIG USR1 to give some runtime debugging               
@@ -278,10 +300,6 @@ sub run_parent {
 #               },
                );
 
-  ### need a selection handle
-  my $select = IO::Select->new();
-  $select->add(\*_READ);
-
   ### loop on reading info from the children
   while( 1 ){
 
@@ -289,7 +307,7 @@ sub run_parent {
     ## Normally it is not good to do selects with
     ## getline or <$fh> but this is controlled output
     ## where everything that comes through came from us.
-    my @fh = $select->can_read(10);
+    my @fh = $prop->{child_select}->can_read(10);
     if( &check_sigs() ){
       last if $prop->{_HUP};
     }
@@ -298,33 +316,41 @@ sub run_parent {
       next;
     }
 
-    ### get the filehandle
-    my $fh = shift(@fh);
-    next unless defined $fh;
-    
-    ### read a line
-    my $line = <$fh>;
-    next if not defined $line;
+    ### process every readable handle
+    foreach my $fh (@fh) {
 
-    ### optional test by user hook
-    last if $self->parent_read_hook($line);
+      ### preforking server data
+      if ($fh == \*_READ) {
+	
+        ### read a line
+        my $line = <$fh>;
+        next if not defined $line;
 
-    ### child should say "$pid status\n"
-    next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
-    my ($pid,$status) = ($1,$2);
+        ### optional test by user hook
+        last if $self->parent_read_hook($line);
 
-    ### record the status
-    $prop->{children}->{$pid} = $status;
-    if( $status eq 'processing' ){
-      $prop->{tally}->{processing} ++;
-      $prop->{tally}->{waiting} --;
-      $prop->{last_process} = time();
-    }elsif( $status eq 'waiting' ){
-      $prop->{tally}->{processing} --;
-      $prop->{tally}->{waiting} ++;
-    }elsif( $status eq 'exiting' ){
-      $prop->{tally}->{processing} --;
-      delete $prop->{children}->{$pid};
+        ### child should say "$pid status\n"
+        next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
+        my ($pid,$status) = ($1,$2);
+
+        ### record the status
+        $prop->{children}->{$pid}->{status} = $status;
+        if( $status eq 'processing' ){
+          $prop->{tally}->{processing} ++;
+          $prop->{tally}->{waiting} --;
+          $prop->{last_process} = time();
+        }elsif( $status eq 'waiting' ){
+          $prop->{tally}->{processing} --;
+          $prop->{tally}->{waiting} ++;
+        }elsif( $status eq 'exiting' ){
+          $prop->{tally}->{processing} --;
+	  $self->delete_child( $pid );
+        }
+
+      ### user defined handler
+      }else{
+        $self->child_is_talking($fh);
+      }
     }
 
     ### check up on the children
@@ -352,7 +378,7 @@ sub coordinate_children {
                       processing => 0,
                       dequeue    => 0};
     foreach (values %{ $prop->{children} }){
-      $prop->{tally}->{$_} ++;
+      $prop->{tally}->{$_->{status}} ++;
     }
     $w -= $prop->{tally}->{waiting};
     $p -= $prop->{tally}->{processing};
@@ -403,7 +429,7 @@ sub coordinate_children {
     $prop->{last_checked_for_dead} = $time;
     foreach (keys %{ $prop->{children} }){
       ### see if the child can be killed
-      kill(0,$_) or delete $prop->{children}->{$_};
+      kill(0,$_) or $self->delete_child($_);
     }
   }
 
@@ -429,6 +455,8 @@ sub coordinate_children {
 
 ### allow for other process to tie in to the parent read
 sub parent_read_hook {}
+
+sub child_is_talking {}
 
 1;
 

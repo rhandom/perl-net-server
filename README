@@ -42,40 +42,40 @@ FEATURES
      * Extensibility
 
 DESCRIPTION
-    `Net::Server' is an extensible, generic Perl server engine.
-    `Net::Server' combines the good properties from `Net::Daemon' (0.34),
-    `NetServer::Generic' (1.03), and `Net::FTPServer' (1.0), and also from
+    "Net::Server" is an extensible, generic Perl server engine.
+    "Net::Server" combines the good properties from "Net::Daemon" (0.34),
+    "NetServer::Generic" (1.03), and "Net::FTPServer" (1.0), and also from
     various concepts in the Apache Webserver.
 
-    `Net::Server' attempts to be a generic server as in `Net::Daemon' and
-    `NetServer::Generic'. It includes with it the ability to run as an inetd
-    process (`Net::Server::INET'), a single connection server (`Net::Server'
-    or `Net::Server::Single'), a forking server (`Net::Server::Fork'), a
+    "Net::Server" attempts to be a generic server as in "Net::Daemon" and
+    "NetServer::Generic". It includes with it the ability to run as an inetd
+    process ("Net::Server::INET"), a single connection server ("Net::Server"
+    or "Net::Server::Single"), a forking server ("Net::Server::Fork"), a
     preforking server which maintains a constant number of preforked
-    children (`Net::Server::PreForkSimple'), or as a managed preforking
+    children ("Net::Server::PreForkSimple"), or as a managed preforking
     server which maintains the number of children based on server load
-    (`Net::Server::PreFork'). In all but the inetd type, the server provides
+    ("Net::Server::PreFork"). In all but the inetd type, the server provides
     the ability to connect to one or to multiple server ports.
 
-    `Net::Server' uses ideologies of `Net::FTPServer' in order to provide
+    "Net::Server" uses ideologies of "Net::FTPServer" in order to provide
     extensibility. The additional server types are made possible via
-    "personalities" or sub classes of the `Net::Server'. By moving the
-    multiple types of servers out of the main `Net::Server' class, the
-    `Net::Server' concept is easily extended to other types (in the near
+    "personalities" or sub classes of the "Net::Server". By moving the
+    multiple types of servers out of the main "Net::Server" class, the
+    "Net::Server" concept is easily extended to other types (in the near
     future, we would like to add a "Thread" personality).
 
-    `Net::Server' borrows several concepts from the Apache Webserver.
-    `Net::Server' uses "hooks" to allow custom servers such as SMTP, HTTP,
-    POP3, etc. to be layered over the base `Net::Server' class. In addition
-    the `Net::Server::PreFork' class borrows concepts of min_start_servers,
-    max_servers, and min_waiting servers. `Net::Server::PreFork' also uses
+    "Net::Server" borrows several concepts from the Apache Webserver.
+    "Net::Server" uses "hooks" to allow custom servers such as SMTP, HTTP,
+    POP3, etc. to be layered over the base "Net::Server" class. In addition
+    the "Net::Server::PreFork" class borrows concepts of min_start_servers,
+    max_servers, and min_waiting servers. "Net::Server::PreFork" also uses
     the concept of an flock serialized accept when accepting on multiple
     ports (PreFork can choose between flock, IPC::Semaphore, and pipe to
     control serialization).
 
 PERSONALITIES
-    `Net::Server' is built around a common class (Net::Server) and is
-    extended using sub classes, or `personalities'. Each personality
+    "Net::Server" is built around a common class (Net::Server) and is
+    extended using sub classes, or "personalities". Each personality
     inherits, overrides, or enhances the base methods of the base class.
 
     Included with the Net::Server package are several basic personalities,
@@ -91,7 +91,7 @@ PERSONALITIES
     INET
         Found in the module Net/Server/INET.pm (see the Net::Server::INET
         manpage). This server is designed to be used with inetd. The
-        `pre_bind', `bind', `accept', and `post_accept' are all overridden
+        "pre_bind", "bind", "accept", and "post_accept" are all overridden
         as these services are taken care of by the INET daemon.
 
     MultiType
@@ -99,7 +99,7 @@ PERSONALITIES
         Net::Server::MultiType manpage). This server has no server
         functionality of its own. It is designed for servers which need a
         simple way to easily switch between different personalities.
-        Multiple `server_type' parameters may be given and
+        Multiple "server_type" parameters may be given and
         Net::Server::MultiType will cycle through until it finds a class
         that it can use.
 
@@ -109,18 +109,18 @@ PERSONALITIES
         ports. It uses IO::Multiplex to multiplex between waiting for new
         connections and waiting for input on currently established
         connections. This personality is designed to run as one process
-        without forking. The `process_request' method is never used but the
-        `mux_input' callback is used instead (see also the IO::Multiplex
+        without forking. The "process_request" method is never used but the
+        "mux_input" callback is used instead (see also the IO::Multiplex
         manpage). See examples/samplechat.pl for an example using most of
         the features of Net::Server::Multiplex.
 
     PreForkSimple
         Found in the module Net/Server/PreFork.pm (see the
         Net::Server::PreFork manpage). This server binds to one or more
-        ports and then forks `max_servers' child process. The server will
-        make sure that at any given time there are always `max_servers'
+        ports and then forks "max_servers" child process. The server will
+        make sure that at any given time there are always "max_servers"
         available to receive a client request. Each of these children will
-        process up to `max_requests' client connections. This type is good
+        process up to "max_requests" client connections. This type is good
         for a heavily hit site that can dedicate max_server processes no
         matter what the load. It should scale well for most applications.
         Multi port accept is accomplished using either flock,
@@ -133,11 +133,11 @@ PERSONALITIES
     PreFork
         Found in the module Net/Server/PreFork.pm (see the
         Net::Server::PreFork manpage). This server binds to one or more
-        ports and then forks `min_servers' child process. The server will
+        ports and then forks "min_servers" child process. The server will
         make sure that at any given time there are at least
-        `min_spare_servers' but not more than `max_spare_servers' available
-        to receive a client request, up to `max_servers'. Each of these
-        children will process up to `max_requests' client connections. This
+        "min_spare_servers" but not more than "max_spare_servers" available
+        to receive a client request, up to "max_servers". Each of these
+        children will process up to "max_requests" client connections. This
         type is good for a heavily hit site, and should scale well for most
         applications. Multi port accept is accomplished using either flock,
         IPC::Semaphore, or pipe to serialize the children. Serialization may
@@ -150,7 +150,7 @@ PERSONALITIES
         All methods fall back to Net::Server. This personality is provided
         only as parallelism for Net::Server::MultiType.
 
-    `Net::Server' was partially written to make it easy to add new
+    "Net::Server" was partially written to make it easy to add new
     personalities. Using separate modules built upon an open architecture
     allows for easy addition of new features, a separate development
     process, and reduced code bloat in the core module.
@@ -172,7 +172,7 @@ SAMPLE CODE
     The following is a very simple server. The main functionality occurs in
     the process_request method call as shown below. Notice the use of
     timeouts to prevent Denial of Service while reading. (Other examples of
-    using `Net::Server' can, or will, be included with this distribution).
+    using "Net::Server" can, or will, be included with this distribution).
 
       #!/usr/bin/perl -w -T
       #--------------- file test.pl ---------------
@@ -229,11 +229,11 @@ ARGUMENTS
     run*, or *using a pre-built object to call the run method*.
 
     Arguments consist of key value pairs. On the commandline these pairs
-    follow the POSIX fashion of `--key value' or `--key=value', and also
-    `key=value'. In the conf file the parameter passing can best be shown by
+    follow the POSIX fashion of "--key value" or "--key=value", and also
+    "key=value". In the conf file the parameter passing can best be shown by
     the following regular expression: ($key,$val)=~/^(\w+)\s+(\S+?)\s+$/.
     Passing arguments to the run method is done as follows:
-    `Net::Server-'run(key1 => 'val1')>. Passing arguments via a prebuilt
+    "Net::Server-"run(key1 => 'val1')>. Passing arguments via a prebuilt
     object can best be shown in the following code:
 
       #!/usr/bin/perl -w -T
@@ -253,7 +253,7 @@ ARGUMENTS
 
     All five methods for passing arguments may be used at the same time.
     Once an argument has been set, it is not over written if another method
-    passes the same argument. `Net::Server' will look for arguments in the
+    passes the same argument. "Net::Server" will look for arguments in the
     following order:
 
       1) Arguments contained in the prebuilt object.
@@ -263,10 +263,10 @@ ARGUMENTS
       5) Arguments set in the configure_hook.
 
     Key/value pairs used by the server are removed by the configuration
-    process so that server layers on top of `Net::Server' can pass and read
+    process so that server layers on top of "Net::Server" can pass and read
     their own parameters. Currently, Getopt::Long is not used. The following
-    arguments are available in the default `Net::Server' or
-    `Net::Server::Single' modules. (Other personalities may use additional
+    arguments are available in the default "Net::Server" or
+    "Net::Server::Single" modules. (Other personalities may use additional
     parameters and may optionally not use parameters from the base class.)
 
       Key               Value                    Default
@@ -320,9 +320,9 @@ ARGUMENTS
         not overridden, log goes to STDERR. Default is undef. If the magic
         name "Sys::Syslog" is used, all logging will take place via the
         Sys::Syslog module. If syslog is used the parameters
-        `syslog_logsock', `syslog_ident', and `syslog_logopt',and
-        `syslog_facility' may also be defined. If a `log_file' is given or
-        if `setsid' is set, STDIN and STDOUT will automatically be opened to
+        "syslog_logsock", "syslog_ident", and "syslog_logopt",and
+        "syslog_facility" may also be defined. If a "log_file" is given or
+        if "setsid" is set, STDIN and STDOUT will automatically be opened to
         /dev/null and STDERR will be opened to STDOUT. This will prevent any
         output from ending up at the terminal.
 
@@ -331,39 +331,39 @@ ARGUMENTS
         forking servers. Default is none (undef).
 
     syslog_logsock
-        Only available if `log_file' is equal to "Sys::Syslog". May be
+        Only available if "log_file" is equal to "Sys::Syslog". May be
         either "unix" of "inet". Default is "unix". See the Sys::Syslog
         manpage.
 
     syslog_ident
-        Only available if `log_file' is equal to "Sys::Syslog". Id to
+        Only available if "log_file" is equal to "Sys::Syslog". Id to
         prepend on syslog entries. Default is "net_server". See the
         Sys::Syslog manpage.
 
     syslog_logopt
-        Only available if `log_file' is equal to "Sys::Syslog". May be
+        Only available if "log_file" is equal to "Sys::Syslog". May be
         either zero or more of "pid","cons","ndelay","nowait". Default is
         "pid". See the Sys::Syslog manpage.
 
     syslog_facility
-        Only available if `log_file' is equal to "Sys::Syslog". See the
+        Only available if "log_file" is equal to "Sys::Syslog". See the
         Sys::Syslog manpage and the syslog manpage. Default is "daemon".
 
     port
         See the Net::Server::Proto manpage. Local port/socket on which to
         bind. If low port, process must start as root. If multiple ports are
         given, all will be bound at server startup. May be of the form
-        `host:port/proto', `host:port', `port/proto', or `port', where
+        "host:port/proto", "host:port", "port/proto", or "port", where
         *host* represents a hostname residing on the local box, where *port*
         represents either the number of the port (eg. "80") or the service
         designation (eg. "http"), and where *proto* represents the protocol
         to be used. See the Net::Server::Proto manpage. If you are working
-        with unix sockets, you may also specify `socket_file|unix' or
-        `socket_file|type|unix' where type is SOCK_DGRAM or SOCK_STREAM. If
-        the protocol is not specified, *proto* will default to the `proto'
-        specified in the arguments. If `proto' is not specified there it
+        with unix sockets, you may also specify "socket_file|unix" or
+        "socket_file|type|unix" where type is SOCK_DGRAM or SOCK_STREAM. If
+        the protocol is not specified, *proto* will default to the "proto"
+        specified in the arguments. If "proto" is not specified there it
         will default to "tcp". If *host* is not specified, *host* will
-        default to `host' specified in the arguments. If `host' is not
+        default to "host" specified in the arguments. If "host" is not
         specified there it will default to "*". Default port is 20203.
 
     host
@@ -384,7 +384,7 @@ ARGUMENTS
 
     reverse_lookups
         Specify whether to lookup the hostname of the connected IP.
-        Information is cached in server object under `peerhost' property.
+        Information is cached in server object under "peerhost" property.
         Default is to not use reverse_lookups (undef).
 
     allow/deny
@@ -401,23 +401,23 @@ ARGUMENTS
     user
         Userid or username to become after the bind process has occured.
         Defaults to "nobody." If you would like the server to run as root,
-        you will have to specify `user' equal to "root".
+        you will have to specify "user" equal to "root".
 
     group
         Groupid or groupname to become after the bind process has occured.
         Defaults to "nobody." If you would like the server to run as root,
-        you will have to specify `group' equal to "root".
+        you will have to specify "group" equal to "root".
 
     background
         Specifies whether or not the server should fork after the bind
         method to release itself from the command line. Defaults to undef.
-        Process will also background if `setsid' is set.
+        Process will also background if "setsid" is set.
 
     setsid
         Specifies whether or not the server should fork after the bind
         method to release itself from the command line and then run the
-        `POSIX::setsid()' command to truly daemonize. Defaults to undef. If
-        a `log_file' is given or if `setsid' is set, STDIN and STDOUT will
+        "POSIX::setsid()" command to truly daemonize. Defaults to undef. If
+        a "log_file" is given or if "setsid" is set, STDIN and STDOUT will
         automatically be opened to /dev/null and STDERR will be opened to
         STDOUT. This will prevent any output from ending up at the terminal.
 
@@ -428,7 +428,7 @@ ARGUMENTS
         (not set).
 
 PROPERTIES
-    All of the `ARGUMENTS' listed above become properties of the server
+    All of the "ARGUMENTS" listed above become properties of the server
     object under the same name. These properties, as well as other internal
     properties, are available during hooks and other method calls.
 
@@ -462,7 +462,7 @@ PROPERTIES
     not undef the sock property or you will close the client connection).
 
 CONFIGURATION FILE
-    `Net::Server' allows for the use of a configuration file to read in
+    "Net::Server" allows for the use of a configuration file to read in
     server parameters. The format of this conf file is simple key value
     pairs. Comments and white space are ignored.
 
@@ -539,7 +539,7 @@ PROCESS FLOW
 
     The server then exits.
 
-    During the client processing phase (`$self->run_client_connection'), the
+    During the client processing phase ("$self->run_client_connection"), the
     following represents the program flow:
 
       $self->post_accept;
@@ -567,7 +567,7 @@ PROCESS FLOW
     The process then loops and waits for the next connection. For a more in
     depth discussion, please read the code.
 
-    During the server shutdown phase (`$self->server_close'), the following
+    During the server shutdown phase ("$self->server_close"), the following
     represents the program flow:
 
       $self->close_children;  # if any
@@ -582,79 +582,79 @@ PROCESS FLOW
       exit;
 
 HOOKS
-    `Net::Server' provides a number of "hooks" allowing for servers layered
-    on top of `Net::Server' to respond at different levels of execution.
+    "Net::Server" provides a number of "hooks" allowing for servers layered
+    on top of "Net::Server" to respond at different levels of execution.
 
-    `$self->configure_hook()'
-        This hook takes place immediately after the `->run()' method is
+    "$self->configure_hook()"
+        This hook takes place immediately after the "->run()" method is
         called. This hook allows for setting up the object before any built
         in configuration takes place. This allows for custom
         configurability.
 
-    `$self->post_configure_hook()'
+    "$self->post_configure_hook()"
         This hook occurs just after the reading of configuration parameters
         and initiation of logging and pid_file creation. It also occurs
-        before the `->pre_bind()' and `->bind()' methods are called. This
+        before the "->pre_bind()" and "->bind()" methods are called. This
         hook allows for verifying configuration parameters.
 
-    `$self->post_bind_hook()'
+    "$self->post_bind_hook()"
         This hook occurs just after the bind process and just before any
         chrooting, change of user, or change of group occurs. At this point
         the process will still be running as the user who started the
         server.
 
-    `$self->pre_loop_hook()'
+    "$self->pre_loop_hook()"
         This hook occurs after chroot, change of user, and change of group
         has occured. It allows for preparation before looping begins.
 
-    `$self->post_accept_hook()'
+    "$self->post_accept_hook()"
         This hook occurs after a client has connected to the server. At this
         point STDIN and STDOUT are mapped to the client socket. This hook
         occurs before the processing of the request.
 
-    `$self->allow_deny_hook()'
+    "$self->allow_deny_hook()"
         This hook allows for the checking of ip and host information beyond
-        the `$self->allow_deny()' routine. If this hook returns 1, the
+        the "$self->allow_deny()" routine. If this hook returns 1, the
         client request will be processed, otherwise, the request will be
         denied processing.
 
-    `$self->request_denied_hook()'
-        This hook occurs if either the `$self->allow_deny()' or
-        `$self->allow_deny_hook()' have taken place.
+    "$self->request_denied_hook()"
+        This hook occurs if either the "$self->allow_deny()" or
+        "$self->allow_deny_hook()" have taken place.
 
-    `$self->post_process_request_hook()'
+    "$self->post_process_request_hook()"
         This hook occurs after the processing of the request, but before the
         client connection has been closed.
 
-    `$self->pre_server_close_hook()'
+    "$self->pre_server_close_hook()"
         This hook occurs before the server begins shutting down.
 
-    `$self->write_to_log_hook'
+    "$self->write_to_log_hook"
         This hook handles writing to log files. The default hook is to write
-        to STDERR, or to the filename contained in the parameter `log_file'.
+        to STDERR, or to the filename contained in the parameter "log_file".
         The arguments passed are a log level of 0 to 4 (4 being very
         verbose), and a log line. If log_file is equal to "Sys::Syslog",
         then logging will go to Sys::Syslog and will bypass the
         write_to_log_hook.
 
-    `$self->fatal_hook'
+    "$self->fatal_hook"
         This hook occurs when the server has encountered an unrecoverable
         error. Arguments passed are the error message, the package, file,
         and line number. The hook may close the server, but it is suggested
         that it simply return and use the built in shut down features.
 
-    `$self->post_child_cleanup_hook'
+    "$self->post_child_cleanup_hook"
         This hook occurs in the parent server process after all children
         have been shut down and just before the server either restarts or
         exits. It is intended for additional cleanup of information. At this
         point pid_files and lockfiles still exist.
 
-    `$self->restart_open_hook'
+    "$self->restart_open_hook"
         This hook occurs if a server has been HUPed (restarted via the HUP
         signal. It occurs just before reopening to the filenos of the
         sockets that were already opened.
 
-    `$self->restart_close_hook'
+    "$self->restart_close_hook"
         This hook occurs if a server has been HUPed (restarted via the HUP
         signal. It occurs just before restarting the server via exec.
 
@@ -664,7 +664,7 @@ RESTARTING
     will close children (if any), make sure that sockets are left open, and
     re-exec using the same commandline parameters that initially started the
     server. (Note: for this reason it is important that @ARGV is not
-    modified until `->run' is called.
+    modified until "->run" is called.
 
 TO DO
     There are several tasks to perform before the alpha label can be removed

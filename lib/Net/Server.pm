@@ -125,7 +125,6 @@ sub run_client_connection {
 
 ###----------------------------------------------------------###
 
-
 ### any pre-initialization stuff
 sub configure_hook {}
 
@@ -833,7 +832,7 @@ sub run_dequeue {
 
   ### parent
   }elsif( $pid ){
-    $self->{server}->{children}->{$pid} = 'dequeue';
+    $self->{server}->{children}->{$pid}->{status} = 'dequeue';
 
   ### child
   }else{
@@ -921,7 +920,7 @@ sub close_children {
 
     ### if it is killable, kill it
     if( not defined($pid) or kill(2,$pid) or not kill(0,$pid) ){
-      delete $prop->{children}->{$pid};
+      $self->delete_child( $pid );
     }
 
   }
@@ -1166,6 +1165,20 @@ sub process_conf {
   $self->process_args( $self->{server}->{conf_file_args}, $template );
 }
 
+### remove a child from the children hash. Not to be called by user.
+### if UNIX sockets are in use the socket is removed from the select object.
+sub delete_child {
+  my $self = shift;
+  my $pid  = shift;
+  my $prop = $self->{server};
+
+  if( $prop->{unix_sockets} ){
+    $prop->{chld_select}->remove( $prop->{children}->{$pid}->{sock} );
+    $prop->{children}->{$pid}->{sock}->close();
+  }
+  
+  delete $prop->{children}->{$pid};  
+}
 
 ###----------------------------------------------------------###
 sub get_property {

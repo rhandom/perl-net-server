@@ -160,7 +160,7 @@ sub run_n_children {
 
     ### parent
     }elsif( $pid ){
-      $prop->{children}->{$pid} = 1;
+      $prop->{children}->{$pid}->{status} = 'processing';
 
     ### child
     }else{
@@ -302,7 +302,7 @@ sub run_parent {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
-                   delete $prop->{children}->{$chld};
+                   $self->delete_child($chld);
                  }
                },
 ### uncomment this area to allow SIG USR1 to give some runtime debugging               
@@ -331,7 +331,7 @@ sub run_parent {
       $prop->{last_checked_for_dead} = $time;
       foreach (keys %{ $prop->{children} }){
         ### see if the child can be killed
-        kill(0,$_) or delete $prop->{children}->{$_};
+        kill(0,$_) or $self->delete_child($_);
       }
     }
 
@@ -339,7 +339,7 @@ sub run_parent {
     my $total_n = 0;
     my $total_d = 0;
     foreach (values %{ $prop->{children} }){
-      if( $_ eq 'dequeue' ){
+      if( $_->{status} eq 'dequeue' ){
         $total_d ++;
       }else{
         $total_n ++;

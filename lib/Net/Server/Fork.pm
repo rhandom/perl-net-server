@@ -90,7 +90,7 @@ sub loop {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
-                   delete $prop->{children}->{$chld};
+                   $self->delete_child($chld);
                  }
                },
                );
@@ -101,7 +101,7 @@ sub loop {
   while( 1 ){
     
     ### make sure we don't use too many processes
-    my $n_children = grep { !/dequeue/ } (values %{ $prop->{children} });
+    my $n_children = grep { $_->{status} !~ /dequeue/ } (values %{ $prop->{children} });
     while ($n_children > $prop->{max_servers}){
 
       ### block for a moment (don't look too often)
@@ -115,10 +115,10 @@ sub loop {
         $self->log(2,"Max number of children reached ($prop->{max_servers}) -- checking for alive.");
         foreach (keys %{ $prop->{children} }){
           ### see if the child can be killed
-          kill(0,$_) or delete $prop->{children}->{$_};
+          kill(0,$_) or $self->delete_child($_);
         }
       }
-      $n_children = grep { !/dequeue/ } (values %{ $prop->{children} });
+      $n_children = grep { $_->{status} !~ /dequeue/ } (values %{ $prop->{children} });
     }
 
     ### periodically check to see if we should clear a queue
@@ -128,7 +128,7 @@ sub loop {
           > $prop->{check_for_dequeue} ){
         $last_checked_for_dequeue = $time;
         if( defined($prop->{max_dequeue}) ){
-          my $n_dequeue = grep { /dequeue/ } (values %{ $prop->{children} });
+          my $n_dequeue = grep { $_->{status} =~ /dequeue/ } (values %{ $prop->{children} });
           if( $n_dequeue < $prop->{max_dequeue} ){
             $self->run_dequeue();
           }
@@ -154,7 +154,7 @@ sub loop {
     ### parent
     }elsif( $pid ){
       close($prop->{client}) if ! $prop->{udp_true};
-      $prop->{children}->{$pid} = time;
+      $prop->{children}->{$pid}->{status} = 'processing';
       
     ### child
     }else{
