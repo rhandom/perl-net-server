@@ -478,7 +478,7 @@ sub post_bind {
   if( $@ ){
     if( $< == 0 || $> == 0 ){
       $self->fatal( $@ );
-    }else{
+    } else {
       $self->log(2,$@);
     }
   }
@@ -2059,14 +2059,15 @@ Paul T. Seamons <paul at seamons.com>
 
 =head1 THANKS
 
-Thanks to Rob Brown <rbrown at about-inc.com> for help with
+Thanks to Rob Brown (bbb at cpan.org) for help with
 miscellaneous concepts such as tracking down the
 serialized select via flock ala Apache and the reference
 to IO::Select making multiport servers possible.  And for
 researching into allowing sockets to remain open upon
 exec (making HUP possible).
+Rob Brown is also the maintainer for Net::Server.
 
-Thanks to Jonathan J. Miner <miner@doit.wisc.edu> for
+Thanks to Jonathan J. Miner <miner at doit.wisc.edu> for
 patching a blatant problem in the reverse lookups.
 
 Thanks to Bennett Todd <bet at rahul.net> for
