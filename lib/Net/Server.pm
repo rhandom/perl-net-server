@@ -27,6 +27,7 @@ use Socket qw( inet_aton inet_ntoa AF_INET );
 use IO::Socket ();
 use POSIX ();
 use Fcntl ();
+use Net::Server::Proto ();
 
 $VERSION = '0.65';
 
@@ -251,34 +252,28 @@ sub pre_bind {
 
   ### loop through the passed ports
   ### set up parallel arrays of hosts, ports, and protos
-  foreach (@{ $prop->{port} }){
-    if( m|^([\w\.\-\*\/]+):(\w+)/(\w+)$| ){
-      $_ = "$1:$2:$3";
-    }elsif( /^([\w\.\-\*\/]+):(\w+)$/ ){
-      my $proto = $prop->{proto};
-      $_ = "$1:$2:$proto";
-    }elsif( m|^(\w+)/(\w+)$| ){
-      my $host  = $prop->{host};
-      $_ = "$host:$1:$2";
-    }elsif( /^(\w+)$/ ){
-      my $host  = $prop->{host};
-      my $proto = $prop->{proto};
-      $_ = "$host:$1:$proto";
-    }else{
-      $self->fatal("Undeterminate port \"$_\"");
-    }
-    $_ = lc($_);
+  ### port can be any of many types (tcp,udp,unix, etc)
+  foreach my $port ( @{ $prop->{port} } ){
+    my $obj = $self->proto_type($prop->{host},
+                                $port,
+                                $prop->{proto},
+                                ) || next;
+    push @{ $prop->{sockets} }, $obj;
   }
-  if( @{ $prop->{port} } < 1 ){
-    $self->fatal("No valid ports found");
+  if( @{ $prop->{sockets} } < 1 ){
+    $self->fatal("No valid socket parameters found");
   }
 
   $prop->{listen} = Socket::SOMAXCONN()
     unless defined($prop->{listen}) && $prop->{listen} =~ /^\d{1,3}$/;
 
+  use Data::Dumper qw(Dumper);
+  print Dumper $self;
+  exit;
+
   ### do udp properties if any port is udp
   foreach( @{ $prop->{port} } ){
-    next unless substr($_,-3) eq 'udp';
+    next unless $_->proto eq 'udp';
 
     $prop->{udp_recv_len} = 4096
       unless defined($prop->{udp_recv_len})
@@ -292,6 +287,12 @@ sub pre_bind {
   }
 }
 
+### method for invoking procol specific bindings
+sub proto_type {
+  my $self = shift;
+  my ($host,$port,$proto) = @_;
+  return Net::Server::Proto->new($host,$port,$proto,$self);
+}
 
 ### bind to the port (This should serve all but INET)
 sub bind {
