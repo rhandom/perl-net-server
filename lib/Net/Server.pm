@@ -808,7 +808,11 @@ sub post_process_request {
 
 ### determine if I am done with a request
 ### in the base type, we are never done until a SIG occurs
-sub done { 0 }
+sub done {
+  my $self = shift;
+  $self->{server}->{done} = shift if @_;
+  return $self->{server}->{done};
+}
 
 
 ### fork off a child process to handle dequeuing

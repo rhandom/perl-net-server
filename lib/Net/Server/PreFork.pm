@@ -137,8 +137,9 @@ sub kill_n_children {
   my $n    = shift;
   return unless $n > 0;
 
-  return unless time() - $prop->{last_kill} > 10;
-  $prop->{last_kill} = time();
+  my $time = time;
+  return unless $time - $prop->{last_kill} > 10;
+  $prop->{last_kill} = $time;
 
   $self->log(3,"Killing \"$n\" children");
 
@@ -190,7 +191,10 @@ sub run_child {
 
   ### restore sigs (turn off warnings during)
   $SIG{INT} = $SIG{TERM} = $SIG{QUIT}
-    = $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
+    = $SIG{CHLD} = 'DEFAULT';
+
+  ### let pipes take care of themselves
+  $SIG{PIPE} = sub { $prop->{SigPIPEd} = 1 };
 
   $self->log(4,"Child Preforked ($$)\n");
 
@@ -263,7 +267,8 @@ sub run_parent {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
-                   delete $prop->{children}->{$chld};
+                   $prop->{children}->{$chld} = "gracias";
+#                   delete $prop->{children}->{$chld};
                  }
                },
 ### uncomment this area to allow SIG USR1 to give some runtime debugging               
@@ -339,7 +344,7 @@ sub coordinate_children {
 
   ### re-tally the possible types (only once a minute)
   ### this might not be even necessary but is a nice sanity check
-  if( $time - $prop->{tally}->{time} > 6 ){
+  if( $time - $prop->{tally}->{time} > 60 ){
     my $w = $prop->{tally}->{waiting};
     my $p = $prop->{tally}->{processing};
     $prop->{tally} = {time       => $time,
