@@ -1674,7 +1674,7 @@ This will prevent any output from ending up at the terminal.
 
 Specifies whether or not a forked child process has permission
 or not to shutdown the entire server process.  If set to 1, the
-child may signal the parent to shutdown all children.  Default
+child may NOT signal the parent to shutdown all children.  Default
 is undef (not set).
 
 =back
