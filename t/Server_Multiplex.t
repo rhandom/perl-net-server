@@ -5,14 +5,14 @@ package Net::Server::Test;
 use Test;
 
 BEGIN {
-  if( ! eval{ require IO::Multiplex; } ){
-    $| = 1;
-    print "1..0\n";
+  $| = 1; plan tests => 4; $success = 0;
+
+  if (! eval{ require IO::Multiplex; }) {
+    print "ok $_ # skip No IO::Multiplex installed\n" for 1 .. 4;
     exit 0;
   }
 }
 
-BEGIN { $| = 1; plan tests => 4; $success = 0; }
 END { ok 0 unless $success; }
 
 ### load the module
