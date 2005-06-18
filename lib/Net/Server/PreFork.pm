@@ -169,6 +169,8 @@ sub run_n_children {
   my $n     = shift;
   return unless $n > 0;
 
+  $self->run_n_children_hook;
+
   my ($parentsock, $childsock);
 
   $self->log(3,"Starting \"$n\" children");
@@ -213,6 +215,8 @@ sub run_n_children {
   }
 }
 
+### let the parent have more accounting upon startup of children
+sub run_n_children_hook {}
 
 ### child process which will accept on the port
 sub run_child {
@@ -642,6 +646,13 @@ to the hooks provided by PreForkSimple.
 See L<Net::Server::PreForkSimple>.
 
 =over 4
+
+=item C<$self-E<gt>run_n_children_hook()>
+
+This hook occurs at the top of run_n_children which is called
+each time the server goes to start more child processes.  This
+gives the parent to do a little of its own accountting (as desired).
+Idea for this hook came from James FitzGibbon.
 
 =item C<$self-E<gt>parent_read_hook()>
 

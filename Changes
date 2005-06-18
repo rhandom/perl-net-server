@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+0.88  Jun 2005
+        - Add run_n_children_hook to prefork servers (At suggestion of
+          James Fitzgibbon)
+        - Make delete child only delete children it knows about.
+          Fixes ancient bug http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=168784
+          filed by Christian Mock and worked on by Lucas Filipozzi.
+
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
           that fixes RT Bug #3671
@@ -18,7 +25,7 @@ Revision history for Perl extension Net::Server.
           rpms are installed just to use Net::Server.
 
 0.85  Mar 06 18:00 2003
-        - Lower timeouts during tests (Anil Madhavapeddy)	
+        - Lower timeouts during tests (Anil Madhavapeddy)
         - Add configure_hook to MultiType (Michael Alan Dorman)
         - More graceful exit of children in PreForkSimple (Helge Kraenz)
         - Correct test for POSIX::setuid(0) success (Peter Chen)
@@ -49,7 +56,7 @@ Revision history for Perl extension Net::Server.
           older perls (<= 5.005)
         - Allow failed attempt to change user to continue with
           warning if not root.
-        - Add parent/child communication code to PreFork.pm based of
+        - Add parent/child communication code to PreFork.pm based off
           code submitted by Vadim.  Allows children to speak to parent.
         - Improved accounting of child processes in PreFork.
         - Add spec file for rpm.
