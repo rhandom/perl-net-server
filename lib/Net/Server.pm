@@ -1187,6 +1187,9 @@ sub delete_child {
   my $pid  = shift;
   my $prop = $self->{server};
 
+  ### don't remove children that don't belong to me (Christian Mock, Luca Filipozzi)
+  return unless exists $prop->{children}->{$pid};
+
   ### prefork server check to clear child communication
   if( $prop->{child_communication} ){
     $prop->{child_select}->remove( $prop->{children}->{$pid}->{sock} );
