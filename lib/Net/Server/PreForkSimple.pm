@@ -244,12 +244,10 @@ sub accept {
   if( $prop->{serialize} eq 'flock' ){
     open(LOCK,">$prop->{lock_file}")
       || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\" [$!]");
-    while (! flock(LOCK,Fcntl::LOCK_EX())) {
+    while (! flock(LOCK, Fcntl::LOCK_EX())) {
       next if $! == EINTR;
       $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
     }
-    flock(LOCK,Fcntl::LOCK_EX())
-      || $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
 
   }elsif( $prop->{serialize} eq 'semaphore' ){
     $prop->{sem}->op( 0, -1, IPC::SysV::SEM_UNDO() )
