@@ -205,7 +205,7 @@ See L<Net::Server::Proto>.
 =head1 DESCRIPTION
 
 Experimental.  If anybody has any successes or ideas for
-improvment under SSL, please email <perl.ssl@seamons.com>.
+improvment under SSL, please email <paul@seamons.com>.
 This is extremely alpha.
 
 Protocol module for Net::Server.  This module implements a
