@@ -406,7 +406,7 @@ sub post_bind {
     $self->log(1,"Group Not Defined.  Defaulting to EGID '$)'\n");
     $prop->{group}  = $);
   }else{
-    if( $prop->{group} =~ /^(\w+( \w+)*)$/ ){
+    if( $prop->{group} =~ /^([\w-]+( [\w-]+)*)$/ ){
       $prop->{group} = eval{ get_gid( $1 ) };
       $self->fatal( $@ ) if $@;
     }else{
