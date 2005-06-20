@@ -25,6 +25,10 @@ Revision history for Perl extension Net::Server.
           first item from @_ is passed as the message.
         - Allow for '-' in group names. (Corey Minyard)
         - Prevent locking caused by interupt of flock (Dietmar Maurer [cpan #11693])
+        - Finally fix UID/GID bugs during daemonization.  This is the
+          biggest bug winner.  The new model Calls POSIX::setuid and
+          setgid and tests for success by checking the values of $<
+          and $( and not by checking the response of the setuid/setgid functions.
 
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
