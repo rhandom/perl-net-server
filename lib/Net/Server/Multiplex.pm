@@ -515,19 +515,22 @@ interface to comply with the Net::Server::Fork style run_dequeue but
 is implemented in terms of the IO::Multiplex style set_timeout and
 mux_timeout methods.
 
-Please notify me, the author, of any other problems or issues
-you find.
-
 =head1 AUTHOR
 
-Copyright (C) 2001-2003, Rob Brown <bbb@cpan.org>
+Rob Brown <bbb@cpan.org>
 
-This package may be distributed under the terms of either the
-GNU General Public License
-   or the
-Perl Artistic License
+=head1 MAINTAINER
 
-All rights reserved.
+Paul Seamons <paul@seamons.com>
+
+=head1 LICENSE
+
+  This package may be distributed under the terms of either the
+  GNU General Public License
+     or the
+  Perl Artistic License
+
+  All rights reserved.
 
 =head1 SEE ALSO
 

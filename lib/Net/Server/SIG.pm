@@ -182,19 +182,15 @@ is array containing any SIGNAL names that had occured.
 
 =head1 AUTHORS
 
-Paul T Seamons (paul@seamons.com)
+Paul Seamons (paul@seamons.com)
 
 Rob B Brown (rob@roobik.com) - Provided a sounding board and feedback
 in creating Net::Server::SIG and sigtest.pl.
 
-=head1 COPYRIGHT
-
-  Copyright (C) 2001, Paul T Seamons
-                      paul@seamons.com
-                      http://seamons.com/
+=head1 LICENSE
 
   This package may be distributed under the terms of either the
-  GNU General Public License 
+  GNU General Public License
     or the
   Perl Artistic License
 

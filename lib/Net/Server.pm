@@ -4,10 +4,13 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2003
-#    Paul T Seamons (paul at seamons.com)
+#  Copyright (C) 2001-2005
+#
+#    Paul Seamons
+#    paul@seamons.com
 #    http://seamons.com/
-#    Rob Brown (bbb at cpan.org)
+#
+#    Rob Brown bbb@cpan,org
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
@@ -15,8 +18,6 @@
 #  Perl Artistic License
 #
 #  All rights reserved.
-#
-#  Please read the perldoc Net::Server
 #
 ################################################################
 
@@ -2094,6 +2095,10 @@ numerous suggestions and for work on Net::Server::Daemonize.
 Thanks to Vadim <vadim at hardison.net> for patches to
 implement parent/child communication on PreFork.pm.
 
+Thanks to various other people for bug fixes over the years.
+These and future thank-you's are available in the Changes file
+as well as CVS comments.
+
 =head1 SEE ALSO
 
 Please see also
@@ -2104,11 +2109,13 @@ L<Net::Server::PreFork>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
 
-=head1 COPYRIGHT
+=head1 AUTHOR
 
-  Copyright (C) 2001, Paul T Seamons
-                      paul at seamons.com
-                      http://seamons.com/
+  Paul Seamons <paul@seamons.com>
+
+  Rob Brown <bbb@cpan.org>
+
+=head1 LICENSE
 
   This package may be distributed under the terms of either the
   GNU General Public License

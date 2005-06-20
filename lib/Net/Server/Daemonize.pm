@@ -433,22 +433,15 @@ Jeremy Howard <j+daemonize@howard.fm>
 
 Program flow, concepts and initial work.
 
-Paul Seamons <perl@seamons.com>
+Paul Seamons <paul@seamons.com>
 
 Code rework and componentization.
 Ongoing maintainer.
 
 =head1 LICENSE
 
-  Copyright (C) 2001, Jeremy Howard
-                      j+daemonize@howard.fm
-
-                      Paul T Seamons
-                      perl@seamons.com
-                      http://seamons.com/
-  
   This package may be distributed under the terms of either the
-  GNU General Public License 
+  GNU General Public License
     or the
   Perl Artistic License
 

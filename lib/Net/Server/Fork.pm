@@ -340,9 +340,9 @@ See L<Net::Server>
 
 =head1 AUTHOR
 
-Paul T. Seamons paul@seamons.com
+Paul Seamons <paul@seamons.com>
 
-and maintained by Rob Brown bbb@cpan.org
+Rob Brown <bbb@cpan.org>
 
 =head1 SEE ALSO
 
