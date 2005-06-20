@@ -186,7 +186,7 @@ sub post_configure {
 
     my $logsock = defined($prop->{syslog_logsock})
       ? $prop->{syslog_logsock} : 'unix';
-    $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet)$/)
+    $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet|stream)$/)
       ? $1 : 'unix';
 
     my $ident = defined($prop->{syslog_ident})
