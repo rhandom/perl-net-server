@@ -23,6 +23,8 @@ Revision history for Perl extension Net::Server.
           potential to break some log implementations that were
           planning on ->log passing all of @_ to syslog.  Now only the
           first item from @_ is passed as the message.
+        - Allow for '-' in group names. (Corey Minyard)
+        - Prevent locking caused by interupt of flock (Dietmar Maurer [cpan #11693])
 
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
