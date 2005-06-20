@@ -47,7 +47,9 @@ sub run {
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
 
   ### save for a HUP
-  $self->{server}->{commandline} = [ $0, @ARGV ]
+  my $script = $0;
+  $script = $ENV{'PWD'} .'/'. $0 if $ENV{'PWD'};
+  $self->{server}->{commandline} = [ $script, @ARGV ]
     unless defined $self->{server}->{commandline};
 
   ### prepare to cache configuration parameters
