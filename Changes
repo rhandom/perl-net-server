@@ -2,7 +2,7 @@ Revision history for Perl extension Net::Server.
 
 0.88  Jun 2005
         - Add run_n_children_hook to prefork servers (At suggestion of
-          James Fitzgibbon)
+          James Fitzgibbon and Paul B. Henson)
         - Make delete child only delete children it knows about.
           Fixes ancient bug http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=168784
           filed by Christian Mock and worked on by Lucas Filipozzi.
@@ -15,6 +15,14 @@ Revision history for Perl extension Net::Server.
           PreForkSimple servers.  This should allow grand child processes to
           run without affecting the child process (or parent).
         - Fix parent/child communication channel buffering issue (Matt Sergeant)
+        - Check for child's sock before closing with
+          child_communication enabled (Alexander Hlawenka)
+        - Documentation fix (Mark Morgan)
+        - Allow 'stream' option for syslog_logsock property (Daniel Matuschek)
+        - Fix syslog format vulnerability. (Carlos Velasco)  This has
+          potential to break some log implementations that were
+          planning on ->log passing all of @_ to syslog.  Now only the
+          first item from @_ is passed as the message.
 
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
