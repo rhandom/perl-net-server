@@ -29,6 +29,8 @@ Revision history for Perl extension Net::Server.
           biggest bug winner.  The new model Calls POSIX::setuid and
           setgid and tests for success by checking the values of $<
           and $( and not by checking the response of the setuid/setgid functions.
+        - Add CIDR style lookups for allow/deny using cidr_allow and
+          cidr_deny (Carsten Wolff)
 
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
