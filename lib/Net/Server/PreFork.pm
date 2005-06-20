@@ -112,7 +112,8 @@ sub loop {
 
   ### get ready for child->parent communication
   pipe(_READ,_WRITE);
-  _WRITE->autoflush(1); # ASAP, before first child is ever forked
+  _READ->autoflush(1); # ASAP, before first child is ever forked
+  _WRITE->autoflush(1);
   $prop->{_READ}  = *_READ;
   $prop->{_WRITE} = *_WRITE;
 
@@ -281,11 +282,9 @@ sub run_parent {
 
   ### prepare to read from children
   local *_READ = $prop->{_READ};
-  _READ->autoflush(1);
 
   ### allow for writing to _READ
   local *_WRITE = $prop->{_WRITE};
-  _WRITE->autoflush(1);
 
   ### set some waypoints
   $prop->{last_checked_for_dead}
