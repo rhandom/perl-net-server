@@ -1038,9 +1038,8 @@ $Net::Server::syslog_map = {0 => 'err',
 
 ### record output
 sub log {
-  my $self  = shift;
+  my ($self, $level, $msg) = @_;
   my $prop = $self->{server};
-  my $level = shift;
 
   return unless $prop->{log_level};
   return unless $level <= $prop->{log_level};
@@ -1048,31 +1047,29 @@ sub log {
   ### log only to syslog if setup to do syslog
   if( $prop->{log_file} eq 'Sys::Syslog' ){
     $level = $level!~/^\d+$/ ? $level : $Net::Server::syslog_map->{$level} ;
-    Sys::Syslog::syslog($level,@_);
+    Sys::Syslog::syslog($level, '%s', $msg);
     return;
   }
 
-  $self->write_to_log_hook($level,@_);
+  $self->write_to_log_hook($level, $msg);
 }
 
 
 ### standard log routine, this could very easily be
 ### overridden with a syslog call
 sub write_to_log_hook {
-  my $self  = shift;
+  my ($self, $level, $msg) = @_;
   my $prop = $self->{server};
-  my $level = shift;
-  local $_  = shift || '';
-  chomp;
-  s/([^\n\ -\~])/sprintf("%%%02X",ord($1))/eg;
+  chomp $msg;
+  $msg =~ s/([^\n\ -\~])/sprintf("%%%02X",ord($1))/eg;
 
   if( $prop->{log_file} ){
-    print _SERVER_LOG $_, "\n";
+    print _SERVER_LOG $msg, "\n";
   }elsif( defined($prop->{setsid}) ){
     # do nothing
   }else{
     my $old = select(STDERR);
-    print $_. "\n";
+    print $msg. "\n";
     select($old);
   }
 
