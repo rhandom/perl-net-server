@@ -224,14 +224,12 @@ sub run_child {
   my $prop = $self->{server};
 
   ### restore sigs (turn off warnings during)
-  $SIG{INT} = $SIG{TERM} = $SIG{QUIT}
-    = $SIG{CHLD} = sub {
-      $self->child_finish_hook;
-      exit;
-    };
+  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
+    $self->child_finish_hook;
+    exit;
+  };
 
-  ### let pipes take care of themselves
-  $SIG{PIPE} = sub { $prop->{SigPIPEd} = 1 };
+  $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
 
   $self->log(4,"Child Preforked ($$)\n");
 
