@@ -281,6 +281,9 @@ sub accept {
 sub done {
   my $self = shift;
   my $prop = $self->{server};
+  $prop->{done} = shift if @_;
+  return 1 if $prop->{done};
+
   return 1 if $prop->{requests} >= $prop->{max_requests};
   return 1 if $prop->{SigHUPed};
   if( ! kill(0,$prop->{ppid}) ){
