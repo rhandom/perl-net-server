@@ -1191,8 +1191,10 @@ sub delete_child {
 
   ### prefork server check to clear child communication
   if( $prop->{child_communication} ){
-    $prop->{child_select}->remove( $prop->{children}->{$pid}->{sock} );
-    $prop->{children}->{$pid}->{sock}->close if $prop->{children}->{$pid}->{sock};
+    if ($prop->{children}->{$pid}->{sock}) {
+      $prop->{child_select}->remove( $prop->{children}->{$pid}->{sock} );
+      $prop->{children}->{$pid}->{sock}->close;
+    }
   }
 
   delete $prop->{children}->{$pid};
