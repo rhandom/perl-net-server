@@ -23,8 +23,8 @@
 package Net::Server;
 
 use strict;
-use vars qw( $VERSION );
-use Socket qw( inet_aton inet_ntoa AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM );
+use vars qw($VERSION);
+use Socket qw(inet_aton inet_ntoa AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM);
 use IO::Socket ();
 use IO::Select ();
 use POSIX ();
@@ -214,7 +214,7 @@ sub post_configure {
   }elsif( $prop->{log_file} ){
 
     die "Unsecure filename \"$prop->{log_file}\""
-      unless $prop->{log_file} =~ m|^([\w\.\-/]+)$|;
+      unless $prop->{log_file} =~ m|^([\w\.\-/\\]+)$|;
     $prop->{log_file} = $1;
     open(_SERVER_LOG, ">>$prop->{log_file}")
       or die "Couldn't open log file \"$prop->{log_file}\" [$!].";
