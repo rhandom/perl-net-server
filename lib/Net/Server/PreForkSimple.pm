@@ -397,7 +397,7 @@ Net::Server::PreForkSimple - Net::Server personality
 =head1 SYNOPSIS
 
   use Net::Server::PreForkSimple;
-  @ISA = qw(Net::Server::PreFork);
+  @ISA = qw(Net::Server::PreForkSimple);
 
   sub process_request {
      #...code...
