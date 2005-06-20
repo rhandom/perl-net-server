@@ -6,6 +6,15 @@ Revision history for Perl extension Net::Server.
         - Make delete child only delete children it knows about.
           Fixes ancient bug http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=168784
           filed by Christian Mock and worked on by Lucas Filipozzi.
+        - Store $ENV{PWD} as part of script name for HUP'ing (Russel Pettway)
+        - Allow PreFork and PreForkSimple to have child mark
+          explicitly as done the same as other server types via
+          the ->done(1) call. (Idea from Marc Martinec)
+        - After numerous requests, the CHLD and PIPE SIGNALS are now
+          set to DEFAULT in the child process of PreFork and
+          PreForkSimple servers.  This should allow grand child processes to
+          run without affecting the child process (or parent).
+        - Fix parent/child communication channel buffering issue (Matt Sergeant)
 
 0.87  Feb 14 2004
         - Patch by Enrik.Berkhan@planb.de (Enrik Berkhan)
