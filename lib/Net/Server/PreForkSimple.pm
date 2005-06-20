@@ -1,9 +1,9 @@
 # -*- perl -*-
 #
 #  Net::Server::PreForkSimple - Net::Server personality
-#  
+#
 #  $Id$
-#  
+#
 #  Copyright (C) 2001, Paul T Seamons
 #                      paul@seamons.com
 #                      http://seamons.com/
@@ -21,7 +21,7 @@ package Net::Server::PreForkSimple;
 
 use strict;
 use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
-use POSIX qw(WNOHANG);
+use POSIX qw(WNOHANG EINTR);
 use Fcntl ();
 use Net::Server ();
 use Net::Server::SIG qw(register_sig check_sigs);
@@ -244,6 +244,10 @@ sub accept {
   if( $prop->{serialize} eq 'flock' ){
     open(LOCK,">$prop->{lock_file}")
       || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\" [$!]");
+    while (! flock(LOCK,Fcntl::LOCK_EX())) {
+      next if ($! = EINTR);
+      $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
+    }
     flock(LOCK,Fcntl::LOCK_EX())
       || $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
 
