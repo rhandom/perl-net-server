@@ -275,6 +275,8 @@ sub post_configure {
   ### make sure that allow and deny look like array refs
   $prop->{allow} = [] unless defined($prop->{allow}) && ref($prop->{allow});
   $prop->{deny}  = [] unless defined($prop->{deny})  && ref($prop->{deny} );
+  $prop->{cidr_allow} = [] unless defined($prop->{cidr_allow}) && ref($prop->{cidr_allow});
+  $prop->{cidr_deny}  = [] unless defined($prop->{cidr_deny})  && ref($prop->{cidr_deny} );
 
 }
 
@@ -720,18 +722,31 @@ sub allow_deny {
   }
 
   ### if no allow or deny parameters are set, allow all
-  return 1 unless @{ $prop->{allow} } || @{ $prop->{deny} };
+  return 1 if
+       $#{ $prop->{allow} } == -1
+    && $#{ $prop->{deny} }  == -1
+    && $#{ $prop->{cidr_allow} } == -1
+    && $#{ $prop->{cidr_deny} }  == -1;
 
   ### if the addr or host matches a deny, reject it immediately
   foreach ( @{ $prop->{deny} } ){
     return 0 if $prop->{peerhost} =~ /^$_$/ && defined($prop->{reverse_lookups});
     return 0 if $prop->{peeraddr} =~ /^$_$/;
   }
+  if ($#{ $prop->{cidr_deny} } != -1) {
+    require Net::CIDR;
+    return 0 if Net::CIDR::cidrlookup($prop->{peeraddr}, @{ $prop->{cidr_deny} });
+  }
+
 
   ### if the addr or host isn't blocked yet, allow it if it is allowed
   foreach ( @{ $prop->{allow} } ){
     return 1 if $prop->{peerhost} =~ /^$_$/ && defined($prop->{reverse_lookups});
     return 1 if $prop->{peeraddr} =~ /^$_$/;
+  }
+  if ($#{ $prop->{cidr_allow} } != -1) {
+    require Net::CIDR;
+    return 0 if Net::CIDR::cidrlookup($prop->{peeraddr}, @{ $prop->{cidr_allow} });
   }
 
   return 0;
@@ -1092,7 +1107,7 @@ sub options {
   my $prop = $self->{server};
   my $ref  = shift;
 
-  foreach ( qw(port allow deny) ){
+  foreach ( qw(port allow deny cidr_allow cidr_deny) ){
     $prop->{$_} = [] unless exists $prop->{$_};
     $ref->{$_} = $prop->{$_};
   }
@@ -1553,6 +1568,8 @@ parameters from the base class.)
   reverse_lookups   1                        undef
   allow             /regex/                  none
   deny              /regex/                  none
+  cidr_allow        CIDR                     none
+  cidr_deny         CIDR                     none
 
   ## daemonization parameters
   pid_file          "filename"               undef
@@ -1678,6 +1695,13 @@ incoming client must match an allow and not match a deny or
 the client connection will be closed.  Defaults to empty
 array refs.
 
+=item cidr_allow/cidr_deny
+
+May be specified multiple times.  Contains a CIDR block to compare to
+incoming peeraddr.  If cidr_allow or cidr_deny options are given, the
+incoming client must match a cidr_allow and not match a cidr_deny or
+the client connection will be closed.  Defaults to empty array refs.
+
 =item chroot
 
 Directory to chroot to after bind process has taken place
@@ -1792,6 +1816,9 @@ ignored.
   allow       .+\.(net|com)
   allow       domain\.com
   deny        a.+
+  cidr_allow  127.0.0.0/8
+  cidr_allow  192.0.2.0/24
+  cidr_deny   192.0.2.4/30
 
   ### background the process?
   background  1
