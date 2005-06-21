@@ -250,7 +250,11 @@ sub run_child {
     $prop->{connected} = 1;
     print _WRITE "$$ processing\n";
 
-    $self->run_client_connection;
+    eval { $self->run_client_connection };
+    if ($@) {
+      print _WRITE "$$ exiting\n";
+      die $@;
+    }
 
     last if $self->done;
 
