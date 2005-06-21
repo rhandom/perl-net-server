@@ -63,7 +63,7 @@ sub process_request {
   local $self->{needs_header} = 1;
 
   ### read the first line of response
-  my $line = <STDIN>;
+  my $line = <STDIN> || return $self->error(400, "No Data");
   $line =~ s/[\r\n]+$//;
   if ($line !~ /^ (\w+) \ + (\S+) \ + (HTTP\/1.\d) $ /x) {
     return $self->error(400, "Bad request");
@@ -78,6 +78,7 @@ sub process_request {
   if ($method !~ /GET|POST|HEAD/) {
     return $self->error(400, "Unsupported Method");
   }
+  $ENV{REQUEST_METHOD} = $method;
 
   ### can we read that request
   if ($req !~ m|^ (?:http://[^/]+)? (.*) $|x) {
@@ -124,20 +125,18 @@ sub process_request {
     print $self->content_type('text/html'),"\r\n";
     print "Directory listing not supported";
 
-  ### spit it out
-  } elsif (open my $fh, "<$uri") {
-
-    my ($type) = $uri =~ /([^\.]+)$/;
-    $type = $self->{mime_types}->{$type} || $self->{mime_default};
-
-    print $self->status(200), $self->content_type($type), "\r\n";
-
-    print STDOUT $_ while read $fh, $_, 8192;
-    close $fh;
-
-  }else{
-    return $self->error(500, "Can't open file [$!]");
   }
+
+  ### spit it out
+  open(my $fh, "<$uri") || return $self->error(500, "Can't open file [$!]");
+
+  my ($type) = $uri =~ /([^\.]+)$/;
+  $type = $self->{mime_types}->{$type} || $self->{mime_default};
+
+  print $self->status(200), $self->content_type($type), "\r\n";
+
+  print STDOUT $_ while read $fh, $_, 8192;
+  close $fh;
 
 }
 
