@@ -186,8 +186,8 @@ sub accept {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### block on trying to get a handle, timeout on 10 seconds
-  my(@socks) = $prop->{select}->can_read(10);
+  ### block on trying to get a handle (select created because we specified multi_port)
+  my (@socks) = $prop->{select}->can_read(2);
 
   ### see if any sigs occured
   if( &check_sigs() ){
