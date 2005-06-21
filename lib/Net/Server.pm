@@ -960,7 +960,7 @@ sub close_children {
 
   ### need to wait off the children
   ### eventually this should probably use &check_sigs
-  1 while (waitpid(-1,POSIX::WNOHANG()) > 0);
+  1 while waitpid(-1, POSIX::WNOHANG()) > 0;
 
 }
 
@@ -1108,7 +1108,11 @@ sub options {
   my $ref  = shift;
 
   foreach ( qw(port allow deny cidr_allow cidr_deny) ){
-    $prop->{$_} = [] unless exists $prop->{$_};
+    if (! defined $prop->{$_}) {
+      $prop->{$_} = [];
+    } elsif (! ref $prop->{$_}) {
+      $prop->{$_} = [$prop->{$_}]; # nicely turn us into an arrayref if we aren't one already
+    }
     $ref->{$_} = $prop->{$_};
   }
 
