@@ -1,6 +1,7 @@
 Revision history for Perl extension Net::Server.
 
-0.88  Jun 2005
+0.88  Jun 21 2005
+        - Change maintainer back to paul@seamons.com (Paul Seamons)
         - Add run_n_children_hook to prefork servers (At suggestion of
           James Fitzgibbon and Paul B. Henson)
         - Make delete child only delete children it knows about.
@@ -10,7 +11,7 @@ Revision history for Perl extension Net::Server.
         - Allow PreFork and PreForkSimple to have child mark
           explicitly as done the same as other server types via
           the ->done(1) call. (Idea from Marc Martinec)
-        - After numerous requests, the CHLD and PIPE SIGNALS are now
+        - After numerous requests, the CHLD SIGNAL is now
           set to DEFAULT in the child process of PreFork and
           PreForkSimple servers.  This should allow grand child processes to
           run without affecting the child process (or parent).
