@@ -226,8 +226,9 @@ sub run_client_connection {
   $_ = undef foreach @{ $self->{server}->{sock} };
 
   ### restore sigs (for the child)
-  $SIG{HUP} = $SIG{CHLD} = $SIG{PIPE}
+  $SIG{HUP} = $SIG{CHLD}
      = $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = 'DEFAULT';
+  $SIG{PIPE} = 'IGNORE';
 
   delete $self->{server}->{children};
 
