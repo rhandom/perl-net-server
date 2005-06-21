@@ -75,11 +75,13 @@ information.
   $self->SUPER::post_configure;
 
   ### some default values to check for
-  my $d = {min_servers       => 5,    # min num of servers to always have running
-           min_spare_servers => 2,    # min num of servers just sitting there
-           max_spare_servers => 10,   # max num of servers just sitting there
-           check_for_waiting => 10,   # how often to see if children laying around
-           };
+  my $d = {
+    # max_servers is set in the PreForkSimple server and defaults to 50
+    min_servers       => 5,    # min num of servers to always have running
+    min_spare_servers => 2,    # min num of servers just sitting there
+    max_spare_servers => 10,   # max num of servers just sitting there
+    check_for_waiting => 10,   # how often to see if children laying around
+  };
   foreach (keys %$d){
     $prop->{$_} = $d->{$_}
     unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
