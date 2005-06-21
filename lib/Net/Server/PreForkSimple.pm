@@ -194,6 +194,8 @@ sub run_child {
 
   $self->log(4,"Child Preforked ($$)\n");
 
+  delete $prop->{children};
+
   $self->child_init_hook;
 
   ### let the parent shut me down

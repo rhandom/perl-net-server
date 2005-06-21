@@ -229,6 +229,8 @@ sub run_client_connection {
   $SIG{HUP} = $SIG{CHLD} = $SIG{PIPE}
      = $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = 'DEFAULT';
 
+  delete $self->{server}->{children};
+
   $self->SUPER::run_client_connection;
 
 }
