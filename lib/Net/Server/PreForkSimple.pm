@@ -23,17 +23,15 @@
 
 package Net::Server::PreForkSimple;
 
+use base qw(Net::Server);
 use strict;
-use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
+use vars qw($VERSION);
 use POSIX qw(WNOHANG EINTR);
 use Fcntl ();
-use Net::Server ();
 use Net::Server::SIG qw(register_sig check_sigs);
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
-### fall back to parent methods
-@ISA = qw(Net::Server);
 
 ### override-able options for this package
 sub options {
@@ -184,30 +182,25 @@ sub run_child {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### restore sigs (turn off warnings during)
   $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
     $self->child_finish_hook;
     exit;
   };
-
-  $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
+  $SIG{PIPE} = 'IGNORE';
+  $SIG{CHLD} = 'DEFAULT';
+  $SIG{HUP}  = sub {
+    if (! $prop->{connected}) {
+      $self->child_finish_hook;
+      exit;
+    }
+    $prop->{SigHUPed} = 1;
+  };
 
   $self->log(4,"Child Preforked ($$)\n");
 
   delete $prop->{children};
 
   $self->child_init_hook;
-
-  ### let the parent shut me down
-  $prop->{connected} = 0;
-  $prop->{SigHUPed}  = 0;
-  $SIG{HUP} = sub {
-    unless( $prop->{connected} ){
-      $self->child_finish_hook;
-      exit;
-    }
-    $prop->{SigHUPed} = 1;
-  };
 
   ### accept connections
   while( $self->accept() ){

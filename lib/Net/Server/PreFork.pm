@@ -23,19 +23,15 @@
 
 package Net::Server::PreFork;
 
+use base qw(Net::Server::PreForkSimple);
 use strict;
-use vars qw($VERSION @ISA $LOCK_EX $LOCK_UN);
+use vars qw($VERSION);
 use POSIX qw(WNOHANG);
-use Net::Server::PreForkSimple;
 use Net::Server::SIG qw(register_sig check_sigs);
 use IO::Select ();
 use IO::Socket::UNIX;
 
 $VERSION = $Net::Server::VERSION; # done until separated
-
-### fall back to parent methods
-@ISA = qw(Net::Server::PreForkSimple);
-
 
 ### override-able options for this package
 sub options {
@@ -226,30 +222,25 @@ sub run_child {
   my $self = shift;
   my $prop = $self->{server};
 
-  ### restore sigs (turn off warnings during)
   $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
     $self->child_finish_hook;
     exit;
   };
-
-  $SIG{CHLD} = $SIG{PIPE} = 'DEFAULT';
+  $SIG{PIPE} = 'IGNORE';
+  $SIG{CHLD} = 'DEFAULT';
+  $SIG{HUP}  = sub {
+    if (! $prop->{connected}) {
+      $self->child_finish_hook;
+      exit;
+    }
+    $prop->{SigHUPed} = 1;
+  };
 
   $self->log(4,"Child Preforked ($$)\n");
 
   delete $prop->{$_} foreach qw(children tally last_start last_process);
 
   $self->child_init_hook;
-
-  ### let the parent shut me down
-  $prop->{connected} = 0;
-  $prop->{SigHUPed}  = 0;
-  $SIG{HUP} = sub {
-    unless( $prop->{connected} ){
-      $self->child_finish_hook;
-      exit;
-    }
-    $prop->{SigHUPed} = 1;
-  };
 
   ### accept connections
   while( $self->accept() ){
@@ -284,9 +275,6 @@ sub run_parent {
 
   ### prepare to read from children
   local *_READ = $prop->{_READ};
-
-  ### allow for writing to _READ
-  local *_WRITE = $prop->{_WRITE};
 
   ### set some waypoints
   $prop->{last_checked_for_dead}
@@ -359,7 +347,7 @@ sub run_parent {
           $prop->{tally}->{waiting} ++;
         }elsif( $status eq 'exiting' ){
           $prop->{tally}->{processing} --;
-	  $self->delete_child( $pid );
+          $self->delete_child( $pid );
         }
 
       ### user defined handler
