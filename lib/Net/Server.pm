@@ -36,7 +36,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.88';
+$VERSION = '0.89';
 
 ### program flow
 sub run {
@@ -883,30 +883,29 @@ sub dequeue {}
 ### user customizable hook
 sub pre_server_close_hook {}
 
-
 ### this happens when the server reaches the end
 sub server_close{
   my $self = shift;
   my $prop = $self->{server};
 
-  ### allow for customizable closing
-  $self->pre_server_close_hook();
-
   $SIG{INT} = 'DEFAULT';
-
-  $self->log(2,$self->log_time . " Server closing!");
 
   ### if this is a child process, signal the parent and close
   ### normally the child shouldn't, but if they do...
   ### otherwise the parent continues with the shutdown
   ### this is safe for non standard forked child processes
   ### as they will not have server_close as a handler
-  if( defined($prop->{ppid}) && $prop->{ppid} != $$ ){
-    if( ! defined $prop->{no_close_by_child} ){
-      kill(2,$prop->{ppid});
-      exit;
-    }
+  if (defined $prop->{ppid}
+      && $prop->{ppid} != $$
+      && ! defined $prop->{no_close_by_child}) {
+    $self->close_parent;
+    exit;
   }
+
+  ### allow for customizable closing
+  $self->pre_server_close_hook;
+
+  $self->log(2,$self->log_time . " Server closing!");
 
   ### shut down children if any
   if( defined $prop->{children} ){
@@ -939,6 +938,14 @@ sub server_close{
   exit;
 }
 
+### Allow children to send INT signal to parent (or use another method)
+### This method is only used by forking servers
+sub close_parent {
+  my $self = shift;
+  my $prop = $self->{server};
+  die "Missing parent pid (ppid)" if ! $prop->{ppid};
+  kill 2, $prop->{ppid};
+}
 
 ### SIG INT the children
 ### This method is only used by forking servers (ie Fork, PreFork)
