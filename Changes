@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::Server.
 
+0.89   2005
+        - Added SSL_passwd_cb to Proto/SSL.pm (Irving A. Bermudez S.)
+
 0.88  Jun 21 2005
         - Change maintainer back to paul@seamons.com (Paul Seamons)
         - Add run_n_children_hook to prefork servers (At suggestion of
