@@ -62,6 +62,7 @@ sub object {
     SSL_ca_path     => \$prop->{SSL_ca_path},
     SSL_ca_file     => \$prop->{SSL_ca_file},
     SSL_cipher_list => \$prop->{SSL_cipher_list},
+    SSL_passwd_cb   => \$prop->{SSL_passwd_cb},
   });
 
   ### create the handle under this package
