@@ -23,18 +23,14 @@
 
 package Net::Server::Fork;
 
+use base qw(Net::Server);
 use strict;
-use vars qw($VERSION @ISA);
-use Net::Server ();
+use vars qw($VERSION);
 use Net::Server::SIG qw(register_sig check_sigs);
 use Socket qw(SO_TYPE SOL_SOCKET SOCK_DGRAM);
 use POSIX qw(WNOHANG);
 
 $VERSION = $Net::Server::VERSION; # done until separated
-
-### fall back to parent methods
-@ISA = qw(Net::Server);
-
 
 ### override-able options for this package
 sub options {
@@ -147,6 +143,7 @@ sub loop {
     ### accept will check signals as appropriate
     if( ! $self->accept() ){
       last if $prop->{_HUP};
+      last if $prop->{done};
       next;
     }
 
