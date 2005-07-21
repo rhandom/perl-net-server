@@ -85,7 +85,7 @@ sub post_bind {
   ### clean up method to use for serialization
   if( ! defined($prop->{serialize})
       || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/i ){
-    $prop->{serialize} = 'flock';
+    $prop->{serialize} = ($^O eq 'MSWin32') ? 'pipe' : 'flock';
   }
   $prop->{serialize} =~ tr/A-Z/a-z/;
 
@@ -102,8 +102,8 @@ sub post_bind {
   ### set up semaphore
   }elsif( $prop->{serialize} eq 'semaphore' ){
     $self->log(3,"Setting up serialization via semaphore");
-    require "IPC/SysV.pm";
-    require "IPC/Semaphore.pm";
+    require IPC::SysV;
+    require IPC::Semaphore;
     my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(),
                                 1,
                                 IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT(),
