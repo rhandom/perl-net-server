@@ -317,7 +317,12 @@ sub pre_bind {
   ### set up parallel arrays of hosts, ports, and protos
   ### port can be any of many types (tcp,udp,unix, etc)
   ### see perldoc Net::Server::Proto for more information
+  my %bound;
   foreach my $port ( @{ $prop->{port} } ){
+    if ($bound{"$prop->{host}/$port/$prop->{proto}"} ++) {
+      $self->log(2, "Duplicate configuration (".uc($prop->{proto})." port $port on host ".$prop->{host}.") - skipping");
+      next;
+    }
     my $obj = $self->proto_object($prop->{host},
                                   $port,
                                   $prop->{proto},
