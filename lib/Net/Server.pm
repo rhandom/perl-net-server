@@ -783,7 +783,7 @@ sub process_request {
 
 
   ### handle tcp connections (tcp echo server)
-  print "Welcome to \"".ref($self)."\" ($$)\n";
+  print "Welcome to \"".ref($self)."\" ($$)\r\n";
 
   ### eval block needed to prevent DoS by using timeout
   my $timeout = 30; # give the user 30 seconds to type a line
@@ -819,7 +819,7 @@ sub process_request {
   alarm($previous_alarm);
 
 
-  if( $@=~/timed out/i ){
+  if ($@ eq "Timed Out!\n") {
     print STDOUT "Timed Out.\r\n";
     return;
   }
