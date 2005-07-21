@@ -202,7 +202,10 @@ sub set_uid {
 
   POSIX::setuid($uid);
   if ($< != $uid) {
-    die "Couldn't become uid \"$uid\": $!\n";
+    $< = $> = $uid; # try again - needed by some 5.8.0 linux systems (rt #13450)
+    if ($< != $uid) {
+      die "Couldn't become uid \"$uid\": $!\n";
+    }
   }
 
   return 1;
@@ -216,8 +219,7 @@ sub set_gid {
   eval { $) = $gids }; # store all the gids - this is really sort of optional
 
   POSIX::setgid($gid);
-  my $_gid = (split /\s+/, $()[0];
-  if ($_gid != $gid) {
+  if (! grep {$gid == $_} split /\s+/, $() { # look for any valid id in the list
     die "Couldn't become gid \"$gid\": $!\n";
   }
 
