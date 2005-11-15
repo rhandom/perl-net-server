@@ -505,8 +505,8 @@ connections.  This type is good for a heavily hit site, and
 should scale well for most applications.  (Multi port accept
 is accomplished using flock to serialize the children).
 
-At this time, it does not appear that this module will work on
-Win32 systems.  Any ideas or patches for making it work would be
+At this time, it does not appear that this module will pass tests on
+Win32 systems.  Any ideas or patches for making the tests pass would be
 welcome.
 
 =head1 SAMPLE CODE
@@ -667,7 +667,7 @@ will be the open socket to the child.
 
 =BUGS
 
-Doesn't seem to work on Win32.  Any ideas or patches would be welcome.
+Tests don't seem to work on Win32.  Any ideas or patches would be welcome.
 
 =head1 TO DO
 
