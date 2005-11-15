@@ -7,6 +7,10 @@ use Net::Server;
 $loaded = 1;
 print "ok 1\n";
 
+if ($^O eq 'MSWin32') {
+    print "ok $_ # skip UNIX Sockets will not work on Win32\n" for 2 .. 5;
+    exit;
+}
 
 ### test fork - don't care about platform
 my $fork = 0;
