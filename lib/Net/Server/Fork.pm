@@ -268,6 +268,9 @@ for a client connection.  When a connection is received,
 the server forks a child.  The child handles the request
 and then closes.
 
+With the exception of parent/child signaling, this module
+will work (with basic functionality) on Win32 systems.
+
 =head1 ARGUMENTS
 
 =over 4

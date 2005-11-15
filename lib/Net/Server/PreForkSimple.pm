@@ -422,6 +422,10 @@ keep C<max_servers> processes dedicated to the serving.
 (Multi port accept defaults to using flock to serialize the
 children).
 
+At this time, it does not appear that this module will work on
+Win32 systems.  Any ideas or patches for making it work would be
+welcome.
+
 =head1 SAMPLE CODE
 
 Please see the sample listed in Net::Server.
@@ -589,6 +593,10 @@ This hook only gets called in conjuction with the
 check_for_dequeue setting.
 
 =back
+
+=BUGS
+
+Doesn't seem to work on Win32.  Any ideas or patches would be welcome.
 
 =head1 TO DO
 

@@ -505,6 +505,10 @@ connections.  This type is good for a heavily hit site, and
 should scale well for most applications.  (Multi port accept
 is accomplished using flock to serialize the children).
 
+At this time, it does not appear that this module will work on
+Win32 systems.  Any ideas or patches for making it work would be
+welcome.
+
 =head1 SAMPLE CODE
 
 Please see the sample listed in Net::Server.
@@ -660,6 +664,10 @@ has written to $self->{server}->{parent_sock}.  The first argument
 will be the open socket to the child.
 
 =back
+
+=BUGS
+
+Doesn't seem to work on Win32.  Any ideas or patches would be welcome.
 
 =head1 TO DO
 
