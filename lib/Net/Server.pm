@@ -294,7 +294,7 @@ sub pre_bind {
   no strict 'refs';
   my $super = ${"${ref}::ISA"}[0];
   use strict 'refs';
-  my $ns_type = $ref eq $super ? '' : " (type $super)";
+  my $ns_type = (! $super || $ref eq $super) ? '' : " (type $super)";
   $self->log(2,$self->log_time ." ". ref($self) .$ns_type. " starting! pid($$)");
 
   ### set a default port, host, and proto
@@ -1073,7 +1073,7 @@ sub log {
   return unless $level <= $prop->{log_level};
 
   ### log only to syslog if setup to do syslog
-  if( $prop->{log_file} eq 'Sys::Syslog' ){
+  if( defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog' ){
     $level = $level!~/^\d+$/ ? $level : $Net::Server::syslog_map->{$level} ;
     Sys::Syslog::syslog($level, '%s', $msg);
     return;
@@ -1156,6 +1156,10 @@ sub process_args {
     $self->options( $template );
   }
 
+  ### we want subsequent calls to not overwrite or add to
+  ### previously set values so that command line arguments win
+  my %previously_set;
+
   foreach (my $i=0 ; $i < @$ref ; $i++ ){
 
     if( $ref->[$i] =~ /^(?:--)?(\w+)([=\ ](\S+))?$/
@@ -1171,9 +1175,17 @@ sub process_args {
       $val =~ s/%([A-F0-9])/chr(hex($1))/eig;
 
       if( ref $template->{$key} eq 'ARRAY' ){
+        if (! defined $previously_set{$key}) {
+          $previously_set{$key} = scalar @{ $template->{$key} };
+        }
+        next if $previously_set{$key};
         push( @{ $template->{$key} }, $val );
       }else{
-        $ { $template->{$key} } = $val;
+        if (! defined $previously_set{$key}) {
+          $previously_set{$key} = defined($template->{$key}) ? 1 : 0;
+        }
+        next if $previously_set{$key};
+        ${ $template->{$key} } = $val;
       }
     }
 
@@ -1196,6 +1208,9 @@ sub process_conf {
       ? $1 : $self->fatal("Unsecure filename \"$file\"");
 
     if( not open(_CONF,"<$file") ){
+      if (! $ENV{BOUND_SOCKETS}) {
+        warn "Couldn't open conf \"$file\" [$!]\n";
+      }
       $self->fatal("Couldn't open conf \"$file\" [$!]");
     }
 
@@ -1550,6 +1565,11 @@ will look for arguments in the following order:
   3) Arguments passed to the run method.
   4) Arguments passed via a conf file.
   5) Arguments set in the configure_hook.
+
+Each of these levels will override parameters of the same
+name specified in subsequent levels.  For example, specifying
+--setsid=0 on the command line will override a value of "setsid 1"
+in the conf file.
 
 Key/value pairs used by the server are removed by the
 configuration process so that server layers on top of
