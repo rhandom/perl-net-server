@@ -63,16 +63,9 @@ sub check_pid_file ($) {
 
   my $exists = undef;
 
-
   ### try a proc file system
-  if( -d '/proc' && opendir(_DH,'/proc') ){
-
-    while ( defined(my $pid = readdir(_DH)) ){
-      if( $pid eq $current_pid ){
-        $exists = 1;
-        last;
-      }
-    }
+  if( -d '/proc' && -e "/proc/$current_pid" ){
+    $exists = 1;
 
   ### try ps
   #}elsif( -x '/bin/ps' ){ # not as portable
