@@ -79,7 +79,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto - adp0 - Net::Server Protocol compatibility layer
+  Net::Server::Proto - Net::Server Protocol compatibility layer
 
 =head1 SYNOPSIS
 

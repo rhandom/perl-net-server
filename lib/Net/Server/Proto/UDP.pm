@@ -93,7 +93,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto::UDP - adp0 - Net::Server UDP protocol.
+  Net::Server::Proto::UDP - Net::Server UDP protocol.
 
 =head1 SYNOPSIS
 
