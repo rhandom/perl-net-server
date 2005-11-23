@@ -751,7 +751,7 @@ sub allow_deny {
   }
   if ($#{ $prop->{cidr_allow} } != -1) {
     require Net::CIDR;
-    return 0 if Net::CIDR::cidrlookup($prop->{peeraddr}, @{ $prop->{cidr_allow} });
+    return 1 if Net::CIDR::cidrlookup($prop->{peeraddr}, @{ $prop->{cidr_allow} });
   }
 
   return 0;
@@ -2166,6 +2166,9 @@ Thanks to Tim Watt for adding udp_broadcast to Proto::UDP.
 Thanks to Christopher A Bongaarts for pointing out problems with
 the Proto::SSL implementation that currently locks around the socket
 accept and the SSL negotiation. See L<Net::Server::Proto::SSL>.
+
+Thanks to Alessandro Zummo for pointing out various bugs including
+some in configuration, commandline args, and cidr_allow.
 
 Thanks to various other people for bug fixes over the years.
 These and future thank-you's are available in the Changes file
