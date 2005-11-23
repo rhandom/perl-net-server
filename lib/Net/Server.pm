@@ -235,14 +235,14 @@ sub post_configure {
 
   ### completetly daemonize by closing STDIN, STDOUT (should be done before fork)
   if( ! $prop->{_is_inet} ){
-    if( defined($prop->{setsid}) || length($prop->{log_file}) ){
+    if( $prop->{setsid} || length($prop->{log_file}) ){
       open STDIN,  '</dev/null' || die "Can't read /dev/null  [$!]";
       open STDOUT, '>/dev/null' || die "Can't write /dev/null [$!]";
     }
   }
 
   ### background the process
-  if( defined($prop->{setsid}) || defined($prop->{background}) ){
+  if( $prop->{setsid} || defined($prop->{background}) ){
     my $pid = eval{ safe_fork() };
     if( not defined $pid ){ $self->fatal( $@ ); }
     exit(0) if $pid;
@@ -250,14 +250,14 @@ sub post_configure {
   }
 
   ### completely remove myself from parent process
-  if( defined($prop->{setsid}) ){
+  if( $prop->{setsid} ){
     &POSIX::setsid();
   }
 
   ### completetly daemonize by closing STDERR (should be done after fork)
   if( length($prop->{log_file}) ){
     open STDERR, '>&_SERVER_LOG' || die "Can't open STDERR to _SERVER_LOG [$!]";
-  }elsif( defined($prop->{setsid}) ){
+  }elsif( $prop->{setsid} ){
     open STDERR, '>&STDOUT' || die "Can't open STDERR to STDOUT [$!]";
   }
 
@@ -1093,7 +1093,7 @@ sub write_to_log_hook {
 
   if( $prop->{log_file} ){
     print _SERVER_LOG $msg, "\n";
-  }elsif( defined($prop->{setsid}) ){
+  }elsif( $prop->{setsid} ){
     # do nothing
   }else{
     my $old = select(STDERR);
@@ -1167,9 +1167,12 @@ sub process_args {
       my ($key,$val) = ($1,$3);
       splice( @$ref, $i, 1 );
       if( not defined($val) ){
-        die ("Odd number of args passed to process_args. Fatal.\n")
-          if $i > $#$ref;
-        $val = splice( @$ref, $i, 1 );
+        if ($i > $#$ref
+            || ($ref->[$i] && $ref->[$i] =~ /^--\w+/)) {
+          $val = 1; # allow for options such as --setsid
+        } else {
+          $val = splice( @$ref, $i, 1 );
+        }
       }
       $i--;
       $val =~ s/%([A-F0-9])/chr(hex($1))/eig;
@@ -1182,7 +1185,7 @@ sub process_args {
         push( @{ $template->{$key} }, $val );
       }else{
         if (! defined $previously_set{$key}) {
-          $previously_set{$key} = defined($template->{$key}) ? 1 : 0;
+          $previously_set{$key} = defined(${ $template->{$key} }) ? 1 : 0;
         }
         next if $previously_set{$key};
         ${ $template->{$key} } = $val;
