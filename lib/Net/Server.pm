@@ -245,6 +245,9 @@ sub post_configure {
   ### see if a daemon is already running
   if( defined $prop->{pid_file} ){
     if( ! eval{ check_pid_file( $prop->{pid_file} ) } ){
+      if (! $ENV{BOUND_SOCKETS}) {
+        warn $@;
+      }
       $self->fatal( $@ );
     }
   }
@@ -257,17 +260,19 @@ sub post_configure {
     }
   }
 
-  ### background the process
-  if( $prop->{setsid} || defined($prop->{background}) ){
-    my $pid = eval{ safe_fork() };
-    if( not defined $pid ){ $self->fatal( $@ ); }
-    exit(0) if $pid;
-    $self->log(2,"Process Backgrounded");
-  }
+  if (! $ENV{BOUND_SOCKETS}) {
+    ### background the process - unless we are hup'ing
+    if( $prop->{setsid} || defined($prop->{background}) ){
+      my $pid = eval{ safe_fork() };
+      if( not defined $pid ){ $self->fatal( $@ ); }
+      exit(0) if $pid;
+      $self->log(2,"Process Backgrounded");
+    }
 
-  ### completely remove myself from parent process
-  if( $prop->{setsid} ){
-    &POSIX::setsid();
+    ### completely remove myself from parent process - unless we are hup'ing
+    if( $prop->{setsid} ){
+      &POSIX::setsid();
+    }
   }
 
   ### completetly daemonize by closing STDERR (should be done after fork)
