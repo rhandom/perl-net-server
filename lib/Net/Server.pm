@@ -48,10 +48,8 @@ sub run {
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
 
   ### save for a HUP
-  my $script = $0;
-  $script = $ENV{'PWD'} .'/'. $0 if $ENV{'PWD'};
-  $self->{server}->{commandline} = [ $script, @ARGV ]
-    unless defined $self->{server}->{commandline};
+  $self->{server}->{commandline} = $self->get_commandline
+      if ! defined $self->{server}->{commandline};
 
   ### prepare to cache configuration parameters
   $self->{server}->{conf_file_args} = undef;
@@ -128,6 +126,24 @@ sub run_client_connection {
 
 
 ###----------------------------------------------------------###
+
+sub get_commandline {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  ### see if we can find the full command line
+  if (open _CMDLINE, "/proc/$$/cmdline") { # unix specific
+    my $line = do { local $/ = undef; <_CMDLINE> };
+    close _CMDLINE;
+    if ($line) {
+      return [split /\0/, $line];
+    }
+  }
+
+  my $script = $0;
+  $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^\.+/| && $ENV{'PWD'}; # add absolute to relative
+  return [ $script, @ARGV ]
+}
 
 ### any pre-initialization stuff
 sub configure_hook {}
@@ -552,11 +568,12 @@ sub accept {
     ### with more than one port, use select to get the next one
     if( defined $prop->{multi_port} ){
 
+      return 0 if defined $prop->{_HUP};
+
       ### anything server type specific
       $sock = $self->accept_multi_port;
       next unless $sock; # keep trying for the rest of retries
 
-      ### last one if HUPed
       return 0 if defined $prop->{_HUP};
 
     ### single port is bound - just accept
