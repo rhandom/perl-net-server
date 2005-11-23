@@ -2140,6 +2140,10 @@ Thanks to Slaven Rezic for suggesing Reuse => 1 in Proto::UDP.
 
 Thanks to Tim Watt for adding udp_broadcast to Proto::UDP.
 
+Thanks to Christopher A Bongaarts for pointing out problems with
+the Proto::SSL implementation that currently locks around the socket
+accept and the SSL negotiation. See L<Net::Server::Proto::SSL>.
+
 Thanks to various other people for bug fixes over the years.
 These and future thank-you's are available in the Changes file
 as well as CVS comments.
@@ -2157,6 +2161,7 @@ L<Net::Server::Single>
 =head1 AUTHOR
 
   Paul Seamons <paul@seamons.com>
+  http://seamons.com/
 
   Rob Brown <bbb@cpan.org>
 
