@@ -7,8 +7,9 @@ Revision history for Perl extension Net::Server.
         - Allow for graceful skipping if a port is configured twice in
           the configuration file.
         - Allow tests that can pass to pass on Win32 (skip those that cannot)
-        - Allow "-" in user names.
-        - Add Reuse = 1 to Proto::UDP
+        - Allow "-" in user names. (Carl Lewis)
+        - Add Reuse = 1 to Proto::UDP. (Slaven Rezic)
+        - Allow for udp_broadcast setting in Proto::UDP. (Tim Watt)
 
 0.88  Jun 21 2005
         - Change maintainer back to paul@seamons.com (Paul Seamons)

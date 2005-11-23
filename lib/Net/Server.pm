@@ -2138,6 +2138,8 @@ Thanks to Carl Lewis for suggesting "-" in user names.
 
 Thanks to Slaven Rezic for suggesing Reuse => 1 in Proto::UDP.
 
+Thanks to Tim Watt for adding udp_broadcast to Proto::UDP.
+
 Thanks to various other people for bug fixes over the years.
 These and future thank-you's are available in the Changes file
 as well as CVS comments.
