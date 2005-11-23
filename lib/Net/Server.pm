@@ -1,6 +1,6 @@
 # -*- perl -*-
 #
-#  Net::Server - bdpO - Extensible Perl internet server
+#  Net::Server - Extensible Perl internet server
 #
 #  $Id$
 #
@@ -428,7 +428,7 @@ sub post_bind {
     $self->log(1,"User Not Defined.  Defaulting to EUID '$>'\n");
     $prop->{user}  = $>;
   }else{
-    if( $prop->{user} =~ /^(\w+)$/ ){
+    if( $prop->{user} =~ /^([\w-]+)$/ ){
       $prop->{user} = eval{ get_uid( $1 ) };
       $self->fatal( $@ ) if $@;
     }else{
@@ -1270,10 +1270,6 @@ Net::Server - Extensible, general Perl server engine
 
   MyPackage->run(port => 160);
   exit;
-
-=head1 OBTAINING
-
-Visit http://seamons.com/ for the latest version.
 
 =head1 FEATURES
 
@@ -2137,6 +2133,10 @@ numerous suggestions and for work on Net::Server::Daemonize.
 
 Thanks to Vadim <vadim at hardison.net> for patches to
 implement parent/child communication on PreFork.pm.
+
+Thanks to Carl Lewis for suggesting "-" in user names.
+
+Thanks to Slaven Rezic for suggesing Reuse => 1 in Proto::UDP.
 
 Thanks to various other people for bug fixes over the years.
 These and future thank-you's are available in the Changes file
