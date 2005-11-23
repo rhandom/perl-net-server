@@ -83,7 +83,7 @@ sub connect {
   $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
   $args{Listen}    = $prop->{listen};        # how many connections for kernel to queue
   $args{Reuse}     = 1;  # allow us to rebind the port on a restart
-  
+
   ### connect to the sock
   $sock->SUPER::configure(\%args)
     or $server->fatal("Can't connect to TCP port $port on $host [$!]");
@@ -175,7 +175,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto::TCP - adp0 - Net::Server TCP protocol.
+  Net::Server::Proto::TCP - Net::Server TCP protocol.
 
 =head1 SYNOPSIS
 
