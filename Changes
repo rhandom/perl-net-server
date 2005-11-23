@@ -1,6 +1,6 @@
 Revision history for Perl extension Net::Server.
 
-0.89   2005
+0.89   Nov 22 2005
         - Added SSL_passwd_cb to Proto/SSL.pm (Irving A. Bermudez S.)
         - Fix rt #13450 which is caused by broken POSIX::setuid on
           perl 5.8.0 on RedHat 9.0.
@@ -10,6 +10,11 @@ Revision history for Perl extension Net::Server.
         - Allow "-" in user names. (Carl Lewis)
         - Add Reuse = 1 to Proto::UDP. (Slaven Rezic)
         - Allow for udp_broadcast setting in Proto::UDP. (Tim Watt)
+        - Add bug note to Proto::SSL (Christopher A Bongaarts)
+        - setsid property is now boolean rather than checking definedness.
+        - Command line parameters override conf file parameters.
+        - Store command line a little better in preparation for HUP.
+        - Allow for cleaner HUP and better error if process already running.
 
 0.88  Jun 21 2005
         - Change maintainer back to paul@seamons.com (Paul Seamons)
