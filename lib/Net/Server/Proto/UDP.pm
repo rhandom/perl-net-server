@@ -75,6 +75,7 @@ sub connect {
   $args{LocalPort} = $port;                  # what port to bind on
   $args{Proto}     = 'udp';                  # what procol to use
   $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
+  $args{Reuse}     = 1;  # allow us to rebind the port on a restart
 
   ### connect to the sock
   $sock->SUPER::configure(\%args)
