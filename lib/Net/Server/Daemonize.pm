@@ -1,6 +1,6 @@
 # -*- perl -*-
 #
-#  Net::Server::Daemonize - bdpf - Daemonization utilities.
+#  Net::Server::Daemonize - Daemonization utilities.
 #
 #  $Id$
 #
@@ -25,13 +25,11 @@
 package Net::Server::Daemonize;
 
 use strict;
-use vars qw( @ISA @EXPORT_OK $VERSION );
-use Exporter ();
+use vars qw( @EXPORT_OK $VERSION );
+use base qw(Exporter);
 use POSIX qw(SIGINT SIG_BLOCK SIG_UNBLOCK);
 
 $VERSION = "0.05";
-
-@ISA = qw(Exporter);
 
 @EXPORT_OK = qw(check_pid_file
                 create_pid_file
@@ -267,7 +265,7 @@ sub safe_fork () {
 sub daemonize ($$$) {
   my ($user, $group, $pid_file) = @_;
 
-  check_pid_file( $pid_file );
+  check_pid_file($pid_file) if defined $pid_file;
 
   my $uid = get_uid( $user );
   my $gid = get_gid( $group ); # returns list of groups
@@ -286,10 +284,10 @@ sub daemonize ($$$) {
   ### child process will continue on
   }else{
 
-    create_pid_file( $pid_file );
+    create_pid_file($pid_file) if defined $pid_file;
 
     ### make sure we can remove the file later
-    chown($uid,$gid,$pid_file);
+    chown($uid, $gid, $pid_file) if defined $pid_file;
 
     ### become another user and group
     set_user($uid, $gid);
@@ -309,7 +307,7 @@ sub daemonize ($$$) {
 
     ### install a signal handler to make sure
     ### SIGINT's remove our pid_file
-    $SIG{INT}  = sub { HUNTSMAN( $pid_file ); };
+    $SIG{INT}  = sub { HUNTSMAN($pid_file) } if defined $pid_file;
     return 1;
 
   }
@@ -320,8 +318,10 @@ sub HUNTSMAN {
   my $path = shift;
   unlink $path;
 
-  require Unix::Syslog;
-  Unix::Syslog::syslog(Unix::Syslog::LOG_ERR(), "Exiting on INT signal.");
+  eval {
+      require Unix::Syslog;
+      Unix::Syslog::syslog(Unix::Syslog::LOG_ERR(), "Exiting on INT signal.");
+  };
 
   exit;
 }
@@ -333,7 +333,7 @@ __END__
 
 =head1 NAME
 
-Net::Server::Daemonize - bdpf Safe fork and daemonization utilities
+Net::Server::Daemonize - Safe fork and daemonization utilities
 
 =head1 SYNOPSIS
 
@@ -342,7 +342,7 @@ Net::Server::Daemonize - bdpf Safe fork and daemonization utilities
   daemonize(
     'nobody',                 # User
     'nobody',                 # Group
-    '/var/state/mydaemon.pid' # Path to PID file
+    '/var/state/mydaemon.pid' # Path to PID file - optional
   );
 
 =head1 DESCRIPTION
@@ -365,7 +365,7 @@ pid file (storing the pid in the file), become another user and
 group, close STDIN, STDOUT and STDERR, separate from the process
 group (become session leader), and install $SIG{INT} to remove
 the pid file.  In otherwords - daemonize.  All errors result in
-a die.
+a die.  As of version 0.89 the pid_file is optional.
 
 =item safe_fork
 
