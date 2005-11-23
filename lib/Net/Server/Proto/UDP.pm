@@ -10,6 +10,9 @@
 #    paul@seamons.com
 #    http://seamons.com/
 #
+#  Modified 2005 by Timothy Watt
+#    Added ability to deal with broadcast packets.
+#
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
 #    or the
@@ -22,11 +25,11 @@
 package Net::Server::Proto::UDP;
 
 use strict;
-use vars qw($VERSION $AUTOLOAD @ISA);
-use Net::Server::Proto::TCP ();
+use vars qw($VERSION);
+use base qw(Net::Server::Proto::TCP);
+use Socket qw(SO_BROADCAST);
 
 $VERSION = $Net::Server::VERSION; # done until separated
-@ISA = qw(Net::Server::Proto::TCP);
 
 sub object {
   my $type  = shift;
@@ -44,18 +47,24 @@ sub object {
   $server->configure({
     udp_recv_len   => \$prop->{udp_recv_len},
     udp_recv_flags => \$prop->{udp_recv_flags},
+    udp_broadcast  => \$prop->{udp_broadcast},
   });
 
   $prop->{udp_recv_len} = 4096
     unless defined($prop->{udp_recv_len})
     && $prop->{udp_recv_len} =~ /^\d+$/;
-    
+
   $prop->{udp_recv_flags} = 0
     unless defined($prop->{udp_recv_flags})
     && $prop->{udp_recv_flags} =~ /^\d+$/;
 
+  $prop->{udp_broadcast} = undef
+    unless defined($prop->{udp_broadcast})
+    && $prop->{udp_broadcast};
+
   $sock->NS_recv_len(   $prop->{udp_recv_len} );
   $sock->NS_recv_flags( $prop->{udp_recv_flags} );
+  $sock->sockopt( SO_BROADCAST, $prop->{udp_broadcast} ? 1 : 0 );
 
   return $sock;
 }
@@ -132,6 +141,7 @@ See L<recv>.  Default is 0.
   ## UDP protocol parameters
   udp_recv_len      \d+                      4096
   udp_recv_flags    \d+                      0
+  udp_broadcast     bool                     undef
 
 =head1 LICENCE
 
