@@ -1218,7 +1218,7 @@ sub process_conf {
     }
 
     while(<_CONF>){
-      push( @args, "$1=$2") if m/^\s*((?:--)?\w+)[=:]?\s*(\S+)/;
+      push( @args, "$1=$2") if m/^\s*((?:--)?\w+)(?:\s*[=:]\s*|\s+)(\S+)/;
     }
 
     close(_CONF);
