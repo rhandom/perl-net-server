@@ -376,19 +376,16 @@ sub bind {
 
     $self->restart_open_hook();
 
-    $self->log(2,"Binding open file descriptors");
+    $self->log(2, "Binding open file descriptors");
 
     ### loop through the past information and match things up
-    foreach my $info ( split(/\n/, $ENV{BOUND_SOCKETS}) ){
-      my ($fd,$hup_string) = split(/\|/,$info,2);
-      $self->fatal("Bad file descriptor")
-        unless $fd =~ /^(\d+)$/;
-      $fd = $1;
-
-      foreach ( @{ $prop->{sock} } ){
-        if( $hup_string eq $_->hup_string() ){
-          $_->log_connect($self);
-          $_->reconnect( $fd, $self );
+    foreach my $info (split /\n/, $ENV{BOUND_SOCKETS}) {
+      my ($fd, $hup_string) = split /\|/, $info, 2;
+      $fd = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
+      foreach my $sock ( @{ $prop->{sock} } ){
+        if ($hup_string eq $sock->hup_string) {
+          $sock->log_connect($self);
+          $sock->reconnect($fd, $self);
           last;
         }
       }
@@ -463,7 +460,7 @@ sub post_bind {
     my @chown_files = ();
     foreach my $sock ( @{ $prop->{sock} } ){
       push @chown_files, $sock->NS_unix_path
-        if$sock->NS_proto eq 'UNIX';
+        if $sock->NS_proto eq 'UNIX';
     }
     if( $prop->{pid_file_unlink} ){
       push @chown_files, $prop->{pid_file};
@@ -959,7 +956,13 @@ sub server_close{
 
     $self->restart_close_hook();
 
-    $self->hup_server;
+    $self->hup_server; # execs at the end
+  }
+
+  ### unlink remaining socket files (if any)
+  foreach my $sock ( @{ $prop->{sock} } ){
+    unlink $sock->NS_unix_path
+      if $sock->NS_proto eq 'UNIX';
   }
 
   exit;
@@ -1013,12 +1016,12 @@ sub sig_hup {
   foreach my $sock ( @{ $prop->{sock} } ){
 
     ### duplicate the sock
-    my $fd = POSIX::dup($sock->fileno())
+    my $fd = POSIX::dup($sock->fileno)
       or $self->fatal("Can't dup socket [$!]");
 
     ### hold on to the socket copy until exec
-    $prop->{_HUP}->[$i] = IO::Socket::INET->new();
-    $prop->{_HUP}->[$i]->fdopen( $fd, 'w' )
+    $prop->{_HUP}->[$i] = IO::Socket::INET->new;
+    $prop->{_HUP}->[$i]->fdopen($fd, 'w')
       or $self->fatal("Can't open to file descriptor [$!]");
 
     ### turn off the FD_CLOEXEC bit to allow reuse on exec
@@ -1038,7 +1041,7 @@ sub sig_hup {
     delete $prop->{select};
   }
 
-  $ENV{BOUND_SOCKETS} = join("\n",@fd);
+  $ENV{BOUND_SOCKETS} = join("\n", @fd);
 }
 
 ### restart the server using prebound sockets
