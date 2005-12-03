@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Server.
 
+0.90   Dec 02 2005
+        - Make HUP work correctly on Multiplex server.
+        - Allow socket files to cleanup correctly.
+
 0.89   Nov 22 2005
         - Added SSL_passwd_cb to Proto/SSL.pm (Irving A. Bermudez S.)
         - Fix rt #13450 which is caused by broken POSIX::setuid on

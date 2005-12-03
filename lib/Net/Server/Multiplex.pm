@@ -34,7 +34,6 @@ $@ && warn "Module IO::Multiplex is required for Multiplex.";
 $VERSION = $Net::Server::VERSION;
 @ISA = qw(Net::Server);
 
-
 sub loop {
   my $self = shift;
   my $prop = $self->{server};
@@ -45,7 +44,7 @@ sub loop {
   foreach my $sock ( @{ $prop->{sock} } ) {
     $mux->listen($sock);
   }
-  $mux->set_callback_object(init Net::Server::Multiplex::MUX $self);
+  $mux->set_callback_object(Net::Server::Multiplex::MUX->init($self));
 
   ###
   ### Use Net::Server::SIG for safe signal handling.
@@ -67,13 +66,26 @@ sub loop {
 
   $mux->loop(sub {
     my ($rdready, $wrready) = @_;
-    &check_sigs();
+    check_sigs();
     $mux->endloop if $prop->{_HUP};
   });
 
   ### fall back to the main run routine
 }
 
+### make sure that we properly disconnect from the mux if we are HUPing
+sub sig_hup {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  if (my $mux  = $self->{mux}) {
+    foreach my $sock ( @{ $prop->{sock} } ){
+      $mux->remove($sock);
+    }
+  }
+
+  return $self->SUPER::sig_hup(@_);
+}
 
 # This method instead of run_client_connection
 # because STDOUT should be tied correctly,
@@ -160,14 +172,14 @@ sub init {
 # Any values within it that this object may need to use
 # later must be copied within itself.
 sub new {
-  my $package  = shift;
-  my $net_server= shift;
-  my $self     = bless {
+  my $package    = shift;
+  my $net_server = shift;
+  my $self       = bless {
     # Some nice values to remember for this client
     net_server => $net_server,
     peeraddr   => $net_server->{server}->{peeraddr},
     connected  => time,
-  } => $package;
+  }, $package;
   return $self;
 }
 
@@ -178,19 +190,25 @@ sub mux_connection {
   my $fh   = shift;
   my $net_server = $self->{net_server};
   $net_server->{server}->{client} = $fh;
+
   $self->_link_stdout($mux, $fh);
+
   if ($net_server->setup_client_connection($mux)) {
     # Create client specific callback object
-    my $client_object = new Net::Server::Multiplex::MUX ($net_server, $fh);
+    my $client_object = Net::Server::Multiplex::MUX->new($net_server, $fh);
+
     # Set this as the callback object for this client
     $mux->set_callback_object($client_object, $fh);
+
     # Finally call the clients real mux_connection routine,
     # if any.  This allows all the mux_* routines to be
     # called from the same type of object.
     $client_object->SUPER::mux_connection($mux, $fh);
     #$client_object->mux_connection($mux, $fh);
   }
+
   $self->_unlink_stdout();
+
   return;
 }
 
