@@ -17,6 +17,7 @@ sub configure_hook {
   my $self = shift;
   $self->{addr} = 'localhost';   # choose a remote addr
   $self->{port} = 20203;         # choose a remote port
+  $self->{file} = '/tmp/mysock'; # sock file for Load testing a unix socket
   $self->{failed} = 0;           # failed hits (server was blocked)
   $self->{hits} = 0;             # log hits
   $self->{max_hits}   = 1000;    # how many impressions to do
@@ -44,10 +45,15 @@ sub process_request {
   if( $self->{remote} = IO::Socket::INET->new(PeerAddr => $self->{addr},
                                               PeerPort => $self->{port},
                                               Proto    => 'tcp') ){
-    $self->load();
+    $self->load;
     return;
 
   }
+
+  #if ($self->{remote} = IO::Socket::UNIX->new(Peer => $self->{file})) {
+  #  $self->load;
+  #  return;
+  #}
 
   ### couldn't connect
   *_WRITE = $self->{server}->{_WRITE};
