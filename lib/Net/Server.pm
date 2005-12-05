@@ -36,7 +36,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.89';
+$VERSION = '0.90';
 
 ### program flow
 sub run {
@@ -48,8 +48,8 @@ sub run {
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
 
   ### save for a HUP
-  $self->{server}->{commandline} = $self->get_commandline
-      if ! defined $self->{server}->{commandline};
+  $self->commandline($self->_get_commandline)
+      if ! eval { $self->commandline };
 
   ### prepare to cache configuration parameters
   $self->{server}->{conf_file_args} = undef;
@@ -124,10 +124,9 @@ sub run_client_connection {
 
 }
 
+###----------------------------------------------------------------###
 
-###----------------------------------------------------------###
-
-sub get_commandline {
+sub _get_commandline {
   my $self = shift;
   my $prop = $self->{server};
 
@@ -144,6 +143,17 @@ sub get_commandline {
   $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^\.+/| && $ENV{'PWD'}; # add absolute to relative
   return [ $script, @ARGV ]
 }
+
+sub commandline {
+    my $self = shift;
+    if (@_) { # allow for set
+      $self->{server}->{commandline} = ref($_[0]) ? shift : \@_;
+    }
+    return $self->{server}->{commandline} || die "commandline was not set during initialization";
+}
+
+###----------------------------------------------------------------###
+
 
 ### any pre-initialization stuff
 sub configure_hook {}
@@ -1050,8 +1060,12 @@ sub hup_server {
 
   $self->log(0,$self->log_time()." HUP'ing server");
 
-  exec @{ $self->{server}->{commandline} };
+  delete $ENV{$_} for $self->hup_delete_env_keys;
+
+  exec @{ $self->commandline };
 }
+
+sub hup_delete_env_keys { return qw(PATH) }
 
 ### this hook occurs if a server has been HUP'ed
 ### it occurs just before opening to the fileno's
@@ -2088,32 +2102,32 @@ is received, the server will close children (if any), make
 sure that sockets are left open, and re-exec using
 the same commandline parameters that initially started the
 server.  (Note: for this reason it is important that @ARGV
-is not modified until C<-E<gt>run> is called.
+is not modified until C<-E<gt>run> is called).
 
-=head1 TO DO
+The Net::Server will attempt to find out the commandline used for
+starting the program.  The attempt is made before any configuration
+files or other arguments are processed.  The outcome of this attempt
+is stored using the method C<-E<gt>commandline>.  The stored
+commandline may also be retrieved using the same method name.  The
+stored contents will undoubtedly contain Tainted items that will cause
+the server to die during a restart when using the -T flag (Taint
+mode).  As it is impossible to arbitrarily decide what is taint safe
+and what is not, the individual program must clean up the tainted
+items before doing a restart.
 
-There are several tasks to perform before the alpha label
-can be removed from this software:
+  sub configure_hook{
+    my $self = shift;
 
-=over 4
+    ### see the contents
+    my $ref  = $self->commandline;
+    use Data::Dumper;
+    print Dumper $ref;
 
-=item Use It
+    ### arbitrary untainting - VERY dangerous
+    my @untainted = map {/(.+)/;$1} @$ref;
 
-The best way to further the status of this project is to use
-it.  There are immediate plans to use this as a base class
-in implementing some mail servers and banner servers on a
-high hit site.
-
-=item Other Personalities
-
-Explore any other personalities
-
-=item Net::Server::HTTP, etc
-
-Create various types of servers.  Possibly, port exising
-servers to user Net::Server as a base layer.
-
-=back
+    $self->commandline(\@untainted)
+  }
 
 =head1 FILES
 
@@ -2141,12 +2155,6 @@ these commands in its base directory:
   make
   make test
   make install
-
-For RPM installation, download tarball before
-running these commands in your _topdir:
-
-  rpm -ta SOURCES/Net-Server-*.tar.gz
-  rpm -ih RPMS/noarch/perl-Net-Server-*.rpm
 
 =head1 AUTHOR
 
