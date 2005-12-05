@@ -588,6 +588,11 @@ sub accept {
 
       return 0 if defined $prop->{_HUP};
 
+      if ($self->can_read_hook($sock)) {
+        $retries ++;
+        next;
+      }
+
     ### single port is bound - just accept
     }else{
 
@@ -654,6 +659,12 @@ sub accept_multi_port {
   return $waiting[ rand(@waiting) ];
 
 }
+
+### this occurs after a socket becomes readible on an accept_multi_port call.
+### It is passed $self and the $sock that is readible.  A return value
+### of true indicates to not pass the handle on to the process_request method and
+### to return to accepting
+sub can_read_hook {}
 
 
 ### this occurs after the request has been processed
@@ -2026,6 +2037,23 @@ who started the server.
 This hook occurs after chroot, change of user, and change of
 group has occured.  It allows for preparation before looping
 begins.
+
+=item C<$self-E<gt>can_read_hook()>
+
+This hook occurs after a socket becomes readible on an accept_multi_port
+request (accept_multi_port is used if there are multiple bound ports
+to accept on, or if the "multi_port" configuration parameter is set to
+true).  This hook is intended to allow for processing of arbitrary handles
+added to the IO::Select used for the accept_multi_port.  These
+handles could be added during the post_bind_hook.  No internal support
+is added for processing these handles or adding them to the IO::Socket.  Care
+must be used in how much occurs during the can_read_hook as a long response
+time will result in the server being susceptible to DOS attacks.  A return value
+of true indicates that the Server should not pass the readible handle on to the
+post_accept and process_request phases.
+
+It is generally suggested that other avenues be pursued for sending messages
+via sockets not created by the Net::Server.
 
 =item C<$self-E<gt>post_accept_hook()>
 
