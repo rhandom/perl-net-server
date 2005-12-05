@@ -1,8 +1,15 @@
 Revision history for Perl extension Net::Server.
 
-0.90   Dec 02 2005
+0.90   Dec 05 2005
         - Make HUP work correctly on Multiplex server.
         - Allow socket files to cleanup correctly.
+        - Allow Net::Server::Daemonize to function properly in Taint
+          mode again (broken in .88).
+        - Add ->commandline method to allow for getting and setting
+          the commandline for use during a HUP.  This is to allow for
+          untainting as necessary.
+        - Add ->can_read_hook (see the documentation) to allow for
+          processing of arbitrary handles in accept_multi_port.
 
 0.89   Nov 22 2005
         - Added SSL_passwd_cb to Proto/SSL.pm (Irving A. Bermudez S.)
