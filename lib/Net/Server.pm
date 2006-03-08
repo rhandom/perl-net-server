@@ -66,6 +66,20 @@ sub _initialize {
   $self->configure(@_);       # allow for reading of commandline,
                               # program, and configuration file parameters
 
+  ### allow yet another way to pass defaults
+  my $defaults = $self->default_values || {};
+  foreach my $key (keys %$defaults) {
+    next if ! exists $self->{server}->{$key};
+    if (ref $self->{server}->{$key} eq 'ARRAY') {
+      if (! @{ $self->{server}->{$key} }) { # was empty
+        my $val = $defaults->{$key};
+        $self->{server}->{$key} = ref($val) ? $val : [$val];
+      }
+    } elsif (! defined $self->{server}->{$key}) {
+      $self->{server}->{$key} = $defaults->{$key};
+    }
+  }
+
   ### get rid of cached config parameters
   delete $self->{server}->{conf_file_args};
   delete $self->{server}->{configure_args};
@@ -173,6 +187,8 @@ sub commandline {
 
 ###----------------------------------------------------------------###
 
+### any values to set if no configuration could be found
+sub default_values { {} }
 
 ### any pre-initialization stuff
 sub configure_hook {}
@@ -1626,9 +1642,10 @@ attacks.
 
 =head1 ARGUMENTS
 
-There are four possible ways to pass arguments to
+There are five possible ways to pass arguments to
 Net::Server.  They are I<passing on command line>, I<using a
-conf file>, I<passing parameters to run>, or I<using a
+conf file>, I<passing parameters to run>, I<returning values
+in the default_values method>, or I<using a
 pre-built object to call the run method>.
 
 Arguments consist of key value pairs.  On the commandline
@@ -1664,12 +1681,17 @@ will look for arguments in the following order:
   2) Arguments passed on command line.
   3) Arguments passed to the run method.
   4) Arguments passed via a conf file.
-  5) Arguments set in the configure_hook.
+  5) Arguments set in default_values method.
+  6) Arguments set in the configure_hook.
 
 Each of these levels will override parameters of the same
 name specified in subsequent levels.  For example, specifying
 --setsid=0 on the command line will override a value of "setsid 1"
 in the conf file.
+
+Note that the configure_hook method doesn't return values
+to set, but is there to allow for setting up configured values
+before the configure method is called.
 
 Key/value pairs used by the server are removed by the
 configuration process so that server layers on top of
@@ -2325,6 +2347,19 @@ server via exec.
 =head1 OTHER METHODS
 
 =over 4
+
+=item C<$self-E<gt>default_values>
+
+Allow for returning configuration values that will be used if no
+other value could be found.
+
+Should return a hashref.
+
+    sub default_values {
+      return {
+        port => 20201,
+      };
+    }
 
 =item C<$self-E<gt>new>
 
