@@ -36,13 +36,19 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.90';
+$VERSION = '0.91';
 
-### program flow
-sub run {
+###----------------------------------------------------------------###
 
-  ### pass package or object
-  my $self = ref($_[0]) ? shift() : (bless {}, shift());
+sub new {
+  my $class = shift || die "Missing class";
+  my $args  = shift || {};
+  my $self  = bless {server => { %$args }}, $class;
+  return $self;
+}
+
+sub _initialize {
+  my $self = shift;
 
   ### need a place to store properties
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
@@ -60,15 +66,27 @@ sub run {
   $self->configure(@_);       # allow for reading of commandline,
                               # program, and configuration file parameters
 
+  ### get rid of cached config parameters
+  delete $self->{server}->{conf_file_args};
+  delete $self->{server}->{configure_args};
+
+}
+
+###----------------------------------------------------------------###
+
+### program flow
+sub run {
+
+  ### pass package or object
+  my $self = ref($_[0]) ? shift() : shift->new;
+
+  $self->_initialize(@_);     # configure all parameters
+
   $self->post_configure;      # verification of passed parameters
 
   $self->post_configure_hook; # user customizable hook
 
   $self->pre_bind;            # finalize ports to be bound
-
-  ### get rid of cached config parameters
-  delete $self->{server}->{conf_file_args};
-  delete $self->{server}->{configure_args};
 
   $self->bind;                # connect to port(s)
                               # setup selection handle for multi port
@@ -241,7 +259,7 @@ sub post_configure {
     }
 
   ### open a logging file
-  }elsif( $prop->{log_file} ){
+  }elsif( $prop->{log_file} && $prop->{log_file} ne 'Sys::Syslog' ){
 
     die "Unsecure filename \"$prop->{log_file}\""
       unless $prop->{log_file} =~ m|^([\w\.\-/\\]+)$|;
@@ -287,7 +305,7 @@ sub post_configure {
   }
 
   ### completetly daemonize by closing STDERR (should be done after fork)
-  if( length($prop->{log_file}) ){
+  if( length($prop->{log_file}) && $prop->{log_file} ne 'Sys::Syslog' ){
     open STDERR, '>&_SERVER_LOG' || die "Can't open STDERR to _SERVER_LOG [$!]";
   }elsif( $prop->{setsid} ){
     open STDERR, '>&STDOUT' || die "Can't open STDERR to STDOUT [$!]";
@@ -680,8 +698,16 @@ sub post_accept {
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   if( defined $prop->{client} ){
-    *STDIN  = \*{ $prop->{client} };
-    *STDOUT = \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+    my $fileno= fileno $prop->{client};
+    if( defined $fileno ){
+        open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
+        open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
+    } else {
+        close STDIN;
+        close STDOUT;
+        *STDIN= \*{ $prop->{client} };
+        *STDOUT= \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+    }
     STDIN->autoflush(1);
     STDOUT->autoflush(1);
     select(STDOUT);
@@ -1133,7 +1159,7 @@ $Net::Server::syslog_map = {0 => 'err',
 
 ### record output
 sub log {
-  my ($self, $level, $msg) = @_;
+  my ($self, $level, $msg, @therest) = @_;
   my $prop = $self->{server};
 
   return unless $prop->{log_level};
@@ -1142,7 +1168,11 @@ sub log {
   ### log only to syslog if setup to do syslog
   if( defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog' ){
     $level = $level!~/^\d+$/ ? $level : $Net::Server::syslog_map->{$level} ;
-    Sys::Syslog::syslog($level, '%s', $msg);
+    if (@therest) { # if more parameters are passed, we must assume that the first is a format string
+      Sys::Syslog::syslog($level, $msg, @therest);
+    } else {
+      Sys::Syslog::syslog($level, '%s', $msg);
+    }
     return;
   }
 
@@ -1941,7 +1971,7 @@ ignored.
 
 The process flow is written in an open, easy to
 override, easy to hook, fashion.  The basic flow is
-shown below.
+shown below.  This is the flow of the C<$self-E<gt>run> method.
 
   $self->configure_hook;
 
@@ -2020,6 +2050,106 @@ represents the program flow:
   $self->shutdown_sockets;
 
   exit;
+
+=head1 MAIN METHODS
+
+=over 4
+
+=item C<$self-E<gt>run>
+
+This method incorporates the main process flow.  This flow
+is listed above.
+
+The method run may be called in any of the following ways.
+
+   MyPackage->run(port => 20201);
+
+   MyPackage->new({port => 20201})->run;
+
+   my $obj = bless {server=>{port => 20201}}, 'MyPackage';
+   $obj->run;
+
+The ->run method should typically be the last method called
+in a server start script (the server will exit at the end
+of the ->run method).
+
+=item C<$self-E<gt>configure>
+
+This method attempts to read configurations from the commandline,
+from the run method call, or from a specified conf_file.
+All of the configured parameters are then stored in the {"server"}
+property of the Server object.
+
+=item C<$self-E<gt>post_configure>
+
+The post_configure hook begins the startup of the server.  During
+this method running server instances are checked for, pid_files are created,
+log_files are created, Sys::Syslog is initialized (as needed), process
+backgrounding occurs and the server closes STDIN and STDOUT (as needed).
+
+=item C<$self-E<gt>pre_bind>
+
+This method is used to initialize all of the socket objects
+used by the server.
+
+=item C<$self-E<gt>bind>
+
+This method actually binds to the inialized sockets (or rebinds
+if the server has been HUPed).
+
+=item C<$self-E<gt>post_bind>
+
+During this method priveleges are dropped.
+The INT, TERM, and QUIT signals are set to run server_close.
+Sig PIPE is set to IGNORE.  Sig CHLD is set to sig_chld.  And sig
+HUP is set to call sig_hup.
+
+Under the Fork, PreFork, and PreFork simple personalities, these
+signals are registered using Net::Server::SIG to allow for
+safe signal handling.
+
+=item C<$self-E<gt>loop>
+
+During this phase, the server accepts incoming connections.
+The behavior of how the accepting occurs and if a child process
+handles the connection is controlled by what type of Net::Server
+personality the server is using.
+
+Net::Server and Net::Server single accept only one connection at
+a time.
+
+Net::Server::INET runs one connection and then exits (for use by
+inetd or xinetd daemons).
+
+Net::Server::MultiPlex allows for one process to simultaneously
+handle multiple connections (but requires rewriting the process_request
+code to operate in a more "packet-like" manner).
+
+Net::Server::Fork forks off a new child process for each incoming
+connection.
+
+Net::Server::PreForkSimple starts up a fixed number of processes
+that all accept on incoming connections.
+
+Net::Server::PreFork starts up a base number of child processes
+which all accept on incoming connections.  The server throttles
+the number of processes running depending upon the number of
+requests coming in (similar to concept to how Apache controls
+its child processes in a PreFork server).
+
+Read the documentation for each of the types for more information.
+
+=item C<$self-E<gt>server_close>
+
+This method is called once the server has been signaled to end, or
+signaled for the server to restart (via HUP),  or the loop
+method has been exited.
+
+This method takes care of cleaning up any remaining child processes,
+setting appropriate flags on sockets (for HUPing), closing up
+logging, and then closing open sockets.
+
+=back
 
 =head1 HOOKS
 
@@ -2141,6 +2271,42 @@ server via exec.
 
 =back
 
+=head1 OTHER METHODS
+
+=over 4
+
+=item C<$self-E<gt>new>
+
+As of Net::Server 0.91 there is finally a new method.  This method
+takes a class name and an argument hashref as parameters.  The argument
+hashref becomes the "server" property of the object.
+
+   package MyPackage;
+   use base qw(Net::Server);
+
+   my $obj = MyPackage->new({port => 20201});
+
+   # same as
+
+   my $obj = bless {server => {port => 20201}}, 'MyPackage';
+
+=item C<$self-E<gt>log>
+
+Takes either a log_level and a message, or it may take a log_level,
+format, and formatstring parameters if log_file is set to 'Sys::Syslog'.
+(The second parameter is assumed to be a formatstring if additional
+arguments are passed along).
+
+If log_file is set to a file (other than Sys::Syslog), the message
+will be appended to the log file.
+
+=item C<$self-E<gt>shutdown_sockets>
+
+This method will close any remaining open sockets.  This is called
+at the end of the server_close method.
+
+=back
+
 =head1 RESTARTING
 
 Each of the server personalities (except for INET), support
@@ -2253,6 +2419,10 @@ some in configuration, commandline args, and cidr_allow.
 Thanks to various other people for bug fixes over the years.
 These and future thank-you's are available in the Changes file
 as well as CVS comments.
+
+Thanks to Ben Cohen and tye (on Permonks) for finding and diagnosing
+more correct behavior for dealing with re-opening STDIN and STDOUT
+on the client handles.
 
 =head1 SEE ALSO
 
