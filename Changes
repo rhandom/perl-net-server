@@ -8,6 +8,15 @@ Revision history for Perl extension Net::Server.
         - Better handling of STDIN and STDOUT as provided by tye on
           perlmonks in response to Ben Cohen's question (in node
           http://www.perlmonks.org/?node_id=534791)
+        - Finally added a new method.
+        - Added much missing perldoc.
+        - Pass parameters to ->run the second time it is called.  This
+          allows for multitype to handle more parameters - but needs
+          to be tested for all use cases (it could result in array fields
+          getting multiple entries which should be fine in most cases).
+          Thanks to Aron Ujvari for pointing this out.
+        - Add default_values method (suggested by Malte S. Stretz).
+        - Fix udp_broadcast issue (fix by Rob Mueller)
 
 0.90   Dec 05 2005
         - Make HUP work correctly on Multiplex server.
