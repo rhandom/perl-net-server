@@ -105,7 +105,7 @@ sub run {
 
   ### now run as the new type of thingy
   ### passing self, instead of package, doesn't instantiate a new object
-  $self->SUPER::run();
+  $self->SUPER::run(@_);
 
 }
 
