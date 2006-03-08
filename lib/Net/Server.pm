@@ -2343,13 +2343,26 @@ hashref becomes the "server" property of the object.
 
 =item C<$self-E<gt>log>
 
-Takes either a log_level and a message, or it may take a log_level,
-format, and formatstring parameters if log_file is set to 'Sys::Syslog'.
-(The second parameter is assumed to be a formatstring if additional
-arguments are passed along).
+Parameters are a log_level and a message.
+
+If log_level is set to 'Sys::Syslog', the parameters may alternately
+be a log_level, a format string, and format string parameters.
+(The second parameter is assumed to be a format string if additional
+arguments are passed along).  Passing arbitrary format strings to
+Sys::Syslog will allow the server to be vulnerable to exploit.  The
+server maintainer should make sure that any string treated as
+a format string is controlled.
+
+    # assuming log_file = 'Sys::Syslog'
+
+    $self->log(1, "My Message with %s in it");
+    # sends "%s", "My Message with %s in it" to syslog
+
+    $self->log(1, "My Message with %s in it", "Foo");
+    # sends "My Message with %s in it", "Foo" to syslog
 
 If log_file is set to a file (other than Sys::Syslog), the message
-will be appended to the log file.
+will be appended to the log file by calling the write_to_log_hook.
 
 =item C<$self-E<gt>shutdown_sockets>
 
