@@ -27,7 +27,6 @@ package Net::Server::Proto::UDP;
 use strict;
 use vars qw($VERSION);
 use base qw(Net::Server::Proto::TCP);
-use Socket qw(SO_BROADCAST);
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -64,7 +63,6 @@ sub object {
 
   $sock->NS_recv_len(   $prop->{udp_recv_len} );
   $sock->NS_recv_flags( $prop->{udp_recv_flags} );
-  $sock->sockopt( SO_BROADCAST, $prop->{udp_broadcast} ? 1 : 0 );
 
   return $sock;
 }
@@ -85,6 +83,7 @@ sub connect {
   $args{Proto}     = 'udp';                  # what procol to use
   $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
   $args{Reuse}     = 1;  # allow us to rebind the port on a restart
+  $args{Broadcast} = 1 if $prop->{udp_broadcast};
 
   ### connect to the sock
   $sock->SUPER::configure(\%args)
