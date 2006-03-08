@@ -238,6 +238,21 @@ sub run_dequeue {
   die "run_dequeue: virtual method not defined";
 }
 
+sub close_children {
+    my $self = shift;
+    $self->SUPER::close_children(@_);
+
+    check_sigs(); # since we have captured signals - make sure we handle them
+
+    register_sig(PIPE => 'DEFAULT',
+                 INT  => 'DEFAULT',
+                 TERM => 'DEFAULT',
+                 QUIT => 'DEFAULT',
+                 HUP  => 'DEFAULT',
+                 CHLD => 'DEFAULT',
+                 );
+}
+
 1;
 
 __END__
