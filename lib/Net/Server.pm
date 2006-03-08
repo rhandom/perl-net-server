@@ -2051,7 +2051,7 @@ represents the program flow:
 
   exit;
 
-=head1 MAIN METHODS
+=head1 MAIN SERVER METHODS
 
 =over 4
 
@@ -2151,11 +2151,62 @@ logging, and then closing open sockets.
 
 =back
 
+=head1 MAIN CLIENT CONNETION methods METHODS
+
+=over 4
+
+=item C<$self-E<gt>run_client_connection>
+
+This method is run after the server has accepted and received
+a client connection.  The full process flow is listed
+above under PROCESS FLOWS.  This method takes care of
+handling each client connection.
+
+=item C<$self-E<gt>post_accept>
+
+This method opens STDIN and STDOUT to the client socket.
+This allows any of the methods during the run_client_connection
+phase to print directly to and read directly from the
+client socket.
+
+=item C<$self-E<gt>get_client_info>
+
+This method looks up information about the client connection
+such as ip address, socket type, and hostname (as needed).
+
+=item C<$self-E<gt>allow_deny>
+
+This method uses the rules defined in the allow and deny configuration
+parameters to determine if the ip address should be accepted.
+
+=item C<$self-E<gt>process_request>
+
+This method is intended to handle all of the client communication.
+At this point STDIN and STDOUT are opened to the client, the ip
+address has been verified.  The server can then
+interact with the client connection according to whatever API or
+protocol the server is implementing.
+
+This is the main method to override.
+
+The default method implements a simple echo server that
+will repeat whatever is sent.  It will quit the child if "quit"
+is sent, and will exit the server if "exit" is sent.
+
+=item C<$self-E<gt>post_process_request>
+
+This method is used to clean up the client connection and
+to handle any parent/child accounting for the forking servers.
+
+=back
+
 =head1 HOOKS
 
 C<Net::Server> provides a number of "hooks" allowing for
 servers layered on top of C<Net::Server> to respond at
-different levels of execution.
+different levels of execution without having to "SUPER" class
+the main built-in methods.  The placement of the hooks
+can be seen in the PROCESS FLOW section.
 
 =over 4
 
