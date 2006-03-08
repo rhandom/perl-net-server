@@ -1,5 +1,11 @@
 Revision history for Perl extension Net::Server.
 
+0.91
+        - Abstract shutdown_sockets method that is called at the end
+          of server_close (to allow for calling in other places).
+        - Make sure close_children unsets the overridden signals in
+          the forked and preforked servers.
+
 0.90   Dec 05 2005
         - Make HUP work correctly on Multiplex server.
         - Allow socket files to cleanup correctly.
