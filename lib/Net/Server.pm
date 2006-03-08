@@ -91,6 +91,7 @@ sub run {
                               # this will run pre_server_close_hook
                               #               close_children
                               #               post_child_cleanup_hook
+                              #               shutdown_sockets
                               # and either exit or run restart_close_hook
 
   exit;
@@ -964,12 +965,12 @@ sub server_close{
   if( defined $prop->{lock_file}
       && -e $prop->{lock_file}
       && defined $prop->{lock_file_unlink} ){
-    unlink $prop->{lock_file} || warn "Couldn't unlink \"$prop->{lock_file}\" [$!]";
+    unlink $prop->{lock_file} || $self->log(1, "Couldn't unlink \"$prop->{lock_file}\" [$!]");
   }
   if( defined $prop->{pid_file}
       && -e $prop->{pid_file}
       && defined $prop->{pid_file_unlink} ){
-    unlink $prop->{pid_file} || warn "Couldn't unlink \"$prop->{pid_file}\" [$!]";
+    unlink $prop->{pid_file} || $self->log(1, "Couldn't unlink \"$prop->{pid_file}\" [$!]");
   }
 
   ### HUP process
@@ -980,13 +981,29 @@ sub server_close{
     $self->hup_server; # execs at the end
   }
 
+  ### we don't need the ports - close everything down
+  $self->shutdown_sockets;
+
+  exit;
+}
+
+### allow for fully shutting down the bound sockets
+sub shutdown_sockets {
+  my $self = shift;
+  my $prop = $self->{server};
+
   ### unlink remaining socket files (if any)
   foreach my $sock ( @{ $prop->{sock} } ){
+    $sock->shutdown(2); # close sockets - nobody should be reading/writing still
+
     unlink $sock->NS_unix_path
       if $sock->NS_proto eq 'UNIX';
   }
 
-  exit;
+  ### delete the sock objects
+  $prop->{sock} = [];
+
+  return 1;
 }
 
 ### Allow children to send INT signal to parent (or use another method)
@@ -1999,6 +2016,8 @@ represents the program flow:
      $self->restart_close_hook();
      $self->hup_server;
   }
+
+  $self->shutdown_sockets;
 
   exit;
 
