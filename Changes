@@ -1,5 +1,11 @@
 Revision history for Perl extension Net::Server.
 
+0.92   Mar 13 2006
+        - Allow for duplicated STDIN and STDOUT to properly close.
+          Previously they closed because they were simple symbol globs.
+          Now they need an explicit close be cause they are opened to
+          the client socket's file descriptors.
+
 0.91   Mar 08 2006
         - Abstract shutdown_sockets method that is called at the end
           of server_close (to allow for calling in other places).
