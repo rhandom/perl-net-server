@@ -714,19 +714,21 @@ sub post_accept {
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   if( defined $prop->{client} ){
-    my $fileno= fileno $prop->{client};
-    if( defined $fileno ){
-        open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
-        open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
-    } else {
-        close STDIN;
-        close STDOUT;
-        *STDIN= \*{ $prop->{client} };
-        *STDOUT= \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+    if( ! $prop->{no_client_stdout} ){
+      my $fileno= fileno $prop->{client};
+      close STDIN;
+      close STDOUT;
+      if( defined $fileno ){
+          open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
+          open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
+      } else {
+          *STDIN= \*{ $prop->{client} };
+          *STDOUT= \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+      }
+      STDIN->autoflush(1);
+      STDOUT->autoflush(1);
+      select(STDOUT);
     }
-    STDIN->autoflush(1);
-    STDOUT->autoflush(1);
-    select(STDOUT);
   }else{
     $self->log(1,"Client socket information could not be determined!");
   }
@@ -928,8 +930,10 @@ sub post_process_request {
   return if $prop->{udp_true};
 
   ### close the client socket handle
-  close STDIN;
-  close STDOUT;
+  if( ! $prop->{no_client_stdout} ){
+    close STDIN;
+    close STDOUT;
+  }
   close($prop->{client});
 
 }
@@ -1250,6 +1254,7 @@ sub options {
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
                no_close_by_child
+               no_client_stdout
                ) ){
     $ref->{$_} = \$prop->{$_};
   }
@@ -1897,10 +1902,23 @@ This will prevent any output from ending up at the terminal.
 
 =item no_close_by_child
 
-Specifies whether or not a forked child process has permission
-or not to shutdown the entire server process.  If set to 1, the
-child may NOT signal the parent to shutdown all children.  Default
+Boolean.  Specifies whether or not a forked child process has
+permission or not to shutdown the entire server process.  If set to 1,
+the child may NOT signal the parent to shutdown all children.  Default
 is undef (not set).
+
+=item no_client_stdout
+
+Boolean.  Default undef (not set).  Specifies that STDIN and STDOUT
+should not be opened on the client handle once a connection has been
+accepted.  By default the Net::Server will open STDIN and STDOUT on
+the client socket making it easier for many types of scripts to read
+directly from and write directly to the socket using normal print and
+read methods.  Disabling this is useful on clients that may be opening
+their own connections to STDIN and STDOUT.
+
+This option has no affect on STDIN and STDOUT which has a magic client
+property that is tied to the already open STDIN and STDOUT.
 
 =back
 
