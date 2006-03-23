@@ -36,7 +36,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.92';
+$VERSION = '0.93';
 
 ###----------------------------------------------------------------###
 
@@ -751,7 +751,7 @@ sub get_client_info {
   }
 
   ### read information about this connection
-  my $sockname = getsockname( STDIN );
+  my $sockname = getsockname( $sock );
   if( $sockname ){
     ($prop->{sockport}, $prop->{sockaddr})
       = Socket::unpack_sockaddr_in( $sockname );
@@ -770,7 +770,7 @@ sub get_client_info {
     $proto_type = 'UDP';
     ($prop->{peerport} ,$prop->{peeraddr})
       = Socket::sockaddr_in( $prop->{udp_peer} );
-  }elsif( $prop->{peername} = getpeername( STDIN ) ){
+  }elsif( $prop->{peername} = getpeername( $sock ) ){
     ($prop->{peerport}, $prop->{peeraddr})
       = Socket::unpack_sockaddr_in( $prop->{peername} );
   }
