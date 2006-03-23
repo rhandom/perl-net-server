@@ -1,5 +1,9 @@
 Revision history for Perl extension Net::Server.
 
+0.93   Mar 23 2006
+        - Allow for get sock info routines to use $peer->{client} rather than STDIN
+          which may not be set if the "no_client_stdout" flag is set.
+
 0.92   Mar 13 2006
         - Allow for duplicated STDIN and STDOUT to properly close.
           Previously they closed because they were simple symbol globs.
