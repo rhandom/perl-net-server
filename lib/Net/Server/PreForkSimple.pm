@@ -225,7 +225,7 @@ sub run_child {
 ### hooks at the beginning and end of forked child processes
 sub child_init_hook {}
 sub child_finish_hook {}
-
+sub is_prefork { 1 }
 
 
 ### We can only let one process do the selecting at a time
