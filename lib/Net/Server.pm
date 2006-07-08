@@ -42,7 +42,7 @@ $VERSION = '0.94';
 
 sub new {
   my $class = shift || die "Missing class";
-  my $args  = shift || {};
+  my $args  = @_ == 1 ? shift : {@_};
   my $self  = bless {server => { %$args }}, $class;
   return $self;
 }
@@ -94,7 +94,7 @@ sub run {
   ### pass package or object
   my $self = ref($_[0]) ? shift() : shift->new;
 
-  $self->_initialize(@_);     # configure all parameters
+  $self->_initialize(@_ == 1 ? %{$_[0]} : @_);     # configure all parameters
 
   $self->post_configure;      # verification of passed parameters
 
