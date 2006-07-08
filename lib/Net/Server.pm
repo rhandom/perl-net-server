@@ -1954,10 +1954,11 @@ will rebind the the open port and begin tracking a fresh set of children.
 Children of a Fork server will exit after their current request.  Children
 of a Prefork type server will finish the current request and then exit.
 
-Note - the newly restarted parent will start up a fresh set of servers.  It
-will attempt to keep track of the children from the former parent.  Normal
-communication channels (open pipes from the child to the old parent) will no
-longer be available to the old child processes.
+Note - the newly restarted parent will start up a fresh set of servers on
+fork servers.  The new parent will attempt to keep track of the children from
+the former parent but custom communication channels (open pipes from the child
+to the old parent) will no longer be available to the old child processes.  New
+child processes will still connect properly to the new parent.
 
 =back
 
@@ -2232,7 +2233,7 @@ logging, and then closing open sockets.
 
 =back
 
-=head1 MAIN CLIENT CONNETION methods METHODS
+=head1 MAIN CLIENT CONNECTION METHODS
 
 =over 4
 
@@ -2588,6 +2589,9 @@ Thanks to Mark Martinec for trouble shooting other problems with
 STDIN and STDOUT (he proposed having a flag that is now the no_client_stdout flag).
 
 Thanks to David (DSCHWEI) on cpan for asking for the nofatal option with syslog.
+
+Thanks to Andreas Kippnick and Peter Beckman for suggesting leaving open child connections
+open during a HUP (this is now available via the leave_children_open_on_hup flag).
 
 =head1 SEE ALSO
 
