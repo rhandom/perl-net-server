@@ -2227,7 +2227,9 @@ This method is intended to handle all of the client communication.
 At this point STDIN and STDOUT are opened to the client, the ip
 address has been verified.  The server can then
 interact with the client connection according to whatever API or
-protocol the server is implementing.
+protocol the server is implementing.  Note that the stub implementation
+uses STDIN and STDOUT and will not work if the no_client_stdout flag
+is set.
 
 This is the main method to override.
 
@@ -2542,6 +2544,9 @@ as well as CVS comments.
 Thanks to Ben Cohen and tye (on Permonks) for finding and diagnosing
 more correct behavior for dealing with re-opening STDIN and STDOUT
 on the client handles.
+
+Thanks to Mark Martinec for trouble shooting other problems with
+STDIN and STDOUT (he proposed having a flag that is now the no_client_stdout flag).
 
 =head1 SEE ALSO
 
