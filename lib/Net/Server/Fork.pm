@@ -79,7 +79,12 @@ sub loop {
   my $prop = $self->{server};
 
   ### get ready for children
-  $prop->{children} = $ENV{HUP_CHILDREN} ? {split(/\s+/, $ENV{HUP_CHILDREN})} : {};
+  $prop->{children} = {};
+  if ($ENV{HUP_CHILDREN}) {
+      my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
+      $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
+      $prop->{children} = \%children;
+  }
 
   ### register some of the signals for safe handling
   register_sig(PIPE => 'IGNORE',

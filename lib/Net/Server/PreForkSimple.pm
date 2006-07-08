@@ -133,6 +133,11 @@ sub loop {
 
   ### get ready for children
   $prop->{children} = {};
+  if ($ENV{HUP_CHILDREN}) {
+      my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
+      $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
+      $prop->{children} = \%children;
+  }
 
   $self->log(3,"Beginning prefork ($prop->{max_servers} processes)\n");
 
