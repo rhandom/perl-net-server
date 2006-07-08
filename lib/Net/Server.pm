@@ -36,7 +36,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.93';
+$VERSION = '0.94';
 
 ###----------------------------------------------------------------###
 
@@ -1002,13 +1002,18 @@ sub server_close{
 
   $self->log(2,$self->log_time . " Server closing!");
 
-  ### shut down children if any
-  if( defined $prop->{children} ){
-    $self->close_children();
-  }
+  if (defined $prop->{_HUP} && $prop->{leave_children_open_on_hup}) {
+      $self->hup_children;
 
-  ### allow for additional cleanup phase
-  $self->post_child_cleanup_hook();
+  } else {
+      ### shut down children if any
+      if( defined $prop->{children} ){
+          $self->close_children();
+      }
+
+      ### allow for additional cleanup phase
+      $self->post_child_cleanup_hook();
+  }
 
   ### remove files
   if( defined $prop->{lock_file}
@@ -1070,11 +1075,9 @@ sub close_children {
   my $self = shift;
   my $prop = $self->{server};
 
-  return unless defined $prop->{children} && %{ $prop->{children} };
+  return unless defined $prop->{children} && scalar keys %{ $prop->{children} };
 
-  while ( %{ $prop->{children} } ){
-    my $pid = each %{ $prop->{children} };
-
+  foreach my $pid (keys %{ $prop->{children} }) {
     ### if it is killable, kill it
     if( ! defined($pid) || kill(15,$pid) || ! kill(0,$pid) ){
       $self->delete_child( $pid );
@@ -1086,6 +1089,22 @@ sub close_children {
   ### eventually this should probably use &check_sigs
   1 while waitpid(-1, POSIX::WNOHANG()) > 0;
 
+}
+
+
+sub is_prefork { 0 }
+
+sub hup_children {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  return unless defined $prop->{children} && scalar keys %{ $prop->{children} };
+  return if ! $self->is_prefork;
+  $self->log(2, "Sending children hup signal during HUP on prefork server\n");
+
+  foreach my $pid (keys %{ $prop->{children} }) {
+      kill(1,$pid); # try to hup it
+  }
 }
 
 sub post_child_cleanup_hook {}
@@ -1129,6 +1148,10 @@ sub sig_hup {
   }
 
   $ENV{BOUND_SOCKETS} = join("\n", @fd);
+
+  if ($prop->{leave_children_open_on_hup} && scalar keys %{ $prop->{children} }) {
+      $ENV{HUP_CHILDREN} = join("\n", map {"$_\t$prop->{children}->{$_}->{status}"} sort keys %{ $prop->{children} });
+  }
 }
 
 ### restart the server using prebound sockets
@@ -1256,6 +1279,7 @@ sub options {
                syslog_logopt syslog_facility
                no_close_by_child
                no_client_stdout
+               leave_children_open_on_hup
                ) ){
     $ref->{$_} = \$prop->{$_};
   }
@@ -1921,6 +1945,20 @@ their own connections to STDIN and STDOUT.
 This option has no affect on STDIN and STDOUT which has a magic client
 property that is tied to the already open STDIN and STDOUT.
 
+=item leave_children_open_on_hup
+
+Boolean.  Default undef (not set).  If set, the parent will not attempt
+to close child processes if the parent receives a SIG HUP.  The parent
+will rebind the the open port and begin tracking a fresh set of children.
+
+Children of a Fork server will exit after their current request.  Children
+of a Prefork type server will finish the current request and then exit.
+
+Note - the newly restarted parent will start up a fresh set of servers.  It
+will attempt to keep track of the children from the former parent.  Normal
+communication channels (open pipes from the child to the old parent) will no
+longer be available to the old child processes.
+
 =back
 
 =head1 PROPERTIES
@@ -2548,6 +2586,8 @@ on the client handles.
 
 Thanks to Mark Martinec for trouble shooting other problems with
 STDIN and STDOUT (he proposed having a flag that is now the no_client_stdout flag).
+
+Thanks to David (DSCHWEI) on cpan for asking for the nofatal option with syslog.
 
 =head1 SEE ALSO
 

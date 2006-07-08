@@ -118,19 +118,26 @@ sub loop {
   $prop->{_WRITE} = *_WRITE;
 
   ### get ready for children
-  $prop->{children} = {};
   $prop->{child_select} = IO::Select->new(\*_READ);
+  $prop->{children} = {};
+  if ($ENV{HUP_CHILDREN}) {
+      my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
+      $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
+      $prop->{children} = \%children;
+  }
 
-  $self->log(3,"Beginning prefork ($prop->{min_servers} processes)\n");
+  my $start = $prop->{min_servers};
+
+  $self->log(3,"Beginning prefork ($start processes)\n");
 
   ### keep track of the status
   $prop->{tally} = {time       => time(),
-                    waiting    => 0,
-                    processing => 0,
-                    dequeue    => 0};
+                    waiting    => scalar(grep {$_->{'status'} eq 'waiting'}    values %{ $prop->{children} }),
+                    processing => scalar(grep {$_->{'status'} eq 'processing'} values %{ $prop->{children} }),
+                    dequeue    => scalar(grep {$_->{'status'} eq 'dequeue'}    values %{ $prop->{children} }),};
 
   ### start up the children
-  $self->run_n_children( $prop->{min_servers} );
+  $self->run_n_children( $start );
 
   ### finish the parent routines
   $self->run_parent;
@@ -299,6 +306,8 @@ sub run_parent {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
+                   $prop->{tally}->{time} = 0 if $prop->{children}->{$chld}->{hup};
+                   $prop->{tally}->{$prop->{children}->{$chld}->{status}}--;
 		   $self->delete_child( $chld );
                  }
                },
@@ -377,9 +386,9 @@ sub coordinate_children {
   my $prop = $self->{server};
   my $time = time();
 
-  ### re-tally the possible types (only once a minute)
+  ### re-tally the possible types (only twice a minute)
   ### this might not be even necessary but is a nice sanity check
-  if( $time - $prop->{tally}->{time} > 60 ){
+  if( $time - $prop->{tally}->{time} > 30 ){
     my $w = $prop->{tally}->{waiting};
     my $p = $prop->{tally}->{processing};
     $prop->{tally} = {time       => $time,
