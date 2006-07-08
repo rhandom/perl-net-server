@@ -79,7 +79,7 @@ sub loop {
   my $prop = $self->{server};
 
   ### get ready for children
-  $prop->{children} = {};
+  $prop->{children} = $ENV{HUP_CHILDREN} ? {split(/\s+/, $ENV{HUP_CHILDREN})} : {};
 
   ### register some of the signals for safe handling
   register_sig(PIPE => 'IGNORE',
