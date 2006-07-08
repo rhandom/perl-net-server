@@ -256,8 +256,10 @@ sub post_configure {
     $prop->{syslog_ident} = ($ident =~ /^(\w+)$/)
       ? $1 : 'net_server';
 
+    require Sys::Syslog;
+
     my $opt = defined($prop->{syslog_logopt})
-      ? $prop->{syslog_logopt} : 'pid';
+      ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
     $prop->{syslog_logopt} = ($opt =~ /^((cons|ndelay|nowait|pid)($|\|))*/)
       ? $1 : 'pid';
 
@@ -266,7 +268,6 @@ sub post_configure {
     $prop->{syslog_facility} = ($fac =~ /^((\w+)($|\|))*/)
       ? $1 : 'daemon';
 
-    require Sys::Syslog;
     Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
     if( ! Sys::Syslog::openlog($prop->{syslog_ident},
                                $prop->{syslog_logopt},
