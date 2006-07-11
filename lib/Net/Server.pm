@@ -1297,7 +1297,7 @@ sub process_args {
   my $template = shift; # allow for custom passed in template
 
   ### if no template is passed, obtain our own
-  if( ! $template || ! ref($template) ){
+  if (! $template || ! ref($template)) {
     $template = {};
     $self->options( $template );
   }
@@ -1306,34 +1306,39 @@ sub process_args {
   ### previously set values so that command line arguments win
   my %previously_set;
 
-  foreach (my $i=0 ; $i < @$ref ; $i++ ){
+  foreach (my $i=0 ; $i < @$ref ; $i++) {
 
-    if( $ref->[$i] =~ /^(?:--)?(\w+)([=\ ](\S+))?$/
-        && exists $template->{$1} ){
+    if ($ref->[$i] =~ /^(?:--)?(\w+)([=\ ](\S+))?$/
+        && exists $template->{$1}) {
       my ($key,$val) = ($1,$3);
       splice( @$ref, $i, 1 );
-      if( not defined($val) ){
+      if (not defined($val)) {
         if ($i > $#$ref
             || ($ref->[$i] && $ref->[$i] =~ /^--\w+/)) {
           $val = 1; # allow for options such as --setsid
         } else {
           $val = splice( @$ref, $i, 1 );
+          if (ref $val) {
+            die "Found an invalid configuration value for \"$key\" ($val)" if ref($val) ne 'ARRAY';
+            $val = $val->[0] if @$val == 1;
+          }
         }
       }
       $i--;
-      $val =~ s/%([A-F0-9])/chr(hex($1))/eig;
+      $val =~ s/%([A-F0-9])/chr(hex $1)/eig if ! ref $val;;
 
-      if( ref $template->{$key} eq 'ARRAY' ){
+      if (ref $template->{$key} eq 'ARRAY') {
         if (! defined $previously_set{$key}) {
           $previously_set{$key} = scalar @{ $template->{$key} };
         }
         next if $previously_set{$key};
-        push( @{ $template->{$key} }, $val );
-      }else{
+        push @{ $template->{$key} }, ref($val) ? @$val : $val;
+      } else {
         if (! defined $previously_set{$key}) {
           $previously_set{$key} = defined(${ $template->{$key} }) ? 1 : 0;
         }
         next if $previously_set{$key};
+        die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref $val;
         ${ $template->{$key} } = $val;
       }
     }
