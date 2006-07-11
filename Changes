@@ -1,5 +1,13 @@
 Revision history for Perl extension Net::Server.
 
+0.94   Jul 08 2006
+        - Add nofatal to Sys::Syslog::openlog if Sys::Syslog version >= 0.15 (thanks to DSCHWEI on cpan)
+        - Added the leave_children_open_on_hup flag which leaves open connections open when the server
+          is hupped.  It is false by default.
+        - Make sure new and run can both take a hash or a hashref of values.
+        - More fixes to HUP under taint (thanks to LUPE on cpan)
+        - Allow for port, host, and proto to be passed as arrayrefs to run and new.
+
 0.93   Mar 23 2006
         - Allow for get sock info routines to use $peer->{client} rather than STDIN
           which may not be set if the "no_client_stdout" flag is set. (thanks to
