@@ -366,38 +366,45 @@ sub pre_bind {
   $self->log(2,$self->log_time ." ". ref($self) .$ns_type. " starting! pid($$)");
 
   ### set a default port, host, and proto
-  if( ! defined( $prop->{port} )
-      || ! ref( $prop->{port} )
-      || ! @{ $prop->{port} } ){
+  $prop->{port} = [$prop->{port}] if defined($prop->{port}) && ! ref($prop->{port});
+  if (! defined($prop->{port}) || ! @{ $prop->{port} }) {
     $self->log(2,"Port Not Defined.  Defaulting to '20203'\n");
     $prop->{port}  = [ 20203 ];
   }
 
-  $prop->{host} = '*' unless defined($prop->{host});
-  $prop->{host} = ($prop->{host}=~/^([\w\.\-\*\/]+)$/)
-    ? $1 : $self->fatal("Unsecure host \"$prop->{host}\"");
+  $prop->{host} = []              if ! defined $prop->{host};
+  $prop->{host} = [$prop->{host}] if ! ref     $prop->{host};
+  push @{ $prop->{host} }, (($prop->{host}->[-1]) x (@{ $prop->{port} } - @{ $prop->{host}})); # augment hosts with as many as port
+  foreach my $host (@{ $prop->{host} }) {
+    $host = '*' if ! defined $host || ! length $host;;
+    $host = ($host =~ /^([\w\.\-\*\/]+)$/) ? $1 : $self->fatal("Unsecure host \"$host\"");
+  }
 
-  $prop->{proto} = 'tcp' unless defined($prop->{proto});
-  $prop->{proto} = ($prop->{proto}=~/^(\w+)$/)
-    ? $1 : $self->fatal("Unsecure proto \"$prop->{host}\"");
+  $prop->{proto} = []               if ! defined $prop->{proto};
+  $prop->{proto} = [$prop->{proto}] if ! ref     $prop->{proto};
+  push @{ $prop->{proto} }, (($prop->{proto}->[-1]) x (@{ $prop->{port} } - @{ $prop->{proto}})); # augment hosts with as many as port
+  foreach my $proto (@{ $prop->{proto} }) {
+      $proto ||= 'tcp';
+      $proto = ($proto =~ /^(\w+)$/) ? $1 : $self->fatal("Unsecure proto \"$proto\"");
+  }
 
   ### loop through the passed ports
   ### set up parallel arrays of hosts, ports, and protos
   ### port can be any of many types (tcp,udp,unix, etc)
   ### see perldoc Net::Server::Proto for more information
   my %bound;
-  foreach my $port ( @{ $prop->{port} } ){
-    if ($bound{"$prop->{host}/$port/$prop->{proto}"} ++) {
-      $self->log(2, "Duplicate configuration (".uc($prop->{proto})." port $port on host ".$prop->{host}.") - skipping");
+  foreach (my $i = 0 ; $i < @{ $prop->{port} } ; $i++) {
+    my $port  = $prop->{port}->[$i];
+    my $host  = $prop->{host}->[$i];
+    my $proto = $prop->{proto}->[$i];
+    if ($bound{"$host/$port/$proto"}++) {
+      $self->log(2, "Duplicate configuration (".(uc $proto)." port $port on host $host - skipping");
       next;
     }
-    my $obj = $self->proto_object($prop->{host},
-                                  $port,
-                                  $prop->{proto},
-                                  ) || next;
+    my $obj = $self->proto_object($host, $port, $proto) || next;
     push @{ $prop->{sock} }, $obj;
   }
-  if( @{ $prop->{sock} } < 1 ){
+  if (! @{ $prop->{sock} }) {
     $self->fatal("No valid socket parameters found");
   }
 
@@ -1263,7 +1270,7 @@ sub options {
   my $prop = $self->{server};
   my $ref  = shift;
 
-  foreach ( qw(port allow deny cidr_allow cidr_deny) ){
+  foreach ( qw(port host proto allow deny cidr_allow cidr_deny) ){
     if (! defined $prop->{$_}) {
       $prop->{$_} = [];
     } elsif (! ref $prop->{$_}) {
@@ -1275,7 +1282,7 @@ sub options {
   foreach ( qw(conf_file
                user group chroot log_level
                log_file pid_file background setsid
-               host proto listen reverse_lookups
+               listen reverse_lookups
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
                no_close_by_child
@@ -1684,7 +1691,8 @@ There are five possible ways to pass arguments to
 Net::Server.  They are I<passing on command line>, I<using a
 conf file>, I<passing parameters to run>, I<returning values
 in the default_values method>, or I<using a
-pre-built object to call the run method>.
+pre-built object to call the run method> (such as that returned
+by the new method).
 
 Arguments consist of key value pairs.  On the commandline
 these pairs follow the POSIX fashion of C<--key value> or
@@ -1703,9 +1711,9 @@ a prebuilt object can best be shown in the following code:
   use Net::Server;
   @ISA = qw(Net::Server);
 
-  my $server = bless {
+  my $server = MyPackage->new({
     key1 => 'val1',
-    }, 'MyPackage';
+  });
 
   $server->run();
   #--------------- file test.pl ---------------
@@ -1852,13 +1860,19 @@ default to the C<proto> specified in the arguments.  If C<proto> is not
 specified there it will default to "tcp".  If I<host> is not
 specified, I<host> will default to C<host> specified in the
 arguments.  If C<host> is not specified there it will
-default to "*".  Default port is 20203.
+default to "*".  Default port is 20203.  Configuration passed
+to new or run may be either a scalar containing a single port
+number or an arrayref of ports.
 
 =item host
 
 Local host or addr upon which to bind port.  If a value of '*' is
 given, the server will bind that port on all available addresses
-on the box.  See L<Net::Server::Proto>. See L<IO::Socket>.
+on the box.  See L<Net::Server::Proto>. See L<IO::Socket>.  Configuration
+passed to new or run may be either a scalar containing a single
+host or an arrayref of hosts - if the hosts array is shorter than
+the ports array, the last host entry will be used to augment the
+hosts arrary to the size of the ports array.
 
 =item proto
 
@@ -1866,7 +1880,11 @@ See L<Net::Server::Proto>.
 Protocol to use when binding ports.  See L<IO::Socket>.  As
 of release 0.70, Net::Server supports tcp, udp, and unix.  Other
 types will need to be added later (or custom modules extending the
-Net::Server::Proto class may be used).
+Net::Server::Proto class may be used).  Configuration
+passed to new or run may be either a scalar containing a single
+proto or an arrayref of protos - if the protos array is shorter than
+the ports array, the last proto entry will be used to augment the
+protos arrary to the size of the ports array.
 
 =item listen
 
