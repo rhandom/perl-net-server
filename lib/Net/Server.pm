@@ -167,14 +167,15 @@ sub _get_commandline {
   if (open _CMDLINE, "/proc/$$/cmdline") { # unix specific
     my $line = do { local $/ = undef; <_CMDLINE> };
     close _CMDLINE;
-    if ($line) {
-      return [split /\0/, $line];
+    if ($line =~ /^(.+)$/) { # need to untaint to allow for later hup
+      return [split /\0/, $1];
     }
   }
 
   my $script = $0;
-  $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^\.+/| && $ENV{'PWD'}; # add absolute to relative
-  return [ $script, @ARGV ]
+  $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^[^/]+/| && $ENV{'PWD'}; # add absolute to relative
+  $script =~ /^(.+)$/; # untaint for later use in hup
+  return [ $1, @ARGV ]
 }
 
 sub commandline {
@@ -2592,6 +2593,8 @@ Thanks to David (DSCHWEI) on cpan for asking for the nofatal option with syslog.
 
 Thanks to Andreas Kippnick and Peter Beckman for suggesting leaving open child connections
 open during a HUP (this is now available via the leave_children_open_on_hup flag).
+
+Thanks to LUPE on cpan for helping patch HUP with taint on.
 
 =head1 SEE ALSO
 
