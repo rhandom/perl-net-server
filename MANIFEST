@@ -22,6 +22,7 @@ t/Server_BASE.t                 Test script for Net::Server
 t/Server_Fork.t                 Test script for Net::Server::Fork
 t/Server_INET.t                 Test script for Net::Server::INET
 t/Server_MultiType.t            Test script for Net::Server::MultiType
+t/Server_Multiplex.t            Test script for Net::Server::Multiplex
 t/Server_PreFork.t              Test script for Net::Server::PreFork
 t/Server_PreForkSimple.t        Test script for Net::Server::PreForkSimple
 t/Server_Single.t               Test script for Net::Server::Single
@@ -33,3 +34,4 @@ examples/udp_server.pl          Sample UDP server
 examples/connection_test.pl     Sample connection on all protocols
 examples/sigtest.pl             Compare safe signals under Net::Server::SIG
 examples/samplechat.pl          Demonstrates some Net::Server::Multiplex features
+META.yml                                 Module meta-data (added by MakeMaker)
