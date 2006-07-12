@@ -674,7 +674,7 @@ will be the open socket to the child.
 
 =back
 
-=BUGS
+=head1 BUGS
 
 Tests don't seem to work on Win32.  Any ideas or patches would be welcome.
 
