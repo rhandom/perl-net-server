@@ -2619,6 +2619,9 @@ open during a HUP (this is now available via the leave_children_open_on_hup flag
 
 Thanks to LUPE on cpan for helping patch HUP with taint on.
 
+Thanks to Michael Virnstein for fixing a bug in the check_for_dead section
+of PreFork server.
+
 =head1 SEE ALSO
 
 Please see also
