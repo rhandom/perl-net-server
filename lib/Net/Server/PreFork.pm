@@ -443,13 +443,13 @@ sub coordinate_children {
   }
 
   ### periodically make sure children are alive
-  if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
+  if ($time - $prop->{last_checked_for_dead} > $prop->{check_for_dead}) {
     $prop->{last_checked_for_dead} = $time;
-    foreach (keys %{ $prop->{children} }){
+    foreach my $pid (keys %{ $prop->{children} }) {
       ### see if the child can be killed
-      if( ! kill(0,$_) ){
-        $self->delete_child($_);
-        $prop->{tally}->{ $prop->{children}->{status} } --;
+      if (! kill(0, $pid)) {
+        $prop->{tally}->{ $prop->{children}->{$pid}->{status} } --;
+        $self->delete_child($pid);
       }
     }
   }
