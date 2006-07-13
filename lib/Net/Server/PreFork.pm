@@ -307,7 +307,7 @@ sub run_parent {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
                    $prop->{tally}->{time} = 0 if $prop->{children}->{$chld}->{hup};
-                   $prop->{tally}->{$prop->{children}->{$chld}->{status}}--;
+                   $prop->{tally}->{$prop->{children}->{$chld}->{status}}-- if $prop->{children}->{$chld}->{status};
 		   $self->delete_child( $chld );
                  }
                },
