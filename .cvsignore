@@ -1,5 +1,6 @@
 Net-Server
 blib
+META.yml
 Makefile
 README
 pm_to_blib
