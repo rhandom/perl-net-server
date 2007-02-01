@@ -261,7 +261,7 @@ sub post_configure {
 
     my $opt = defined($prop->{syslog_logopt})
       ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
-    $prop->{syslog_logopt} = ($opt =~ /^((cons|ndelay|nowait|pid)($|\|))*/)
+    $prop->{syslog_logopt} = ($opt =~ /^((cons|ndelay|nowait|pid|nofatal)($|[,|]))*/)
       ? $1 : 'pid';
 
     my $fac = defined($prop->{syslog_facility})
@@ -2627,9 +2627,13 @@ This patch should be portable on systems supporting flock.
 
 Thanks to Mark Martinec for suggesting additional log messages for failure during accept.
 
-Thanks to Bill Nesbitt for pointing out double decrement bug in PreFork.pm.
+Thanks to Bill Nesbitt and Carlos Velasco for pointing out double decrement bug in PreFork.pm (rt #21271)
 
 Thanks to John W. Krahn for pointing out glaring precended with non-parened open and ||.
+
+Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1 (rt #21262).
+
+Thanks to Carlos Velasco for updating the Syslog options (rt #21265).
 
 =head1 SEE ALSO
 
