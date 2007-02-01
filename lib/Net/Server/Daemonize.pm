@@ -191,7 +191,7 @@ sub set_uid {
   my $uid = get_uid( shift() );
 
   POSIX::setuid($uid);
-  if ($< != $uid) {
+  if ($< != $uid || $> != $uid) { # check $> also (rt #21262)
     $< = $> = $uid; # try again - needed by some 5.8.0 linux systems (rt #13450)
     if ($< != $uid) {
       die "Couldn't become uid \"$uid\": $!\n";
