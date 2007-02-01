@@ -98,6 +98,8 @@ sub post_bind {
       $prop->{lock_file} = POSIX::tmpnam();
       $prop->{lock_file_unlink} = 1;
     }
+    open($prop->{lock_fh}, ">$prop->{lock_file}")
+      || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
 
   ### set up semaphore
   }elsif( $prop->{serialize} eq 'semaphore' ){
@@ -222,6 +224,8 @@ sub run_child {
 
   $self->child_finish_hook;
 
+  close($prop->{lock_fh}) if $prop->{lock_fh};
+
   $self->log(4,"Child leaving ($prop->{max_requests})");
   exit;
 
@@ -242,13 +246,9 @@ sub accept {
   my $self = shift;
   my $prop = $self->{server};
 
-  local *LOCK;
-
   ### serialize the child accepts
   if( $prop->{serialize} eq 'flock' ){
-    open(LOCK,">$prop->{lock_file}")
-      || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\" [$!]");
-    while (! flock(LOCK, Fcntl::LOCK_EX())) {
+    while (! flock($prop->{lock_fh}, Fcntl::LOCK_EX())) {
       next if $! == EINTR;
       $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
     }
@@ -268,7 +268,7 @@ sub accept {
 
   ### unblock serialization
   if( $prop->{serialize} eq 'flock' ){
-    flock(LOCK,Fcntl::LOCK_UN());
+    flock($prop->{lock_fh}, Fcntl::LOCK_UN());
 
   }elsif( $prop->{serialize} eq 'semaphore' ){
     $prop->{sem}->op( 0, 1, IPC::SysV::SEM_UNDO() )
