@@ -1,9 +1,8 @@
-Net-Server
+tgz
 blib
 META.yml
 Makefile
 README
 pm_to_blib
-*.tar.gz
 *.spec
 *.ppd
