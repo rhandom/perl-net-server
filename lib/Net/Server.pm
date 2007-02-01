@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2005
+#  Copyright (C) 2001-2007
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -36,7 +36,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.94';
+$VERSION = '0.95';
 
 ###----------------------------------------------------------------###
 
@@ -302,8 +302,8 @@ sub post_configure {
   ### completetly daemonize by closing STDIN, STDOUT (should be done before fork)
   if( ! $prop->{_is_inet} ){
     if( $prop->{setsid} || length($prop->{log_file}) ){
-      open STDIN,  '</dev/null' || die "Can't read /dev/null  [$!]";
-      open STDOUT, '>/dev/null' || die "Can't write /dev/null [$!]";
+      open(STDIN,  '</dev/null') || die "Can't read /dev/null  [$!]";
+      open(STDOUT, '>/dev/null') || die "Can't write /dev/null [$!]";
     }
   }
 
@@ -1027,12 +1027,12 @@ sub server_close{
   if( defined $prop->{lock_file}
       && -e $prop->{lock_file}
       && defined $prop->{lock_file_unlink} ){
-    unlink $prop->{lock_file} || $self->log(1, "Couldn't unlink \"$prop->{lock_file}\" [$!]");
+    unlink($prop->{lock_file}) || $self->log(1, "Couldn't unlink \"$prop->{lock_file}\" [$!]");
   }
   if( defined $prop->{pid_file}
       && -e $prop->{pid_file}
       && defined $prop->{pid_file_unlink} ){
-    unlink $prop->{pid_file} || $self->log(1, "Couldn't unlink \"$prop->{pid_file}\" [$!]");
+    unlink($prop->{pid_file}) || $self->log(1, "Couldn't unlink \"$prop->{pid_file}\" [$!]");
   }
 
   ### HUP process
@@ -2621,6 +2621,15 @@ Thanks to LUPE on cpan for helping patch HUP with taint on.
 
 Thanks to Michael Virnstein for fixing a bug in the check_for_dead section
 of PreFork server.
+
+Thanks to Rob Mueller for patching PreForkSimple to only open lock_file once during parent call.
+This patch should be portable on systems supporting flock.
+
+Thanks to Mark Martinec for suggesting additional log messages for failure during accept.
+
+Thanks to Bill Nesbitt for pointing out double decrement bug in PreFork.pm.
+
+Thanks to John W. Krahn for pointing out glaring precended with non-parened open and ||.
 
 =head1 SEE ALSO
 
