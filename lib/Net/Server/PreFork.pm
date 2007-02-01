@@ -160,11 +160,13 @@ sub kill_n_children {
   foreach (keys %{ $prop->{children} }){
     next unless $prop->{children}->{$_}->{status} eq 'waiting';
 
-    $n --;
-    $prop->{tally}->{waiting} --;
+    $n--;
 
     ### try to kill the child
-    kill('HUP',$_) or $self->delete_child( $_ );
+    if (! kill('HUP',$_)) {
+        $prop->{tally}->{waiting}--;
+        $self->delete_child( $_ );
+    }
 
     last if $n <= 0;
   }
