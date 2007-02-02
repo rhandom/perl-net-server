@@ -92,6 +92,13 @@ for my $i (0..99){
 }
 ok ( $num_ports == @ports );
 
+SKIP: {
+if ($num_ports != @ports) {
+    print "ok 4 # skip Not attempting connections because ports not setup properly\n";
+    last SKIP;
+}
+
+
 ### start up a vanilla server and connect to it
 my $pid = fork;
 
@@ -129,3 +136,5 @@ if( $pid ){
                    );
   exit;
 }
+
+} # end of SKIP

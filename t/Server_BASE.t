@@ -50,6 +50,14 @@ if( $num_ports == @ports ){
   print "not ok 3\n";
 }
 
+SKIP: {
+if ($num_ports != @ports) {
+    print "ok 4 # skip Not attempting connections because ports not setup properly\n";
+    print "ok 5 # skip Not attempting connections because ports not setup properly\n";
+    print "ok 6 # skip Not attempting connections because ports not setup properly\n";
+    last SKIP;
+}
+
 
 ### test and setup pipe
 local *READ;
@@ -197,3 +205,5 @@ if( $fork && $pipe){
 }else{
   print "not ok 6\n";
 }
+
+} # end of SKIP

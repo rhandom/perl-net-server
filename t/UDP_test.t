@@ -72,6 +72,12 @@ if( $num_ports == @ports ){
   print "not ok 4\n";
 }
 
+SKIP: {
+if ($num_ports != @ports) {
+    print "ok 5 # skip Not attempting connections because ports not setup properly\n";
+    last SKIP;
+}
+
 
 ### extend the accept method a little
 ### we will use this to signal that
@@ -146,3 +152,4 @@ if( $fork && $pipe ){
   print "not ok 5\n";
 }
 
+} # end of SKIP

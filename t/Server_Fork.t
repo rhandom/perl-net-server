@@ -64,6 +64,13 @@ for my $i (0..99){
 print "not " if $num_ports != @ports;
 print "ok 4 - got the right number of ports (@ports)\n";
 
+SKIP: {
+if ($num_ports != @ports) {
+    print "ok 5 # skip Not attempting connections because ports not setup properly\n";
+    last SKIP;
+}
+
+
 ### extend the accept method a little
 ### we will use this to signal that
 ### the server is ready to accept connections
@@ -125,3 +132,4 @@ if (! $fork || ! $pipe) {
 }
 
 
+}; # end of SKIP

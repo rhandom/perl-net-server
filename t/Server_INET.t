@@ -70,6 +70,12 @@ if( $num_ports == @ports ){
   print "not ok 4\n";
 }
 
+SKIP: {
+if ($num_ports != @ports) {
+    print "ok 5 # skip Not attempting connections because ports not setup properly\n";
+    last SKIP;
+}
+
 ### start up a vanilla server and connect to it
 if( $fork && $pipe ){
 
@@ -136,3 +142,4 @@ if( $fork && $pipe ){
 }
 
 
+} # end of SKIP
