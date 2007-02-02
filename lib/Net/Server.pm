@@ -542,7 +542,7 @@ sub post_bind {
     }else{
       $self->log(2,"Chrooting to $prop->{chroot}\n");
       chroot( $prop->{chroot} )
-        or $self->fatal("Couldn't chroot to \"$prop->{chroot}\"");
+        or $self->fatal("Couldn't chroot to \"$prop->{chroot}\": $!");
     }
   }
 
@@ -671,7 +671,7 @@ sub accept {
     ### success
     return 1 if defined $prop->{client};
 
-    $self->log(2,"Accept failed with $retries tries left.");
+    $self->log(2,"Accept failed with $retries tries left: $!");
 
     ### try again in a second
     sleep(1);
@@ -1447,15 +1447,13 @@ Net::Server - Extensible, general Perl server engine
   #!/usr/bin/perl -w -T
   package MyPackage;
 
-  use Net::Server;
-  @ISA = qw(Net::Server);
+  use base qw(Net::Server);
 
   sub process_request {
      #...code...
   }
 
   MyPackage->run(port => 160);
-  exit;
 
 =head1 FEATURES
 
@@ -1651,10 +1649,7 @@ C<Net::Server> can, or will, be included with this distribution).
   package MyPackage;
 
   use strict;
-  use vars qw(@ISA);
-  use Net::Server::PreFork; # any personality will do
-
-  @ISA = qw(Net::Server::PreFork);
+  use base qw(Net::Server::PreFork); # any personality will do
 
   MyPackage->run();
   exit;
@@ -1717,15 +1712,13 @@ a prebuilt object can best be shown in the following code:
   #--------------- file test2.pl ---------------
   package MyPackage;
   use strict;
-  use vars (@ISA);
-  use Net::Server;
-  @ISA = qw(Net::Server);
+  use base qw(Net::Server);
 
   my $server = MyPackage->new({
     key1 => 'val1',
   });
 
-  $server->run();
+  $server->run;
   #--------------- file test.pl ---------------
 
 All five methods for passing arguments may be used at the
@@ -2566,7 +2559,7 @@ these commands in its base directory:
 
 =head1 AUTHOR
 
-Paul T. Seamons <paul at seamons.com>
+Paul Seamons <paul at seamons.com>
 
 =head1 THANKS
 
@@ -2576,7 +2569,6 @@ serialized select via flock ala Apache and the reference
 to IO::Select making multiport servers possible.  And for
 researching into allowing sockets to remain open upon
 exec (making HUP possible).
-Rob Brown is also the maintainer for Net::Server.
 
 Thanks to Jonathan J. Miner <miner at doit.wisc.edu> for
 patching a blatant problem in the reverse lookups.
@@ -2616,44 +2608,61 @@ These and future thank-you's are available in the Changes file
 as well as CVS comments.
 
 Thanks to Ben Cohen and tye (on Permonks) for finding and diagnosing
-more correct behavior for dealing with re-opening STDIN and STDOUT
-on the client handles.
+more correct behavior for dealing with re-opening STDIN and STDOUT on
+the client handles.
 
-Thanks to Mark Martinec for trouble shooting other problems with
-STDIN and STDOUT (he proposed having a flag that is now the no_client_stdout flag).
+Thanks to Mark Martinec for trouble shooting other problems with STDIN
+and STDOUT (he proposed having a flag that is now the no_client_stdout
+flag).
 
-Thanks to David (DSCHWEI) on cpan for asking for the nofatal option with syslog.
+Thanks to David (DSCHWEI) on cpan for asking for the nofatal option
+with syslog.
 
-Thanks to Andreas Kippnick and Peter Beckman for suggesting leaving open child connections
-open during a HUP (this is now available via the leave_children_open_on_hup flag).
+Thanks to Andreas Kippnick and Peter Beckman for suggesting leaving
+open child connections open during a HUP (this is now available via
+the leave_children_open_on_hup flag).
 
 Thanks to LUPE on cpan for helping patch HUP with taint on.
 
-Thanks to Michael Virnstein for fixing a bug in the check_for_dead section
-of PreFork server.
+Thanks to Michael Virnstein for fixing a bug in the check_for_dead
+section of PreFork server.
 
-Thanks to Rob Mueller for patching PreForkSimple to only open lock_file once during parent call.
-This patch should be portable on systems supporting flock.  Rob also suggested not closing STDIN/STDOUT
-but instead reopening them to /dev/null to prevent spurious warnings.  Also suggested short circuit
-in post_accept if in UDP.  Also for cleaning up some of the child managment code of PreFork.
+Thanks to Rob Mueller for patching PreForkSimple to only open
+lock_file once during parent call.  This patch should be portable on
+systems supporting flock.  Rob also suggested not closing STDIN/STDOUT
+but instead reopening them to /dev/null to prevent spurious warnings.
+Also suggested short circuit in post_accept if in UDP.  Also for
+cleaning up some of the child managment code of PreFork.
 
-Thanks to Mark Martinec for suggesting additional log messages for failure during accept.
+Thanks to Mark Martinec for suggesting additional log messages for
+failure during accept.
 
-Thanks to Bill Nesbitt and Carlos Velasco for pointing out double decrement bug in PreFork.pm (rt #21271)
+Thanks to Bill Nesbitt and Carlos Velasco for pointing out double
+decrement bug in PreFork.pm (rt #21271)
 
-Thanks to John W. Krahn for pointing out glaring precended with non-parened open and ||.
+Thanks to John W. Krahn for pointing out glaring precended with
+non-parened open and ||.
 
-Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1 (rt #21262).
+Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1
+(rt #21262).
 
 Thanks to Carlos Velasco for updating the Syslog options (rt #21265).
 
-Thanks to Steven Lembark for pointing out that no_client_stdout wasn't working with the Multiplex server.
+Thanks to Steven Lembark for pointing out that no_client_stdout wasn't
+working with the Multiplex server.
 
-Thanks to Peter Beckman for suggesting allowing Sys::SysLog keyworks be passed through the ->log method
-and for suggesting we allow more types of characters through in syslog_ident.
+Thanks to Peter Beckman for suggesting allowing Sys::SysLog keyworks
+be passed through the ->log method and for suggesting we allow more
+types of characters through in syslog_ident.  Also to Peter Beckman
+for pointing out that a poorly setup localhost will cause tests to
+hang.
 
-Thanks to Curtis Wilbar for pointing out that the Fork server called post_accept_hook twice.  Changed to
-only let the child process call this, but added the pre_fork_hook method.
+Thanks to Curtis Wilbar for pointing out that the Fork server called
+post_accept_hook twice.  Changed to only let the child process call
+this, but added the pre_fork_hook method.
+
+And just a general Thanks You to everybody who is using Net::Server or
+who has contributed fixes over the years.
 
 =head1 SEE ALSO
 
@@ -2667,10 +2676,10 @@ L<Net::Server::Single>
 
 =head1 AUTHOR
 
-  Paul Seamons <paul@seamons.com>
+  Paul Seamons <paul at seamons.com>
   http://seamons.com/
 
-  Rob Brown <bbb@cpan.org>
+  Rob Brown <bbb at cpan.org>
 
 =head1 LICENSE
 

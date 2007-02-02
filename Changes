@@ -8,6 +8,15 @@ Revision history for Perl extension Net::Server.
         - Fix precedence bug with non-parened open (John W. Krahn)
         - Check setuid better after POSIX setuid (Ricardo Signes) (rt #21262)
         - Update Syslog options parsing (Carlos Velasco) (rt #21265)
+        - Allow no_client_stdout to work with Multiplex (Steven Lembark)
+        - Allow Sys::SysLog keyworks be passed through the ->log method (Peter Beckman)
+        - Allow more characters through in syslog_ident (Peter Beckman)
+        - Fix Fork server bug which had post_accept_hook called twice (Curtis Wilbar)
+        - Added pre_fork_hook to Fork server to handle removed duplicate post_accept_hook call.
+        - Reopen STDIN/STDOUT to /dev/null at end of child connection to avoid spurious warnings (Rob Mueller)
+        - Don't process STDIN/STDOUT in post_accept if udp_true (Rob Mueller)
+        - Cleanup child processing code in PreFork server (Rob Mueller)
+        - Try and let tests fail gracefully if localhost is not setup properly (Peter Beckman)
 
 0.94   Jul 08 2006
         - Add nofatal to Sys::Syslog::openlog if Sys::Syslog
