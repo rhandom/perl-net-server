@@ -157,15 +157,14 @@ sub kill_n_children {
 
   $self->log(3,"Killing \"$n\" children");
 
-  foreach (keys %{ $prop->{children} }){
-    next unless $prop->{children}->{$_}->{status} eq 'waiting';
+  foreach my $child (keys %{ $prop->{children} }){
+    next unless $prop->{children}->{$child}->{status} eq 'waiting';
 
     $n--;
 
     ### try to kill the child
-    if (! kill('HUP',$_)) {
-        $prop->{tally}->{waiting}--;
-        $self->delete_child( $_ );
+    if (! kill('HUP', $child)) {
+      $self->delete_child($child);
     }
 
     last if $n <= 0;
@@ -354,17 +353,18 @@ sub run_parent {
         my ($pid,$status) = ($1,$2);
 
         ### record the status
-        $prop->{children}->{$pid}->{status} = $status;
+        $prop->{children}->{$pid}->{status} = $status
+          if $status ne 'exiting';
+
         if( $status eq 'processing' ){
           $prop->{tally}->{processing} ++;
-          $prop->{tally}->{waiting} --;
           $prop->{last_process} = time();
+
         }elsif( $status eq 'waiting' ){
           $prop->{tally}->{processing} --;
-          $prop->{tally}->{waiting} ++;
+
         }elsif( $status eq 'exiting' ){
-          $prop->{tally}->{processing} --;
-          $self->delete_child( $pid );
+          $self->delete_child($pid);
         }
 
       ### user defined handler
@@ -450,7 +450,6 @@ sub coordinate_children {
     foreach my $pid (keys %{ $prop->{children} }) {
       ### see if the child can be killed
       if (! kill(0, $pid)) {
-        $prop->{tally}->{ $prop->{children}->{$pid}->{status} } --;
         $self->delete_child($pid);
       }
     }
@@ -474,6 +473,24 @@ sub coordinate_children {
     }
   }
 
+}
+
+### delete_child and other modifications contributed by Rob Mueller
+sub delete_child {
+  my $self = shift;
+  my $prop = $self->{server};
+  my $pid = shift;
+
+  # Already gone?
+  return if ! exists $prop->{children}->{$pid};
+
+  my $status = $prop->{children}->{$pid}->{status}
+    || $self->log(2, "No status for $pid when deleting child\n");
+  --$prop->{tally}->{$status} >= 0
+    || $self->log(2, "Tally for $status < 0 deleting pid $pid\n");
+  $prop->{tally}->{time} = 0 if $prop->{children}->{$pid}->{hup};
+
+  $self->SUPER::delete_child($pid);
 }
 
 ### allow for other process to tie in to the parent read
