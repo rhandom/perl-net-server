@@ -141,7 +141,6 @@ sub loop {
       }
     }
 
-    ### call the pre accept hook
     $self->pre_accept_hook;
 
     ### try to call accept
@@ -152,8 +151,7 @@ sub loop {
       next;
     }
 
-    ### call the post accept hook
-    $self->post_accept_hook;
+    $self->pre_fork_hook;
 
     ### fork a child so the parent can go back to listening
     my $pid = fork;
@@ -170,6 +168,7 @@ sub loop {
 
     ### child
     }else{
+      ### the child will call post_accept_hook
       $self->run_client_connection;
       exit;
 
@@ -257,6 +256,8 @@ sub close_children {
                  CHLD => 'DEFAULT',
                  );
 }
+
+sub pre_fork_hook {}
 
 1;
 
@@ -346,9 +347,13 @@ See L<Net::Server>
 
 This hook occurs just before the accept is called.
 
-=item C<$self-E<gt>post_accept_hook()>
+=item C<$self-E<gt>pre_fork_hook()>
 
 This hook occurs just after accept but before the fork.
+
+=item C<$self-E<gt>post_accept_hook()>
+
+This hook occurs in the child after the accept and fork.
 
 =item C<$self-E<gt>run_dequeue()>
 
