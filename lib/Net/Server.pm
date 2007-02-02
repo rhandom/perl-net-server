@@ -254,7 +254,7 @@ sub post_configure {
 
     my $ident = defined($prop->{syslog_ident})
       ? $prop->{syslog_ident} : 'net_server';
-    $prop->{syslog_ident} = ($ident =~ /^(\w+)$/)
+    $prop->{syslog_ident} = ($ident =~ /^([\ -~]+)$/)
       ? $1 : 'net_server';
 
     require Sys::Syslog;
@@ -940,8 +940,11 @@ sub post_process_request {
 
   ### close the client socket handle
   if( ! $prop->{no_client_stdout} ){
-    close STDIN;
-    close STDOUT;
+    # close handles - but leave fd's around to prevent spurious messages (Rob Mueller)
+    #close STDIN;
+    #close STDOUT;
+    open(STDIN,  '</dev/null') || die "Can't read /dev/null  [$!]";
+    open(STDOUT, '>/dev/null') || die "Can't write /dev/null [$!]";
   }
   close($prop->{client});
 
@@ -1216,18 +1219,23 @@ sub log {
   my ($self, $level, $msg, @therest) = @_;
   my $prop = $self->{server};
 
-  return unless $prop->{log_level};
-  return unless $level <= $prop->{log_level};
+  return if ! $prop->{log_level};
 
   ### log only to syslog if setup to do syslog
-  if( defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog' ){
-    $level = $level!~/^\d+$/ ? $level : $Net::Server::syslog_map->{$level} ;
+  if (defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog') {
+    if ($level =~ /^\d+$/) {
+        return if $level > $prop->{log_level};
+        $level = $Net::Server::syslog_map->{$level} || $level;
+    }
+
     if (@therest) { # if more parameters are passed, we must assume that the first is a format string
       Sys::Syslog::syslog($level, $msg, @therest);
     } else {
       Sys::Syslog::syslog($level, '%s', $msg);
     }
     return;
+  } else {
+    return if $level !~ /^\d+$/ || $level > $prop->{log_level};
   }
 
   $self->write_to_log_hook($level, $msg);
@@ -2623,7 +2631,8 @@ Thanks to Michael Virnstein for fixing a bug in the check_for_dead section
 of PreFork server.
 
 Thanks to Rob Mueller for patching PreForkSimple to only open lock_file once during parent call.
-This patch should be portable on systems supporting flock.
+This patch should be portable on systems supporting flock.  Rob also suggested not closing STDIN/STDOUT
+but instead reopening them to /dev/null to prevent spurious warnings.
 
 Thanks to Mark Martinec for suggesting additional log messages for failure during accept.
 
@@ -2634,6 +2643,14 @@ Thanks to John W. Krahn for pointing out glaring precended with non-parened open
 Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1 (rt #21262).
 
 Thanks to Carlos Velasco for updating the Syslog options (rt #21265).
+
+Thanks to Steven Lembark for pointing out that no_client_stdout wasn't working with the Multiplex server.
+
+Thanks to Peter Beckman for suggesting allowing Sys::SysLog keyworks be passed through the ->log method
+and for suggesting we allow more types of characters through in syslog_ident.
+
+Thanks to Curtis Wilbar for pointing out that the Fork server called post_accept_hook twice.  Changed to
+only let the child process call this, but added the pre_fork_hook method.
 
 =head1 SEE ALSO
 
