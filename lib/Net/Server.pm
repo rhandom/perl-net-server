@@ -720,6 +720,8 @@ sub post_accept {
   ### keep track of the requests
   $prop->{requests} ++;
 
+  return if $prop->{udp_true}; # no need to do STDIN/STDOUT in UDP
+
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   if( defined $prop->{client} ){
@@ -2632,7 +2634,8 @@ of PreFork server.
 
 Thanks to Rob Mueller for patching PreForkSimple to only open lock_file once during parent call.
 This patch should be portable on systems supporting flock.  Rob also suggested not closing STDIN/STDOUT
-but instead reopening them to /dev/null to prevent spurious warnings.
+but instead reopening them to /dev/null to prevent spurious warnings.  Also suggested short circuit
+in post_accept if in UDP.  Also for cleaning up some of the child managment code of PreFork.
 
 Thanks to Mark Martinec for suggesting additional log messages for failure during accept.
 
