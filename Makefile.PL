@@ -30,22 +30,4 @@ my %args =
 
 WriteMakefile(%args);
 
-package MY;
-
-sub libscan {
-  my $self = shift;
-  my $path = shift;
-  ($path =~ / \bCVS\b | \~$ /x) ? undef : $path;
-}
-
-sub postamble {
-  return qq^
-
-pm_to_blib: README
-
-README: \$(VERSION_FROM)
-	pod2text \$(VERSION_FROM) > README
-^;
-}
-
 1;
