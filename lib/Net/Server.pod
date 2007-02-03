@@ -13,7 +13,7 @@ Net::Server - Extensible, general Perl server engine
         my $self = shift;
         while (<STDIN>) {
             s/\r?\n$//;
-            print "You said \"$_\"\r\n";
+            print "You said \"$_\"\r\n"; # basic echo
             last if /quit/i;
         }
     }

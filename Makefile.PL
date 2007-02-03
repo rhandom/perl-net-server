@@ -4,7 +4,7 @@ my %args =
   (
    NAME	         => 'Net::Server',
    VERSION_FROM  => 'lib/Net/Server.pm',
-   ABSTRACT_FROM => 'lib/Net/Server.pm',
+   ABSTRACT_FROM => 'lib/Net/Server.pod',
    AUTHOR        => 'Paul Seamons (paul@seamons.com) and Rob Brown (bbb@cpan.org)',
    PREREQ_PM  => {
      'IO::Socket' => 0,
