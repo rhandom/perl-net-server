@@ -10,8 +10,6 @@
 #    paul@seamons.com
 #    http://seamons.com/
 #
-#    Rob Brown bbb@cpan,org
-#
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
 #    or the
@@ -125,8 +123,6 @@ sub run {
                               #               post_child_cleanup_hook
                               #               shutdown_sockets
                               # and either exit or run restart_close_hook
-
-  exit;
 }
 
 ### standard connection flow
@@ -1051,8 +1047,12 @@ sub server_close{
   ### we don't need the ports - close everything down
   $self->shutdown_sockets;
 
-  exit;
+  ### all done - exit
+  $self->server_exit;
 }
+
+### called at end once the server has exited
+sub server_exit { exit }
 
 ### allow for fully shutting down the bound sockets
 sub shutdown_sockets {
@@ -1651,8 +1651,7 @@ C<Net::Server> can, or will, be included with this distribution).
   use strict;
   use base qw(Net::Server::PreFork); # any personality will do
 
-  MyPackage->run();
-  exit;
+  MyPackage->run;
 
   ### over-ridden subs below
 
@@ -2158,7 +2157,7 @@ represents the program flow:
 
   $self->shutdown_sockets;
 
-  exit;
+  $self->server_exit;
 
 =head1 MAIN SERVER METHODS
 
@@ -2257,6 +2256,12 @@ method has been exited.
 This method takes care of cleaning up any remaining child processes,
 setting appropriate flags on sockets (for HUPing), closing up
 logging, and then closing open sockets.
+
+=item C<$self-E<gt>server_exit>
+
+This method is called at the end of server_close.  It calls exit,
+but may be overridden to do other items.  At this point all services
+should be shut down.
 
 =back
 

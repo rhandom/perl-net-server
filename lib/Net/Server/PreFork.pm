@@ -10,8 +10,6 @@
 #    paul@seamons.com
 #    http://seamons.com/
 #
-#    Rob Brown bbb@cpan,org
-#
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
 #    or the
