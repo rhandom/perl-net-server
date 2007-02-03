@@ -4,16 +4,21 @@ Net::Server - Extensible, general Perl server engine
 
 =head1 SYNOPSIS
 
-  #!/usr/bin/perl -w -T
-  package MyPackage;
+    #!/usr/bin/perl -w -T
+    package MyPackage;
 
-  use base qw(Net::Server);
+    use base qw(Net::Server);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        my $self = shift;
+        while (<STDIN>) {
+            s/\r?\n$//;
+            print "You said \"$_\"\r\n";
+            last if /quit/i;
+        }
+    }
 
-  MyPackage->run(port => 160);
+    MyPackage->run(port => 160);
 
 =head1 FEATURES
 
