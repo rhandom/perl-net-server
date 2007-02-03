@@ -10,7 +10,7 @@ package FooServer;
 
 use vars qw(@ISA);
 use strict;
-use Test::More tests => 56;
+use Test::More tests => 64;
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -31,6 +31,14 @@ sub options {
 
   $prop->{'an_arrayref_item'} ||= [];
   $template->{'an_arrayref_item'} = $prop->{'an_arrayref_item'};
+}
+
+### provide default values
+sub default_values {
+    return {
+        group => 'defaultgroup',
+        allow => ['127.0.0.1', '192.169.0.1'],
+    };
 }
 
 #sub proto_object {
@@ -62,7 +70,6 @@ my $prop = eval { $server->{'server'} } || {};
 ok($prop->{'log_level'} == 2,  "Correct default log_level");
 ok($prop->{'log_file'}  eq "", "Correct default log_file");
 ok(! $prop->{'user'},          "Correct default user");
-ok(! $prop->{'group'},         "Correct default group");
 ok(@{ $prop->{'port'} } == 1,         "Had 1 configured ports");
 ok(@{ $prop->{'sock'} } == 1,         "Had 1 configured socket");
 my $sock = eval {$prop->{'sock'}->[0]};
@@ -178,3 +185,33 @@ ok(@{ $prop->{'an_arrayref_item'} } == 3,     "Had 3 configured custom array opt
 ok($prop->{'an_arrayref_item'}->[0] eq 'one', "Right value");
 ok($prop->{'an_arrayref_item'}->[1] eq 'three', "Right value");
 ok($prop->{'an_arrayref_item'}->[2] eq 'two', "Right value");
+
+###----------------------------------------------------------------###
+
+$prop = eval { local @ARGV = ('--group=cmdline'); FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
+ok($prop, "Loaded server");
+$prop ||= {};
+ok($prop->{'group'} eq 'cmdline', "Right user \"$prop->{'group'}\"");
+
+###----------------------------------------------------------------###
+
+$prop = eval { FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
+ok($prop, "Loaded server");
+$prop ||= {};
+ok($prop->{'group'} eq 'runargs', "Right user \"$prop->{'group'}\"");
+
+###----------------------------------------------------------------###
+
+$prop = eval { FooServer->run(conf_file => __FILE__.'.conf')->{'server'} };
+ok($prop, "Loaded server");
+$prop ||= {};
+ok($prop->{'group'} eq 'confgroup', "Right user \"$prop->{'group'}\"");
+
+###----------------------------------------------------------------###
+
+$prop = eval { FooServer->run->{'server'} };
+ok($prop, "Loaded server");
+$prop ||= {};
+ok($prop->{'group'} eq 'defaultgroup', "Right user \"$prop->{'group'}\"");
+ok(@{ $prop->{'allow'} } == 2, "Defaults for allow are set also");
+
