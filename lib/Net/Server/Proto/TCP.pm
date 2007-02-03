@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2005
+#  Copyright (C) 2001-2007
 #
 #    Paul Seamons
 #    paul@seamons.com
