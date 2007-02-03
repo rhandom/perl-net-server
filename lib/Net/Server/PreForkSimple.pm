@@ -612,7 +612,7 @@ check_for_dequeue setting.
 
 =back
 
-=BUGS
+=head1 BUGS
 
 Tests don't seem to work on Win32.  Any ideas or patches would be welcome.
 
