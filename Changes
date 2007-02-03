@@ -1,6 +1,6 @@
 Revision history for Perl extension Net::Server.
 
-0.95   Jul 12 2006
+0.95   Feb 02 2007
         - Warn clean on the chld hanlder in PreFork. (Michael Virnstein)
         - Allow lock_file for lock serialization to only be opened once (Rob Mueller)
         - Add additional log messages during failure in accept (Mark Martinec)
@@ -17,6 +17,8 @@ Revision history for Perl extension Net::Server.
         - Don't process STDIN/STDOUT in post_accept if udp_true (Rob Mueller)
         - Cleanup child processing code in PreFork server (Rob Mueller)
         - Try and let tests fail gracefully if localhost is not setup properly (Peter Beckman)
+        - Add numerous tests for configuration passing.
+        - Add perldoc about adding your own custom options.
 
 0.94   Jul 08 2006
         - Add nofatal to Sys::Syslog::openlog if Sys::Syslog
