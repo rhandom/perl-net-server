@@ -221,6 +221,12 @@ sub configure {
   ### do a config file
   if( defined $prop->{conf_file} ){
     $self->process_conf( $prop->{conf_file}, $template );
+  } else {
+    ### look for a default conf_file
+    my $def = $self->default_values || {};
+    if ($def->{conf_file}) {
+        $self->process_conf( $def->{conf_file}, $template );
+    }
   }
 
 }
