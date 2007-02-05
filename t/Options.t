@@ -10,7 +10,7 @@ package FooServer;
 
 use vars qw(@ISA);
 use strict;
-use Test::More tests => 65;
+use Test::More tests => 66;
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -232,3 +232,11 @@ $prop ||= {};
 ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
+
+$prop = eval { FooServer->new({
+    conf_file => __FILE__.'.conf', # arguments passed to new win
+})->run({
+    conf_file => 'somefile_that_doesnot_exist',
+})->{'server'} };
+$prop ||= {};
+ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
