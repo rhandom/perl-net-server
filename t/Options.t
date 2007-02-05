@@ -10,7 +10,7 @@ package FooServer;
 
 use vars qw(@ISA);
 use strict;
-use Test::More tests => 64;
+use Test::More tests => 65;
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -191,27 +191,44 @@ ok($prop->{'an_arrayref_item'}->[2] eq 'two', "Right value");
 $prop = eval { local @ARGV = ('--group=cmdline'); FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'cmdline', "Right user \"$prop->{'group'}\"");
+ok($prop->{'group'} eq 'cmdline', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'runargs', "Right user \"$prop->{'group'}\"");
+ok($prop->{'group'} eq 'runargs', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'confgroup', "Right user \"$prop->{'group'}\"");
+ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'defaultgroup', "Right user \"$prop->{'group'}\"");
+ok($prop->{'group'} eq 'defaultgroup', "Right group \"$prop->{'group'}\"");
 ok(@{ $prop->{'allow'} } == 2, "Defaults for allow are set also");
 
+###----------------------------------------------------------------###
+
+{
+    package BarServer;
+    @BarServer::ISA = qw(FooServer);
+    sub default_values {
+        return {
+            conf_file => __FILE__.'.conf'
+        };
+    }
+}
+
+$prop = eval { BarServer->run->{'server'} };
+$prop ||= {};
+ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
+
+###----------------------------------------------------------------###

@@ -790,7 +790,8 @@ of the ->run method).
 =item C<$self-E<gt>configure>
 
 This method attempts to read configurations from the commandline,
-from the run method call, or from a specified conf_file.
+from the run method call, or from a specified conf_file (the conf_file
+may be specified by passed in parameters, or in the default_values).
 All of the configured parameters are then stored in the {"server"}
 property of the Server object.
 
