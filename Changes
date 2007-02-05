@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::Server.
 
+0.96
+        - Allow for conf_file to be specified in the default_values.
+
 0.95   Feb 02 2007
         - Warn clean on the chld hanlder in PreFork. (Michael Virnstein)
         - Allow lock_file for lock serialization to only be opened once (Rob Mueller)
