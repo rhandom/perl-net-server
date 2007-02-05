@@ -13,7 +13,7 @@ Net::Server - Extensible, general Perl server engine
         my $self = shift;
         while (<STDIN>) {
             s/\r?\n$//;
-            print "You said \"$_\"\r\n"; # basic echo
+            print "You said '$_'\r\n"; # basic echo
             last if /quit/i;
         }
     }
@@ -209,7 +209,6 @@ of Service while reading.  (Other examples of using
 C<Net::Server> can, or will, be included with this distribution).
 
     #!/usr/bin/perl -w -T
-    #--------------- file test.pl ---------------
 
     package MyPackage;
 
@@ -224,20 +223,20 @@ C<Net::Server> can, or will, be included with this distribution).
         my $self = shift;
         eval {
 
-            local $SIG{ALRM} = sub { die "Timed Out!\n" };
-            my $timeout = 30; # give the user 30 seconds to type a line
+            local $SIG{'ALRM'} = sub { die "Timed Out!\n" };
+            my $timeout = 30; # give the user 30 seconds to type some lines
 
             my $previous_alarm = alarm($timeout);
-            while( <STDIN> ){
+            while (<STDIN>) {
                 s/\r?\n$//;
-                print "You said \"$_\"\r\n";
+                print "You said '$_'\r\n";
                 alarm($timeout);
             }
             alarm($previous_alarm);
 
         };
 
-        if( $@=~/timed out/i ){
+        if ($@ =~ /timed out/i) {
             print STDOUT "Timed Out.\r\n";
             return;
         }
@@ -246,29 +245,29 @@ C<Net::Server> can, or will, be included with this distribution).
 
     1;
 
-    #--------------- file test.pl ---------------
-
 Playing this file from the command line will invoke a
 Net::Server using the PreFork personality.  When building a
 server layer over the Net::Server, it is important to use
-features such as timeouts to prevent Denial of Service
+features such as timeouts to prevent Denial Of Service
 attacks.
 
 =head1 ARGUMENTS
 
 There are five possible ways to pass arguments to
-Net::Server.  They are I<passing on command line>, I<using a
-conf file>, I<passing parameters to run>, I<returning values
-in the default_values method>, or I<using a
-pre-built object to call the run method> (such as that returned
-by the new method).
+Net::Server.  They are I<passing to the new method>, I<passing on
+command line>, I<passing parameters to run>, I<using a conf file>,
+I<returning values in the default_values method>, or I<configuring the
+values in post_configure_hook>.
 
-The C<options> method is used to determine which arguments the
-server will search for.  Any arguments found from the command line,
-parameters passed to run, and arguments found in the conf_file will
-be matched against the keys of the options template.  Any commandline
-parameters that do not match will be left in place and can be further
-processed by the server in the various hooks (by looking at @ARGV).
+The C<options> method is used to determine which arguments the server
+will search for and can be used to extend the parsed parameters.  Any
+arguments found from the command line, parameters passed to run, and
+arguments found in the conf_file will be matched against the keys of
+the options template.  Any commandline parameters that do not match
+will be left in place and can be further processed by the server in
+the various hooks (by looking at @ARGV).  Arguments passed to new will
+automatically win over any other options (this can be used if you
+would like to disallow a user passing in other arguments).
 
 Arguments consist of key value pairs.  On the commandline
 these pairs follow the POSIX fashion of C<--key value> or
@@ -280,7 +279,7 @@ C<Net::Server->run(key1 => 'val1')>.  Passing arguments via
 a prebuilt object can best be shown in the following code:
 
     #!/usr/bin/perl -w -T
-    #--------------- file test2.pl ---------------
+
     package MyPackage;
     use strict;
     use base qw(Net::Server);
@@ -290,19 +289,24 @@ a prebuilt object can best be shown in the following code:
     });
 
     $server->run;
-    #--------------- file test2.pl ---------------
 
 All five methods for passing arguments may be used at the
 same time.  Once an argument has been set, it is not over
 written if another method passes the same argument.  C<Net::Server>
 will look for arguments in the following order:
 
-  1) Arguments contained in the prebuilt object.
+  1) Arguments passed to the C<new> method.
   2) Arguments passed on command line.
-  3) Arguments passed to the run method.
+  3) Arguments passed to the C<run> method.
   4) Arguments passed via a conf file.
-  5) Arguments set in default_values method.
-  6) Arguments set in the configure_hook.
+  5) Arguments set in the C<default_values> method.
+
+Additionally the following hooks are available:
+
+  1) Arguments set in the configure_hook (occurs after new
+     but before any of the other areas are checked).
+  2) Arguments set and validated in the post_configure_hook
+     (occurs after all of the other areas are checked).
 
 Each of these levels will override parameters of the same
 name specified in subsequent levels.  For example, specifying
@@ -331,7 +335,7 @@ by Net::Server.  The following code shows how this is done:
         $self->SUPER::options($template);
 
         ### add a single value option
-        $prop->{'my_option'} = undef;
+        $prop->{'my_option'} ||= undef;
         $template->{'my_option'} = \ $prop->{'my_option'};
 
         ### add a multi value option
@@ -339,15 +343,62 @@ by Net::Server.  The following code shows how this is done:
         $template->{'an_arrayref_item'} = $prop->{'an_arrayref_item'};
     }
 
-Overriding the C<options> method allows for adding your own custom fields.
-A template hashref is passed in, that should then be modified to contain
-an of your custom fields.  Fields which are intended to receive a single
-scalar value should have a reference to the destination scalar given.  Fields
-which are intended to receive multiple values should reference the corresponding
-destination arrayref.
+Overriding the C<options> method allows for adding your own custom
+fields.  A template hashref is passed in, that should then be modified
+to contain an of your custom fields.  Fields which are intended to
+receive a single scalar value should have a reference to the
+destination scalar given.  Fields which are intended to receive
+multiple values should reference the corresponding destination
+arrayref.
 
-You are responsible for validating your custom options once they have been parsed.
-The post_configure_hook is a good place to do your validation.
+You are responsible for validating your custom options once they have
+been parsed.  The post_configure_hook is a good place to do your
+validation.
+
+Some emails have asked why we use this "template" method.  The idea is
+that you are creating the the data structure to store the values in,
+and you are also creating a way to get the values into the data
+structure.  The template is the way to get the values to the servers
+data structure.  One of the possibilities (that probably isn't used
+that much) is that by letting you specify the mapping, you could build
+a nested data structure - even though the passed in arguments are
+flat.  It also allows you to setup aliases to your names.
+
+For example, a basic structure might look like this:
+
+   $prop = $self->{'server'}
+
+   $prop->{'my_custom_option'} ||= undef;
+   $prop->{'my_custom_array'}  ||= [];
+
+   $template = {
+      my_custom_option => \ $prop->{'my_custom_option'},
+      mco              => \ $prop->{'my_custom_option'}, # alias
+      my_custom_array  => $prop->{'my_custom_array'},
+      mca              => $prop->{'my_custom_array'}, # an alias
+   };
+
+   $template->{'mco2'} = $template->{'mco'}; # another way to alias
+
+But you could also have more complex data:
+
+   $prop = $self->{'server'};
+
+   $prop->{'one_layer'} = {
+       two_layer => [
+           undef,
+           undef,
+       ],
+   };
+
+   $template = {
+        param1 => \ $prop->{'one_layer'}->{'two_layer'}->[0],
+        param2 => \ $prop->{'one_layer'}->{'two_layer'}->[1],
+   };
+
+This is of course a contrived example - but it does show that you can
+get the data from the flat passed in arguments to whatever type of
+structure you need - with only a little bit of effort.
 
 =head1 DEFAULT ARGUMENTS FOR Net::Server
 
@@ -398,6 +449,40 @@ base class.)
 
 Filename from which to read additional key value pair arguments
 for starting the server.  Default is undef.
+
+There are two ways that you can specify a default location for
+a conf_file.  The first is to pass the default value to the run
+method as in:
+
+    MyServer->run({
+       conf_file => '/etc/my_server.conf',
+    });
+
+If the end user passes in --conf_file=/etc/their_server.conf then
+the value will be overridden.
+
+The second way to do this was added in the 0.96 version.  It uses
+the default_values method as in:
+
+    sub default_values {
+        return {
+            conf_file => '/etc/my_server.conf',
+        }
+    }
+
+This method has the advantage of also being able to be overridden
+in the run method.
+
+If you do not want the user to be able to specify a conf_file at
+all, you can pass conf_file to the new method when creating your
+object:
+
+    MyServer->new({
+       conf_file => '/etc/my_server.conf',
+    })->run;
+
+If passed this way, the value passed to new will "win" over any of
+the other passed in values.
 
 =item log_level
 
@@ -619,12 +704,12 @@ clean namespace in the hashref.
 You may get and set properties in two ways.  The suggested
 way is to access properties directly via
 
- my $val = $self->{server}->{key1};
+  my $val = $self->{server}->{key1};
 
-Accessing the properties directly will speed the
-server process.  A second way has been provided for object
-oriented types who believe in methods.  The second way
-consists of the following methods:
+Accessing the properties directly will speed the server process -
+though some would deem this as bad style.  A second way has been
+provided for object oriented types who believe in methods.  The second
+way consists of the following methods:
 
   my $val = $self->get_property( 'key1' );
   my $self->set_property( key1 => 'val1' );
@@ -637,7 +722,7 @@ close the client connection).
 
 C<Net::Server> allows for the use of a configuration file to
 read in server parameters.  The format of this conf file is
-simple key value pairs.  Comments and white space are
+simple key value pairs.  Comments and blank lines are
 ignored.
 
   #-------------- file test.conf --------------
@@ -979,20 +1064,21 @@ begins.
 
 =item C<$self-E<gt>can_read_hook()>
 
-This hook occurs after a socket becomes readible on an accept_multi_port
-request (accept_multi_port is used if there are multiple bound ports
-to accept on, or if the "multi_port" configuration parameter is set to
-true).  This hook is intended to allow for processing of arbitrary handles
-added to the IO::Select used for the accept_multi_port.  These
-handles could be added during the post_bind_hook.  No internal support
-is added for processing these handles or adding them to the IO::Socket.  Care
-must be used in how much occurs during the can_read_hook as a long response
-time will result in the server being susceptible to DOS attacks.  A return value
-of true indicates that the Server should not pass the readible handle on to the
-post_accept and process_request phases.
+This hook occurs after a socket becomes readible on an
+accept_multi_port request (accept_multi_port is used if there are
+multiple bound ports to accept on, or if the "multi_port"
+configuration parameter is set to true).  This hook is intended to
+allow for processing of arbitrary handles added to the IO::Select used
+for the accept_multi_port.  These handles could be added during the
+post_bind_hook.  No internal support is added for processing these
+handles or adding them to the IO::Socket.  Care must be used in how
+much occurs during the can_read_hook as a long response time will
+result in the server being susceptible to DOS attacks.  A return value
+of true indicates that the Server should not pass the readible handle
+on to the post_accept and process_request phases.
 
-It is generally suggested that other avenues be pursued for sending messages
-via sockets not created by the Net::Server.
+It is generally suggested that other avenues be pursued for sending
+messages via sockets not created by the Net::Server.
 
 =item C<$self-E<gt>post_accept_hook()>
 
@@ -1160,30 +1246,30 @@ items before doing a restart.
 
 =head1 FILES
 
-  The following files are installed as part of this
-  distribution.
+The following files are installed as part of this
+distribution.
 
-  Net/Server.pm
-  Net/Server/Fork.pm
-  Net/Server/INET.pm
-  Net/Server/MultiType.pm
-  Net/Server/PreForkSimple.pm
-  Net/Server/PreFork.pm
-  Net/Server/Single.pm
-  Net/Server/Daemonize.pm
-  Net/Server/SIG.pm
-  Net/Server/Proto.pm
-  Net/Server/Proto/*.pm
+    Net/Server.pm
+    Net/Server/Fork.pm
+    Net/Server/INET.pm
+    Net/Server/MultiType.pm
+    Net/Server/PreForkSimple.pm
+    Net/Server/PreFork.pm
+    Net/Server/Single.pm
+    Net/Server/Daemonize.pm
+    Net/Server/SIG.pm
+    Net/Server/Proto.pm
+    Net/Server/Proto/*.pm
 
 =head1 INSTALL
 
 Download and extract tarball before running
 these commands in its base directory:
 
-  perl Makefile.PL
-  make
-  make test
-  make install
+    perl Makefile.PL
+    make
+    make test
+    make install
 
 =head1 AUTHOR
 
@@ -1311,11 +1397,12 @@ L<Net::Server::Single>
 
 =head1 LICENSE
 
-  This package may be distributed under the terms of either the
+This package may be distributed under the terms of either the
+
   GNU General Public License
     or the
   Perl Artistic License
 
-  All rights reserved.
+All rights reserved.
 
 =cut
