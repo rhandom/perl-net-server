@@ -30,6 +30,7 @@ use IO::Socket ();
 use IO::Select ();
 use POSIX ();
 use Fcntl ();
+use FileHandle;
 use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               get_uid get_gid set_uid set_gid
