@@ -1164,20 +1164,12 @@ Should return a hashref.
       };
     }
 
-=item C<$self-E<gt>new>
+=item C<$self-E<gt>handle_syslog_error>
 
-As of Net::Server 0.91 there is finally a new method.  This method
-takes a class name and an argument hashref as parameters.  The argument
-hashref becomes the "server" property of the object.
-
-   package MyPackage;
-   use base qw(Net::Server);
-
-   my $obj = MyPackage->new({port => 20201});
-
-   # same as
-
-   my $obj = bless {server => {port => 20201}}, 'MyPackage';
+Called when log_file is set to 'Sys::Syslog' and an error occurs
+while writing to the syslog.  It is passed two arguments, the
+value of $@, and an arrayref containing the arguments that
+were passed to the log method when the error occured.
 
 =item C<$self-E<gt>log>
 
@@ -1201,6 +1193,44 @@ a format string is controlled.
 
 If log_file is set to a file (other than Sys::Syslog), the message
 will be appended to the log file by calling the write_to_log_hook.
+
+If the log_file is Sys::Syslog and an error occurs during write,
+the handle_syslog_error method will be called and passed the
+error exception.  The default option of handle_syslog_error is
+to die - but could easily be told to do nothing by using the following
+code in your subclassed server:
+
+    sub handle_syslog_error {}
+
+It the log had been closed, you could attempt to reopen it in the error
+handler with the following code:
+
+    sub handle_syslog_error {
+      my $self = shift;
+      $self->open_syslog;
+    }
+
+=item C<$self-E<gt>new>
+
+As of Net::Server 0.91 there is finally a new method.  This method
+takes a class name and an argument hashref as parameters.  The argument
+hashref becomes the "server" property of the object.
+
+   package MyPackage;
+   use base qw(Net::Server);
+
+   my $obj = MyPackage->new({port => 20201});
+
+   # same as
+
+   my $obj = bless {server => {port => 20201}}, 'MyPackage';
+
+=item C<$self-E<gt>open_syslog>
+
+Called during post_configure when the log_file option is set to 'Sys::Syslog'.
+By default it use the parsed configuration options listed in this document.
+If more custom behavior is desired, the method could be overridden and
+Sys::Syslog::openlog should be called with the custom parameters.
 
 =item C<$self-E<gt>shutdown_sockets>
 
