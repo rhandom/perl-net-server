@@ -1,7 +1,13 @@
 Revision history for Perl extension Net::Server.
 
-0.96
+0.96   Mar 23 2007
         - Allow for conf_file to be specified in the default_values.
+        - Add perldoc for why we use a template in options.
+        - Fix syslog log options regex again (Carlos Velasco)
+        - Fix ->autoflush (needs FileHandle) (Paul Miller)
+        - Add handle_syslog_error to allow catching errors during syslog writes (Patrik Wallstrom)
+        - Add open_syslog to slightly abstract opening of syslog.
+        - Add numerous patches from Rob Mueller to cleanup child accounting in PreFork server.
 
 0.95   Feb 02 2007
         - Warn clean on the chld hanlder in PreFork. (Michael Virnstein)
