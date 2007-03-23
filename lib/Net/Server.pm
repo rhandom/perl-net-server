@@ -252,34 +252,7 @@ sub post_configure {
   ### log to syslog
   }elsif( $prop->{log_file} eq 'Sys::Syslog' ){
 
-    my $logsock = defined($prop->{syslog_logsock})
-      ? $prop->{syslog_logsock} : 'unix';
-    $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet|stream)$/)
-      ? $1 : 'unix';
-
-    my $ident = defined($prop->{syslog_ident})
-      ? $prop->{syslog_ident} : 'net_server';
-    $prop->{syslog_ident} = ($ident =~ /^([\ -~]+)$/)
-      ? $1 : 'net_server';
-
-    require Sys::Syslog;
-
-    my $opt = defined($prop->{syslog_logopt})
-      ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
-    $prop->{syslog_logopt} = ($opt =~ /^( (?: (?:cons|ndelay|nowait|pid|nofatal) (?:$|[,|]) )* )/x)
-      ? $1 : 'pid';
-
-    my $fac = defined($prop->{syslog_facility})
-      ? $prop->{syslog_facility} : 'daemon';
-    $prop->{syslog_facility} = ($fac =~ /^((\w+)($|\|))*/)
-      ? $1 : 'daemon';
-
-    Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
-    if( ! Sys::Syslog::openlog($prop->{syslog_ident},
-                               $prop->{syslog_logopt},
-                               $prop->{syslog_facility}) ){
-      die "Couldn't open syslog [$!]" if $prop->{syslog_logopt} ne 'ndelay';
-    }
+    $self->open_syslog;
 
   ### open a logging file
   }elsif( $prop->{log_file} && $prop->{log_file} ne 'Sys::Syslog' ){
@@ -1257,6 +1230,42 @@ sub log {
   $self->write_to_log_hook($level, $msg);
 }
 
+### handle opening syslog
+sub open_syslog {
+  my $self = shift;
+  my $prop = $self->{server};
+
+  my $logsock = defined($prop->{syslog_logsock})
+    ? $prop->{syslog_logsock} : 'unix';
+  $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet|stream)$/)
+    ? $1 : 'unix';
+
+  my $ident = defined($prop->{syslog_ident})
+    ? $prop->{syslog_ident} : 'net_server';
+  $prop->{syslog_ident} = ($ident =~ /^([\ -~]+)$/)
+    ? $1 : 'net_server';
+
+  require Sys::Syslog;
+
+  my $opt = defined($prop->{syslog_logopt})
+    ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
+  $prop->{syslog_logopt} = ($opt =~ /^( (?: (?:cons|ndelay|nowait|pid|nofatal) (?:$|[,|]) )* )/x)
+    ? $1 : 'pid';
+
+  my $fac = defined($prop->{syslog_facility})
+    ? $prop->{syslog_facility} : 'daemon';
+  $prop->{syslog_facility} = ($fac =~ /^((\w+)($|\|))*/)
+    ? $1 : 'daemon';
+
+  Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
+  if( ! Sys::Syslog::openlog($prop->{syslog_ident},
+                             $prop->{syslog_logopt},
+                             $prop->{syslog_facility}) ){
+    die "Couldn't open syslog [$!]" if $prop->{syslog_logopt} ne 'ndelay';
+  }
+}
+
+### allow catching syslog errors
 sub handle_syslog_error {
   my ($self, $error) = @_;
   die $error;
