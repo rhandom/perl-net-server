@@ -1191,45 +1191,6 @@ sub fatal_hook {}
 
 ###----------------------------------------------------------###
 
-### how internal levels map to syslog levels
-$Net::Server::syslog_map = {0 => 'err',
-                            1 => 'warning',
-                            2 => 'notice',
-                            3 => 'info',
-                            4 => 'debug'};
-
-### record output
-sub log {
-  my ($self, $level, $msg, @therest) = @_;
-  my $prop = $self->{server};
-
-  return if ! $prop->{log_level};
-
-  ### log only to syslog if setup to do syslog
-  if (defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog') {
-    if ($level =~ /^\d+$/) {
-        return if $level > $prop->{log_level};
-        $level = $Net::Server::syslog_map->{$level} || $level;
-    }
-
-    my $ok = eval {
-      if (@therest) { # if more parameters are passed, we must assume that the first is a format string
-        Sys::Syslog::syslog($level, $msg, @therest);
-      } else {
-        Sys::Syslog::syslog($level, '%s', $msg);
-      }
-      1;
-    };
-    $self->handle_syslog_error(my $e = $@) if ! $ok;
-
-    return;
-  } else {
-    return if $level !~ /^\d+$/ || $level > $prop->{log_level};
-  }
-
-  $self->write_to_log_hook($level, $msg);
-}
-
 ### handle opening syslog
 sub open_syslog {
   my $self = shift;
@@ -1263,6 +1224,49 @@ sub open_syslog {
                              $prop->{syslog_facility}) ){
     die "Couldn't open syslog [$!]" if $prop->{syslog_logopt} ne 'ndelay';
   }
+}
+
+### how internal levels map to syslog levels
+$Net::Server::syslog_map = {0 => 'err',
+                            1 => 'warning',
+                            2 => 'notice',
+                            3 => 'info',
+                            4 => 'debug'};
+
+### record output
+sub log {
+  my ($self, $level, $msg, @therest) = @_;
+  my $prop = $self->{server};
+
+  return if ! $prop->{log_level};
+
+  ### log only to syslog if setup to do syslog
+  if (defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog') {
+    if ($level =~ /^\d+$/) {
+        return if $level > $prop->{log_level};
+        $level = $Net::Server::syslog_map->{$level} || $level;
+    }
+
+    my $ok = eval {
+      if (@therest) { # if more parameters are passed, we must assume that the first is a format string
+        Sys::Syslog::syslog($level, $msg, @therest);
+      } else {
+        Sys::Syslog::syslog($level, '%s', $msg);
+      }
+      1;
+    };
+
+    if (! $ok) {
+        my $err = $@;
+        $self->handle_syslog_error($err, [$level, $msg, @therest]);
+    }
+
+    return;
+  } else {
+    return if $level !~ /^\d+$/ || $level > $prop->{log_level};
+  }
+
+  $self->write_to_log_hook($level, $msg);
 }
 
 ### allow catching syslog errors
