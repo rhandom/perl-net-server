@@ -201,9 +201,9 @@ sub run_child {
     $prop->{SigHUPed} = 1;
   };
 
-  # Open in child at start
-  open($prop->{lock_fh}, ">$prop->{lock_file}")
-    || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
+  # Open in child at start
+  open($prop->{lock_fh}, ">$prop->{lock_file}")
+    || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
 
   $self->log(4,"Child Preforked ($$)\n");
 
