@@ -1239,11 +1239,16 @@ sub log {
         $level = $Net::Server::syslog_map->{$level} || $level;
     }
 
-    if (@therest) { # if more parameters are passed, we must assume that the first is a format string
-      Sys::Syslog::syslog($level, $msg, @therest);
-    } else {
-      Sys::Syslog::syslog($level, '%s', $msg);
-    }
+    my $ok = eval {
+      if (@therest) { # if more parameters are passed, we must assume that the first is a format string
+        Sys::Syslog::syslog($level, $msg, @therest);
+      } else {
+        Sys::Syslog::syslog($level, '%s', $msg);
+      }
+      1;
+    };
+    $self->handle_syslog_error(my $e = $@) if ! $ok;
+
     return;
   } else {
     return if $level !~ /^\d+$/ || $level > $prop->{log_level};
@@ -1252,6 +1257,10 @@ sub log {
   $self->write_to_log_hook($level, $msg);
 }
 
+sub handle_syslog_error {
+  my ($self, $error) = @_;
+  die $error;
+}
 
 ### standard log routine, this could very easily be
 ### overridden with a syslog call
