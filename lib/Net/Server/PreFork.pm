@@ -118,6 +118,7 @@ sub loop {
   ### get ready for children
   $prop->{child_select} = IO::Select->new(\*_READ);
   $prop->{children} = {};
+  $prop->{reaped_children} = {};
   if ($ENV{HUP_CHILDREN}) {
       my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
       $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
@@ -155,14 +156,18 @@ sub kill_n_children {
 
   $self->log(3,"Killing \"$n\" children");
 
-  foreach my $child (keys %{ $prop->{children} }){
-    next unless $prop->{children}->{$child}->{status} eq 'waiting';
+  foreach my $pid (keys %{ $prop->{children} }){
+    # Only kill waiting children
+    # XXX: This is race condition prone as the child may have
+    # started handling a connection, but will have to do for now
+    my $child = $prop->{children}->{$pid};
+    next unless $child->{status} eq 'waiting';
 
     $n--;
 
     ### try to kill the child
-    if (! kill('HUP', $child)) {
-      $self->delete_child($child);
+    if (! kill('HUP', $pid)) {
+      $self->delete_child($pid);
     }
 
     last if $n <= 0;
@@ -244,6 +249,10 @@ sub run_child {
     $prop->{SigHUPed} = 1;
   };
 
+  # Open in child at start
+  open($prop->{lock_fh}, ">$prop->{lock_file}")
+    || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
+
   $self->log(4,"Child Preforked ($$)\n");
 
   delete $prop->{$_} foreach qw(children tally last_start last_process);
@@ -305,9 +314,8 @@ sub run_parent {
                CHLD => sub {
                  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
                    last unless $chld > 0;
-                   $prop->{tally}->{time} = 0 if $prop->{children}->{$chld}->{hup};
-                   $prop->{tally}->{$prop->{children}->{$chld}->{status}}-- if $prop->{children}->{$chld}->{status};
-		   $self->delete_child( $chld );
+                   # We'll deal with this in coordinate_children to avoid a race
+                   $self->{reaped_children}->{$chld} = 1;
                  }
                },
 ### uncomment this area to allow SIG USR1 to give some runtime debugging
@@ -350,19 +358,29 @@ sub run_parent {
         next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
         my ($pid,$status) = ($1,$2);
 
-        ### record the status
-        $prop->{children}->{$pid}->{status} = $status
-          if $status ne 'exiting';
+        # Check child details still exist
+        if (my $child = $prop->{children}->{$pid}) {
 
-        if( $status eq 'processing' ){
-          $prop->{tally}->{processing} ++;
-          $prop->{last_process} = time();
+          # Delete child if it tells us it's exiting
+          if ($status eq 'exiting') {
+            $self->delete_child($pid);
 
-        }elsif( $status eq 'waiting' ){
-          $prop->{tally}->{processing} --;
+          # Changing state
+          } else {
 
-        }elsif( $status eq 'exiting' ){
-          $self->delete_child($pid);
+            # Decrement tally of state pid was in (plus sanity check)
+            my $old_status = $child->{status}
+              || $self->log(2, "No status for $pid when changing to $status\n");
+            --$prop->{tally}->{$old_status} >= 0
+              || $self->log(2, "Tally for $status < 0 changing pid $pid from $old_status to $status\n");
+
+            # Set child status and increment tally
+            $child->{status} = $status;
+            ++$prop->{tally}->{$status};
+
+            $prop->{last_process} = time()
+              if $status eq 'processing';
+          }
         }
 
       ### user defined handler
@@ -385,6 +403,17 @@ sub coordinate_children {
   my $self = shift;
   my $prop = $self->{server};
   my $time = time();
+
+  ### deleted SIG{CHLD} repeaped children
+  foreach my $pid (keys %{ $self->{reaped_children} }) {
+    # delete each pid one by one to avoid another race
+    delete $self->{reaped_children}->{$pid};
+
+    # Only delete if not already deleted
+    next if ! $prop->{children}->{$pid};
+
+    $self->delete_child($pid);
+  }
 
   ### re-tally the possible types (only twice a minute)
   ### this might not be even necessary but is a nice sanity check
@@ -479,14 +508,20 @@ sub delete_child {
   my $prop = $self->{server};
   my $pid = shift;
 
+  my $child = $prop->{children}->{$pid};
+  if (! $child) {
+    $self->log(2, "Attempt to delete already deleted child $pid\n");
+    return;
+  }
+
   # Already gone?
   return if ! exists $prop->{children}->{$pid};
 
-  my $status = $prop->{children}->{$pid}->{status}
+  my $status = $child->{status}
     || $self->log(2, "No status for $pid when deleting child\n");
   --$prop->{tally}->{$status} >= 0
     || $self->log(2, "Tally for $status < 0 deleting pid $pid\n");
-  $prop->{tally}->{time} = 0 if $prop->{children}->{$pid}->{hup};
+  $prop->{tally}->{time} = 0 if $child->{hup};
 
   $self->SUPER::delete_child($pid);
 }
