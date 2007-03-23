@@ -1391,6 +1391,7 @@ Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1
 (rt #21262).
 
 Thanks to Carlos Velasco for updating the Syslog options (rt #21265).
+And for additional fixes later.
 
 Thanks to Steven Lembark for pointing out that no_client_stdout wasn't
 working with the Multiplex server.
@@ -1407,6 +1408,12 @@ this, but added the pre_fork_hook method.
 
 And just a general Thanks You to everybody who is using Net::Server or
 who has contributed fixes over the years.
+
+Thanks to Paul Miller for some ->autoflush, FileHandle fixes.
+
+Thanks to Patrik Wallstrom for suggesting handling syslog errors better.
+
+Thanks again to Rob Mueller for more logic cleanup for child accounting in PreFork server.
 
 =head1 SEE ALSO
 
