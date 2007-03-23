@@ -265,7 +265,7 @@ sub post_configure {
 
     my $opt = defined($prop->{syslog_logopt})
       ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
-    $prop->{syslog_logopt} = ($opt =~ /^((cons|ndelay|nowait|pid|nofatal)($|[,|]))*/)
+    $prop->{syslog_logopt} = ($opt =~ /^( (?: (?:cons|ndelay|nowait|pid|nofatal) (?:$|[,|]) )* )/x)
       ? $1 : 'pid';
 
     my $fac = defined($prop->{syslog_facility})
