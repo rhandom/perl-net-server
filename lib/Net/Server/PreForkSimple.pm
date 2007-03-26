@@ -96,8 +96,6 @@ sub post_bind {
       $prop->{lock_file} = POSIX::tmpnam();
       $prop->{lock_file_unlink} = 1;
     }
-    open($prop->{lock_fh}, ">$prop->{lock_file}")
-      || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
 
   ### set up semaphore
   }elsif( $prop->{serialize} eq 'semaphore' ){
