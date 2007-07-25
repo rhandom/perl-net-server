@@ -275,7 +275,7 @@ C<--key=value>, and also C<key=value>.  In the conf file the
 parameter passing can best be shown by the following regular
 expression: ($key,$val)=~/^(\w+)\s+(\S+?)\s+$/.  Passing
 arguments to the run method is done as follows:
-C<Net::Server->run(key1 => 'val1')>.  Passing arguments via
+C<Net::Server-E<gt>run(key1 => 'val1')>.  Passing arguments via
 a prebuilt object can best be shown in the following code:
 
     #!/usr/bin/perl -w -T
