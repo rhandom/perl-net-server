@@ -1,28 +1,50 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
-#use Time::HiRes qw(time);  # uncomment for more accuracy
-use vars qw(@ISA);
+=head1 NAME
+
+LoadTester.pl - Allow for testing load agains various servers
+
+=head1 SYNOPIS
+
+    # start - or find a server somewhere
+
+    perl -e 'use base qw(Net::Server::PreForkSimple); __PACKAGE__->run'
+
+
+    # change parameters in sub configure_hook
+    # setup the load to test against the server in sub load
+
+    # run this script
+
+    LoadTester.pl
+
+=cut
+
+BEGIN {
+    Time::HiRes->import('time') if eval { require Time::HiRes };
+}
 use strict;
-use Net::Server::PreFork;
+use warnings;
+use base qw(Net::Server::PreFork);
 use IO::Socket;
 
-@ISA = qw(Net::Server::PreFork);
-main->run();
+$| = 1;
+__PACKAGE__->run(min_servers => 100, max_servers => 255);
 exit;
 
-$|=1;
+###----------------------------------------------------------------###
 
 ### set up the test parameters
 sub configure_hook {
-  my $self = shift;
-  $self->{addr} = 'localhost';   # choose a remote addr
-  $self->{port} = 20203;         # choose a remote port
-  $self->{file} = '/tmp/mysock'; # sock file for Load testing a unix socket
-  $self->{failed} = 0;           # failed hits (server was blocked)
-  $self->{hits} = 0;             # log hits
-  $self->{max_hits}   = 1000;    # how many impressions to do
-  $self->{time_begin} = time;    # keep track of time
-  $self->{sleep} = 0;            # sleep between hits?
+    my $self = shift;
+    $self->{addr}       = 'localhost';   # choose a remote addr
+    $self->{port}       = 20203;         # choose a remote port
+    $self->{file}       = '/tmp/mysock'; # sock file for Load testing a unix socket
+    $self->{failed}     = 0;             # failed hits (server was blocked)
+    $self->{hits}       = 0;             # log hits
+    $self->{max_hits}   = 1000;          # how many impressions to do
+    $self->{time_begin} = time;          # keep track of time
+    $self->{sleep}      = 0;             # sleep between hits?
 }
 
 
@@ -70,7 +92,7 @@ sub load {
   my $line = <$handle>;
   print $handle "quit\n";
 }
- 
+
 
 ### keep track of what is going on
 sub parent_read_hook {
