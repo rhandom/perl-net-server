@@ -834,6 +834,8 @@ represents the program flow:
 
   $self->post_process_request;
 
+  $self->post_client_connection_hook;
+
 The process then loops and waits for the next
 connection.  For a more in depth discussion, please
 read the code.
@@ -1108,6 +1110,13 @@ C<$self-E<gt>allow_deny_hook()> have taken place.
 
 This hook occurs after the processing of the request, but
 before the client connection has been closed.
+
+=item C<$self-E<gt>post_client_connection_hook>
+
+This is one final hook that occurs at the very end of the
+run_client_connection method.  At this point all other methods
+and hooks that will run during the run_client_connection
+have finished and the client connection has already been closed.
 
 =item C<$self-E<gt>pre_server_close_hook()>
 
@@ -1419,6 +1428,12 @@ Thanks to Paul Miller for some ->autoflush, FileHandle fixes.
 Thanks to Patrik Wallstrom for suggesting handling syslog errors better.
 
 Thanks again to Rob Mueller for more logic cleanup for child accounting in PreFork server.
+
+Thanks to David Schweikert for suggesting handling setlogsock a little better on newer
+versions of Sys::Syslog (>= 0.15).
+
+Thanks to Mihail Nasedkin for suggesting adding a hook that is now
+called post_client_connection_hook.
 
 =head1 SEE ALSO
 
