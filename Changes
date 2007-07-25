@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Server.
 
+0.97   Jul 25 2007
+        - Allow for better handling of setlogsock depending upon the version of Sys::Syslog installed (David Schweikert)
+        - Update examples with minimal pod and working synopses
+        - Added post_client_connection_hook (Mihail Nasedkin)
+
 0.96   Mar 23 2007
         - Allow for conf_file to be specified in the default_values.
         - Add perldoc for why we use a template in options.
