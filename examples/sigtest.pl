@@ -1,5 +1,29 @@
 #!/usr/bin/perl -w
 
+=head1 NAME
+
+sigtest.pl - test for safe/unsafe signal handling
+
+=head1 SYNOPSIS
+
+    sigtest.pl SIGNAME SAFE|UNSAFE
+
+    # (SIGNAME is a standard signal - default is USR1)
+    # (SAFE will use Net::Server::SIG, UNSAFE uses \$SIG{} - default is SAFE)
+    # If the child isn't saying anything, the test is invalid.
+    # If the child dies, look for a core file.
+
+    # The process will run until it dies or you kill it
+
+=head1 DESCRIPTION
+
+Recent versions of Perl (5.8 ish) have much better signal handling
+so the safe signal handling may not be necessary.  But on older versions
+of Perl the safe signal handling was necessary.  It still doesn't hurt to
+use some of the safer practices on newer Perls.
+
+=cut
+
 use IO::Select ();
 use IO::Socket ();
 use Net::Server::SIG qw(register_sig check_sigs);
@@ -104,7 +128,7 @@ if( $pid ){
     my $val;
 
     ### this is the handler for safe (fine under unsafe also)
-    next if &check_sigs() && ! @fh;
+    next if check_sigs() && ! @fh;
 
     ### do some hash manipulation
     delete $hash{foo};
