@@ -1,4 +1,16 @@
-#!/usr/bin/perl -w -T
+#!/usr/bin/perl
+
+=head1 NAME
+
+httpd - Simple http daemon
+
+=head1 SYNOPSIS
+
+    # customize options in sub configure_hook
+
+    ./httpd
+
+=cut
 
 ###----------------------------------------###
 ###     httpd server class                 ###
@@ -6,6 +18,7 @@
 
 use base qw(Net::Server::PreFork);
 use strict;
+use warnings;
 
 ### run the server
 __PACKAGE__->run;
@@ -17,7 +30,7 @@ exit;
 sub configure_hook {
   my $self = shift;
 
-  my $root = $self->{server_root} = "/home/http";
+  my $root = $self->{server_root} = "/var/www";
 
   $self->{server}->{port}     = '*:80';   # port and addr to bind
   $self->{server}->{user}     = 'nobody'; # user to run as
@@ -26,7 +39,7 @@ sub configure_hook {
   $self->{server}->{log_file} = "$root/server.log";
 
 
-  $self->{document_root} = "$root/www";
+  $self->{document_root} = "$root/htdocs";
   $self->{access_log}    = "$root/access.log";
   $self->{error_log}     = "$root/error.log";
 
