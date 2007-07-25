@@ -414,7 +414,8 @@ base class.)
   log_file          (filename|Sys::Syslog)   undef
 
   ## syslog parameters
-  syslog_logsock    (unix|inet)              unix
+  syslog_logsock    (native|unix|inet|udp
+                     |tcp|stream|console)    unix (on Sys::Syslog < 0.15)
   syslog_ident      "identity"               "net_server"
   syslog_logopt     (cons|ndelay|nowait|pid) pid
   syslog_facility   \w+                      daemon
@@ -514,7 +515,11 @@ only to forking servers.  Default is none (undef).
 =item syslog_logsock
 
 Only available if C<log_file> is equal to "Sys::Syslog".  May
-be either "unix" of "inet".  Default is "unix".
+be either unix, inet, native, console, stream, udp, or tcp, or
+an arrayref of the types to try.  Default is "unix" if the version
+of Sys::Syslog < 0.15 - otherwise the default is to not call
+setlogsock.
+
 See L<Sys::Syslog>.
 
 =item syslog_ident
