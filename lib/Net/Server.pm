@@ -37,7 +37,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.96';
+$VERSION = '0.97';
 
 ###----------------------------------------------------------------###
 
@@ -154,6 +154,7 @@ sub run_client_connection {
 
   $self->post_process_request;      # clean up client connection, etc
 
+  $self->post_client_connection_hook; # one last hook
 }
 
 ###----------------------------------------------------------------###
@@ -909,6 +910,7 @@ sub process_request {
 ### user customizable hook
 sub post_process_request_hook {}
 
+sub post_client_connection_hook {}
 
 ### this is server type specific functions after the process
 sub post_process_request {
