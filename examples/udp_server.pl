@@ -4,7 +4,6 @@
 ###     sample udp server class            ###
 ###----------------------------------------###
 package MyUDPD;
-use lib qw(/home/rhandom/Net-Server/lib);
 use vars qw(@ISA);
 use strict;
 
@@ -55,7 +54,7 @@ sub process_request {
 #  }
  
   if( $prop->{udp_data} =~ /dump/ ){
-    require "Data/Dumper.pm";
+    require Data::Dumper;
     $prop->{client}->send( Data::Dumper::Dumper( $self ) , 0);
   }else{
     $prop->{client}->send( "You said \"$prop->{udp_data}\"", 0);
