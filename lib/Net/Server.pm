@@ -1196,17 +1196,26 @@ sub open_syslog {
   my $self = shift;
   my $prop = $self->{server};
 
-  my $logsock = defined($prop->{syslog_logsock})
-    ? $prop->{syslog_logsock} : 'unix';
-  $prop->{syslog_logsock} = ($logsock =~ /^(unix|inet|stream)$/)
-    ? $1 : 'unix';
+  require Sys::Syslog;
+
+  if (ref($prop->{syslog_logsock}) eq 'ARRAY') {
+    # do nothing - assume they have what they want
+  } else {
+    if (! defined $prop->{syslog_logsock}) {
+      $prop->{syslog_logsock} = ($Sys::Syslog::VERSION < 0.15) ? 'unix' : '';
+    }
+    if ($prop->{syslog_logsock} =~ /^(|native|tcp|udp|unix|inet|stream|console)$/) {
+      $prop->{syslog_logsock} = $1;
+    } else {
+      $prop->{syslog_logsock} = ($Sys::Syslog::VERSION < 0.15) ? 'unix' : '';
+    }
+  }
 
   my $ident = defined($prop->{syslog_ident})
     ? $prop->{syslog_ident} : 'net_server';
   $prop->{syslog_ident} = ($ident =~ /^([\ -~]+)$/)
     ? $1 : 'net_server';
 
-  require Sys::Syslog;
 
   my $opt = defined($prop->{syslog_logopt})
     ? $prop->{syslog_logopt} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
@@ -1218,7 +1227,9 @@ sub open_syslog {
   $prop->{syslog_facility} = ($fac =~ /^((\w+)($|\|))*/)
     ? $1 : 'daemon';
 
-  Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
+  if ($prop->{syslog_logsock}) {
+    Sys::Syslog::setlogsock($prop->{syslog_logsock}) || die "Syslog err [$!]";
+  }
   if( ! Sys::Syslog::openlog($prop->{syslog_ident},
                              $prop->{syslog_logopt},
                              $prop->{syslog_facility}) ){
