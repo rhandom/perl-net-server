@@ -1,24 +1,42 @@
-#!/usr/bin/perl -w -T
+#!/usr/bin/perl -w
 
-# This example demonstrates some of the features of Net::Server::Multiplex
-#
-#
-# To run this in background daemon mode, listening on port 2000, do:
-#
-#   samplechat.pl --setsid=1 --log_file=/tmp/samplechat.log --pid_file=/tmp/samplechat.pid --port=2000
-#
-# To turn off the daemon, do:
-#
-#   kill `cat /tmp/samplechat.pid`;
-#
+=head1 NAME
+
+samplechat.pl - Show a basic Net::Server::Multiplex sample
+
+=head SERVER SYNOPIS
+
+    # To run this in background daemon mode, listening on port 2000, do:
+
+    samplechat.pl --setsid=1 --log_file=/tmp/samplechat.log --pid_file=/tmp/samplechat.pid --port=2000
+
+    # To turn off the daemon, do:
+
+    kill `cat /tmp/samplechat.pid`;
+
+=head CLIENT SYNOPIS
+
+    # from a terminal type
+
+    telnet localhost 2000
+
+    # you will then be in a echo server.
+
+=head DESCRIPTION
+
+This example demonstrates some of the features of Net::Server::Multiplex
+
+=cut
 
 package SampleChatServer;
 
 use strict;
-use Net::Server::Multiplex;
-use vars qw(@ISA);
-@ISA = qw(Net::Server::Multiplex);
+use base qw(Net::Server::Multiplex);
 
+__PACKAGE__->run();
+exit;
+
+###----------------------------------------------------------------###
 
 # Demonstrate a Net::Server style hook
 sub allow_deny_hook {
@@ -138,6 +156,3 @@ sub broadcast {
     print $fh $msg;
   }
 }
-
-
-__PACKAGE__->run();
