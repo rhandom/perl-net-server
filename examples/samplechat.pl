@@ -75,6 +75,7 @@ sub mux_connection {
   # STDOUT is tie'd to the correct IO::Multiplex handle
   print "Welcome, you are number $self->{id} to connect.\r\n";
   # Try out the timeout feature of IO::Multiplex
+  $mux->set_timeout($fh, undef);
   $mux->set_timeout($fh, 20);
   # This is my state and will be unique to this connection
   $self->{state} = "junior";
@@ -101,6 +102,7 @@ sub mux_input {
     print " - sent ".(length $message)." byte message\r\n";
   }
   if ($self->{state} eq "senior") {
+    $mux->set_timeout($fh, undef);
     $mux->set_timeout($fh, 40);
   }
 }
@@ -139,6 +141,7 @@ sub mux_timeout {
     print "If you don't want to talk then you should leave. *BYE*\r\n";
     close(STDOUT);
   }
+  $mux->set_timeout($fh, undef);
   $mux->set_timeout($fh, 40);
 }
 
