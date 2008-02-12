@@ -376,7 +376,7 @@ sub pre_bind {
     my $port  = $prop->{port}->[$i];
     my $host  = $prop->{host}->[$i];
     my $proto = $prop->{proto}->[$i];
-    if ($port != 0 && $bound{"$host/$port/$proto"}++) {
+    if ($port ne 0 && $bound{"$host/$port/$proto"}++) {
       $self->log(2, "Duplicate configuration (".(uc $proto)." port $port on host $host - skipping");
       next;
     }
@@ -753,7 +753,7 @@ sub get_client_info {
 
   }else{
     ### does this only happen from command line?
-    $prop->{sockaddr} = '0.0.0.0';
+    $prop->{sockaddr} = $ENV{'REMOTE_HOST'} || '0.0.0.0';
     $prop->{sockhost} = 'inet.test';
     $prop->{sockport} = 0;
   }
