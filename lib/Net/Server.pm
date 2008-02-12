@@ -376,7 +376,7 @@ sub pre_bind {
     my $port  = $prop->{port}->[$i];
     my $host  = $prop->{host}->[$i];
     my $proto = $prop->{proto}->[$i];
-    if ($bound{"$host/$port/$proto"}++) {
+    if ($port != 0 && $bound{"$host/$port/$proto"}++) {
       $self->log(2, "Duplicate configuration (".(uc $proto)." port $port on host $host - skipping");
       next;
     }
@@ -387,8 +387,12 @@ sub pre_bind {
     $self->fatal("No valid socket parameters found");
   }
 
-  $prop->{listen} = Socket::SOMAXCONN()
-    unless defined($prop->{listen}) && $prop->{listen} =~ /^\d{1,3}$/;
+  if (! defined($prop->{listen}) || $prop->{listen} !~ /^\d+$/) {
+    my $max = Socket::SOMAXCONN();
+    $max = 128 if $max < 10; # some invalid Solaris contants ?
+    $prop->{listen} = $max;
+    $self->log(2, "Using default listen value of $max");
+  }
 
 }
 
@@ -712,8 +716,8 @@ sub post_accept {
           open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
           open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
       } else {
-          *STDIN= \*{ $prop->{client} };
-          *STDOUT= \*{ $prop->{client} } if ! $prop->{client}->isa('IO::Socket::SSL');
+          *STDIN  = \*{ $prop->{client} };
+          *STDOUT = \*{ $prop->{client} };
       }
       STDIN->autoflush(1);
       STDOUT->autoflush(1);
@@ -972,8 +976,9 @@ sub dequeue {}
 sub pre_server_close_hook {}
 
 ### this happens when the server reaches the end
-sub server_close{
-  my $self = shift;
+sub server_close {
+  my $self     = shift;
+  my $exit_val = shift || 0;
   my $prop = $self->{server};
 
   $SIG{INT} = 'DEFAULT';
@@ -1032,11 +1037,15 @@ sub server_close{
   $self->shutdown_sockets;
 
   ### all done - exit
-  $self->server_exit;
+  $self->server_exit($exit_val);
 }
 
 ### called at end once the server has exited
-sub server_exit { exit }
+sub server_exit {
+  my $self = shift;
+  my $exit_val = shift || 0;
+  exit($exit_val);
+}
 
 ### allow for fully shutting down the bound sockets
 sub shutdown_sockets {
@@ -1184,7 +1193,7 @@ sub fatal {
   $self->log(0, $self->log_time ." ". $error
              ."\n  at line $line in file $file");
 
-  $self->server_close;
+  $self->server_close(1);
 }
 
 
@@ -1253,6 +1262,9 @@ sub log {
 
   return if ! $prop->{log_level};
 
+  # if multiple arguments are passed, assume that the first is a format string
+  $msg = sprintf($msg, @therest) if @therest;
+
   ### log only to syslog if setup to do syslog
   if (defined($prop->{log_file}) && $prop->{log_file} eq 'Sys::Syslog') {
     if ($level =~ /^\d+$/) {
@@ -1260,18 +1272,9 @@ sub log {
         $level = $Net::Server::syslog_map->{$level} || $level;
     }
 
-    my $ok = eval {
-      if (@therest) { # if more parameters are passed, we must assume that the first is a format string
-        Sys::Syslog::syslog($level, $msg, @therest);
-      } else {
-        Sys::Syslog::syslog($level, '%s', $msg);
-      }
-      1;
-    };
-
-    if (! $ok) {
+    if (! eval { Sys::Syslog::syslog($level, '%s', $msg); 1 }) {
         my $err = $@;
-        $self->handle_syslog_error($err, [$level, $msg, @therest]);
+        $self->handle_syslog_error($err, [$level, $msg]);
     }
 
     return;
