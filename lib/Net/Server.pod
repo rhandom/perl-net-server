@@ -562,6 +562,13 @@ default to "*".  Default port is 20203.  Configuration passed
 to new or run may be either a scalar containing a single port
 number or an arrayref of ports.
 
+On systems that support it, a port value of 0 may be used to ask
+the OS to auto-assign a port.  The value of the auto-assigned port
+will be stored in the NS_port property of the Net::Server::Proto::TCP
+object and is also available in the sockport method.  When the server
+is processing a request, the $self->{server}->{sockport} property
+contains the port that was connected through.
+
 =item host
 
 Local host or addr upon which to bind port.  If a value of '*' is
@@ -956,11 +963,15 @@ This method takes care of cleaning up any remaining child processes,
 setting appropriate flags on sockets (for HUPing), closing up
 logging, and then closing open sockets.
 
+Can optionally be passed an exit value that will be passed to the server_exit call.
+
 =item C<$self-E<gt>server_exit>
 
 This method is called at the end of server_close.  It calls exit,
 but may be overridden to do other items.  At this point all services
 should be shut down.
+
+Can optionally be passed an exit value that will be passed to the exit call.
 
 =back
 
