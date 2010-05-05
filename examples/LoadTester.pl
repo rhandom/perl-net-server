@@ -45,11 +45,12 @@ sub configure_hook {
     $self->{max_hits}   = 1000;          # how many impressions to do
     $self->{time_begin} = time;          # keep track of time
     $self->{sleep}      = 0;             # sleep between hits?
+    $self->{ssl}        = 0;             # use SSL ?
 }
 
 
 ### these generally deal with sockets - ignore them
-sub pre_bind {}
+sub pre_bind { require IO::Socket::SSL if shift->{ssl} }
 sub bind { shift()->log(2,"Running under pid $$\n") }
 sub accept { 1 }
 sub post_accept {}
@@ -64,9 +65,10 @@ sub process_request {
   sleep($self->{sleep}) if $self->{sleep};
 
   ### try to connect and deliver the load
-  if( $self->{remote} = IO::Socket::INET->new(PeerAddr => $self->{addr},
-                                              PeerPort => $self->{port},
-                                              Proto    => 'tcp') ){
+  my $class = $self->{ssl} ? 'IO::Socket::SSL' : 'IO::Socket::INET';
+  if( $self->{remote} = $class->new(PeerAddr => $self->{addr},
+                                    PeerPort => $self->{port},
+                                    ) ){
     $self->load;
     return;
 
