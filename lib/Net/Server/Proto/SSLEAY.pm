@@ -24,7 +24,6 @@ package Net::Server::Proto::SSLEAY;
 use strict;
 use vars qw($VERSION $AUTOLOAD @ISA);
 use IO::Socket::INET;
-use Tie::Handle;
 use Fcntl ();
 use Errno ();
 use Socket ();
@@ -110,17 +109,14 @@ sub connect { # connect the first time
     my $port  = $sock->NS_port;
 
     my %args;
-    $args{'LocalPort'} = $port;                  # what port to bind on
-    $args{'Proto'}     = 'tcp';                  # what procol to use
-    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
-    $args{'Listen'}    = $prop->{'listen'};      # how many connections for kernel to queue
-    $args{'Reuse'}     = 1;                      # allow us to rebind the port on a restart
-
-    my @keys = grep {/^SSL_/} keys %$prop;
-    @args{@keys} = @{ $prop }{@keys};
+    $args{'LocalPort'} = $port;
+    $args{'Proto'}     = 'tcp';
+    $args{'LocalAddr'} = $host if $host !~ /\*/; # * is all
+    $args{'Listen'}    = $prop->{'listen'};
+    $args{'Reuse'}     = 1;
 
     $sock->SUPER::configure(\%args) || $server->fatal("Can't connect to SSL port $port on $host [$!]");
-    $server->fatal("Back sock [$!]!".caller()) if ! $sock;
+    $server->fatal("Bad sock [$!]!".caller()) if ! $sock;
 
     if ($port == 0 && ($port = $sock->sockport)) {
         $sock->NS_port($port);
@@ -224,7 +220,7 @@ sub SSLeay_check_error {
 ###----------------------------------------------------------------###
 
 sub read_until {
-    my ($client, $bytes, $end_qr) = @_;
+    my ($client, $bytes, $end_qr, $non_greedy) = @_;
 
     my $ssl = $client->SSLeay;
     my $content = ${*$client}{'SSLeay_buffer'};
@@ -253,14 +249,24 @@ sub read_until {
         my $n_empty = 0;
         while (1) {
             # 16384 is the maximum amount read() can return
+            my $n = 16384;
+            $n -= ($bytes - length($content)) if $non_greedy && ($bytes - length($content)) < $n;
             my $buf = Net::SSLeay::read($ssl, 16384); # read the most we can - continue reading until the buffer won't read any more
             if ($client->SSLeay_check_error('SSLeay read_until read')) {
                 last OUTER;
             }
             die "SSLeay read_until: $!\n" if ! defined($buf) && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
             last if ! defined($buf);
-            last OUTER if !length($buf) && $n_empty++;
-            $content .= $buf;
+            if (!length($buf)) {
+                last OUTER if !length($buf) && $n_empty++;
+            }
+            else {
+                $content .= $buf;
+                if ($non_greedy && length($content) == $bytes) {
+                    $ok = 3;
+                    last;
+                }
+            }
         }
     }
     return wantarray ? ($ok, $content) : $content;
@@ -268,7 +274,7 @@ sub read_until {
 
 sub read {
     my ($client, $buf, $size, $offset) = @_;
-    my ($ok, $read) = $client->read_until($size);
+    my ($ok, $read) = $client->read_until($size, undef, 1);
     substr($_[1], $offset || 0, defined($buf) ? length($buf) : 0, $read);
     return length $read;
 }
@@ -292,12 +298,23 @@ sub getlines {
 
 sub print {
     my $client = shift;
-    $client->write(@_ == 1 ? $_[0] : join('', @_));
+    my $buf    = @_ == 1 ? $_[0] : join('', @_);
+    my $ssl    = $client->SSLeay;
+    while (length $buf) {
+        vec(my $vec = '', $client->fileno, 1) = 1;
+        select(undef, $vec, undef, undef);
+
+        my $write = Net::SSLeay::write($ssl, $buf);
+        return 0 if $client->SSLeay_check_error('SSLeay write');
+        die "SSLeay print: $!\n" if $write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
+        substr($buf, 0, $write, "") if $write > 0;
+    }
+    return 1;
 }
 
 sub printf {
     my $client = shift;
-    $client->print(sprintf @_);
+    $client->print(sprintf(shift, @_));
 }
 
 sub say {
@@ -309,18 +326,11 @@ sub write {
     my $client = shift;
     my $buf    = shift;
     $buf = substr($buf, $_[1] || 0, $_[0]) if @_;
-    my $ssl    = $client->SSLeay;
-    while (length $buf) {
-        vec(my $vec = '', $client->fileno, 1) = 1;
-        select(undef, $vec, undef, undef);
-
-        my $write = Net::SSLeay::write($ssl, $buf);
-        return 0 if $client->SSLeay_check_error('SSLeay write');
-        die "SSLeay write: $!\n" if $write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
-        substr($buf, 0, $write, "") if $write > 0;
-    }
-    return 1;
+    $client->print($buf);
 }
+
+sub sysread  { die "sysread is not supported by Net::Server::Proto::SSLEAY" }
+sub syswrite { die "syswrite is not supported by Net::Server::Proto::SSLEAY" }
 
 ###----------------------------------------------------------------###
 
@@ -356,6 +366,8 @@ sub AUTOLOAD {
     };
     return $sock->$prop(@_);
 }
+
+sub tie_stdout { 1 }
 
 1;
 

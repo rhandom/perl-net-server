@@ -707,12 +707,13 @@ sub post_accept {
 
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
-  if( defined $prop->{client} ){
+  if (defined(my $client = $prop->{client})) {
     if (! $prop->{no_client_stdout}) {
       close STDIN;
       close STDOUT;
-      if ($prop->{client}->can('bind_stdout')) {
-          $prop->{client}->bind_stdout($self);
+      if ($prop->{'tie_client_stdout'} || ($client->can('tie_stdout') && $client->tie_stdout)) {
+          tie *STDOUT, 'Net::Server::TiedHandle', $client, $prop->{'tied_stdout_callback'} or die "Couldn't tie STDOUT: $!";
+          tie *STDIN,  'Net::Server::TiedHandle', $client, $prop->{'tied_stdin_callback'}  or die "Couldn't tie STDIN: $!";
       } elsif (defined(my $fileno = fileno $prop->{client})) {
           open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
           open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
@@ -936,7 +937,8 @@ sub post_process_request {
     # close handles - but leave fd's around to prevent spurious messages (Rob Mueller)
     #close STDIN;
     #close STDOUT;
-    $prop->{'client'}->unbind_stdout($self) if $prop->{'client'}->can('unbind_stdout');
+    untie *STDOUT if tied *STDOUT;
+    untie *STDIN  if tied *STDIN;
     open(STDIN,  '</dev/null') || die "Can't read /dev/null  [$!]";
     open(STDOUT, '>/dev/null') || die "Can't write /dev/null [$!]";
   }
@@ -1351,7 +1353,7 @@ sub options {
                syslog_logsock syslog_ident
                syslog_logopt syslog_facility
                no_close_by_child
-               no_client_stdout
+               no_client_stdout tie_client_stdout tied_stdout_callback tied_stdin_callback
                leave_children_open_on_hup
                ) ){
     $ref->{$_} = \$prop->{$_};
@@ -1390,7 +1392,7 @@ sub process_args {
           $val = 1; # allow for options such as --setsid
         } else {
           $val = splice( @$ref, $i, 1 );
-          if (ref $val) {
+          if (ref($val) && $key !~ /_callback$/) {
             die "Found an invalid configuration value for \"$key\" ($val)" if ref($val) ne 'ARRAY';
             $val = $val->[0] if @$val == 1;
           }
@@ -1410,7 +1412,7 @@ sub process_args {
           $previously_set{$key} = defined(${ $template->{$key} }) ? 1 : 0;
         }
         next if $previously_set{$key};
-        die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref $val;
+        die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref($val) && $key !~ /_callback$/;
         ${ $template->{$key} } = $val;
       }
     }
@@ -1490,6 +1492,17 @@ sub set_property {
 }
 
 ###----------------------------------------------------------------###
+
+package Net::Server::TiedHandle;
+sub TIEHANDLE { my $pkg = shift; return bless [@_], $pkg }
+sub READLINE { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'getline',  @_) : $s->[0]->getline }
+sub SAY      { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'say',      @_) : $s->[0]->say(@_) }
+sub PRINT    { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'print',    @_) : $s->[0]->print(@_) }
+sub PRINTF   { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'printf',   @_) : $s->[0]->printf(@_) }
+sub READ     { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'read',     @_) : $s->[0]->read(@_) }
+sub WRITE    { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'write',    @_) : $s->[0]->write(@_) }
+sub SYSREAD  { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'sysread',  @_) : $s->[0]->sysread(@_) }
+sub SYSWRITE { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'syswrite', @_) : $s->[0]->syswrite(@_) }
 
 1;
 
