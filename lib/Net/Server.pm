@@ -37,7 +37,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.97';
+$VERSION = '0.99';
 
 ###----------------------------------------------------------------###
 
@@ -741,6 +741,12 @@ sub get_client_info {
     $self->log(3,$self->log_time
                ." CONNECT UNIX Socket: \"$path\"\n");
 
+    return;
+  } elsif ($self->isa('Net::Server::INET')) {
+    $prop->{sockaddr} = $ENV{'REMOTE_HOST'} || '0.0.0.0';
+    $prop->{peeraddr} = '0.0.0.0';
+    $prop->{sockhost} = $prop->{peerhost} = 'inetd.server';
+    $prop->{sockport} = $prop->{peerport} = 0;
     return;
   }
 
