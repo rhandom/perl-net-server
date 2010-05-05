@@ -938,7 +938,7 @@ sub post_process_request {
     open(STDIN,  '</dev/null') || die "Can't read /dev/null  [$!]";
     open(STDOUT, '>/dev/null') || die "Can't write /dev/null [$!]";
   }
-  close($prop->{client});
+  $prop->{client}->close;
 
 }
 
