@@ -88,6 +88,11 @@ sub connect {
   $sock->SUPER::configure(\%args)
     or $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
+  if ($port == 0 && ($port = $sock->sockport)) {
+    $sock->NS_port($port);
+    $server->log(2,"Bound to auto-assigned port $port");
+  }
+
   $server->fatal("Back sock [$!]!".caller())
     unless $sock;
 
