@@ -16,6 +16,7 @@ lib/Net/Server/PreFork.pm	Sub class allowing for managed pre forked processes
 lib/Net/Server/PreForkSimple.pm	Sub class allowing for simple pre forked processes
 lib/Net/Server/Proto.pm		Class for managing different connection types
 lib/Net/Server/Proto/SSL.pm	Proto interface to IO::Socket::SSL (experimental)
+lib/Net/Server/Proto/SSLEAY.pm	Proto interface to Net::SSLeay
 lib/Net/Server/Proto/TCP.pm	Proto interface to IO::Socket::INET
 lib/Net/Server/Proto/UDP.pm	Proto interface to IO::Socket::INET
 lib/Net/Server/Proto/UNIX.pm	Proto interface to IO::Socket::UNIX
