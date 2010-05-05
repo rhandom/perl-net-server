@@ -33,7 +33,7 @@ sub configure_hook {
   my $root = $self->{server_root} = "/var/www";
 
   $self->{server}->{port}     = '*:8888';   # port and addr to bind
-  $self->{server}->{port}     = '*:8888/SSLEAY'; # if you want a secure server
+#  $self->{server}->{port}     = '*:8888/SSLEAY'; # if you want a secure server
   $self->{server}->{user}     = 'nobody'; # user to run as
   $self->{server}->{group}    = 'nobody'; # group to run as
   $self->{server}->{setsid}   = 1;        # daemonize
