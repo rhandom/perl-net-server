@@ -145,12 +145,13 @@ IO::Socket style objects blessed into its own set of classes
 (ie Net::Server::Proto::TCP, Net::Server::Proto::UNIX).
 
 Only three or four protocols come bundled with Net::Server.
-TCP, UDP, UNIX, and eventually SSL.  TCP is an implementation
+TCP, UDP, UNIX, and SSLEAY.  TCP is an implementation
 of SOCK_STREAM across an INET socket.  UDP is an implementation
 of SOCK_DGRAM across an INET socket.  UNIX uses a unix style
 socket file and lets the user choose between SOCK_STREAM and
-SOCK_DGRAM (the default is SOCK_STREAM).  SSL is actually just
-a layer on top of TCP.
+SOCK_DGRAM (the default is SOCK_STREAM).  SSLEAY is actually just
+a layer on top of TCP but uses Net::SSLeay to read and write from
+the stream..
 
 The protocol that is passed to Net::Server can be the name of
 another module which contains the protocol bindings.  If

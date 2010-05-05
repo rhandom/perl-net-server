@@ -203,19 +203,19 @@ sub AUTOLOAD {
 
 =head1 NAME
 
-Net::Server::Proto::SSL - Net::Server SSL protocol (deprecated - use Net::Server::Proto::SSLeay instead).
+Net::Server::Proto::SSL - Net::Server SSL protocol (deprecated - use Net::Server::Proto::SSLEAY instead).
 
 =head1 SYNOPSIS
 
-This module is mostly deprecated - you will want to look at Net::Server::Proto::SSLeay instead.
+This module is mostly deprecated - you will want to look at Net::Server::Proto::SSLEAY instead.
 
 See L<Net::Server::Proto>.
-See L<Net::Server::Proto::SSLeay>.
+See L<Net::Server::Proto::SSLEAY>.
 
 =head1 DESCRIPTION
 
 This original SSL module was experimental.  It has been superceeded by
-Net::Server::Proto::SSLeay If anybody has any successes or ideas for
+Net::Server::Proto::SSLEAY If anybody has any successes or ideas for
 improvment under SSL, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a
