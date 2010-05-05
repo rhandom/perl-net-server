@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2010
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -37,7 +37,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file
                               safe_fork
                               );
 
-$VERSION = '0.99';
+$VERSION = '0.98';
 
 ###----------------------------------------------------------------###
 
