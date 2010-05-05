@@ -345,6 +345,18 @@ at the following examples:
   # NS_unix_type = SOCK_DGRAM
   # NS_proto = UNIX
 
+  # example 9 ###################################
+
+  $port = "someother.com:20203/ssleay";
+  $def_host  = "default_domain.com";
+  $def_proto = "tcp";
+  $obj = Net::Server::Proto->object($def_host,$port,$def_proto);
+
+  # ref      = Net::Server::Proto::SSLEAY
+  # NS_host  = someother.com
+  # NS_port  = 20203
+  # NS_proto = SSLEAY
+
 =head1 LICENCE
 
 Distributed under the same terms as Net::Server
