@@ -131,7 +131,7 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
     my $content = '';
     my $ok = 0;
     while (1) {
-        read(STDIN, $content, 1, length($content));
+        $client->read($content, 1, length($content));
         if (defined($bytes) && length($content) >= $bytes) {
             $ok = 2;
             last;
