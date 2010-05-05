@@ -52,26 +52,32 @@ sub object {
     $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
   }
 
-  ### read any additional protocol specific arguments
-  $server->configure({
-    SSL_server      => \$prop->{SSL_server},
-    SSL_use_cert    => \$prop->{SSL_use_cert},
-    SSL_verify_mode => \$prop->{SSL_verify_mode},
-    SSL_key_file    => \$prop->{SSL_key_file},
-    SSL_cert_file   => \$prop->{SSL_cert_file},
-    SSL_ca_path     => \$prop->{SSL_ca_path},
-    SSL_ca_file     => \$prop->{SSL_ca_file},
-    SSL_cipher_list => \$prop->{SSL_cipher_list},
-    SSL_passwd_cb   => \$prop->{SSL_passwd_cb},
-  });
+  # read any additional protocol specific arguments
+  my @ssl_args = qw(
+      SSL_server
+      SSL_use_cert
+      SSL_verify_mode
+      SSL_key_file
+      SSL_cert_file
+      SSL_ca_path
+      SSL_ca_file
+      SSL_cipher_list
+      SSL_passwd_cb
+      SSL_max_getline_length
+  );
+  my %args;
+  $args{$_} = \$prop->{$_} for @ssl_args;
+  $server->configure(\%args);
 
-  ### create the handle under this package
-  my $sock = $class->SUPER::new();
-
-  ### store some properties
+  my $sock = $class->new;
   $sock->NS_host($host);
   $sock->NS_port($port);
   $sock->NS_proto('SSL');
+
+  for my $key (@ssl_args) {
+    my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSL') : undef;
+    $sock->$key($val);
+  }
 
   return $sock;
 }
@@ -197,15 +203,19 @@ sub AUTOLOAD {
 
 =head1 NAME
 
-  Net::Server::Proto::SSL - Net::Server SSL protocol.
+Net::Server::Proto::SSL - Net::Server SSL protocol (deprecated - use Net::Server::Proto::SSLeay instead).
 
 =head1 SYNOPSIS
 
+This module is mostly deprecated - you will want to look at Net::Server::Proto::SSLeay instead.
+
 See L<Net::Server::Proto>.
+See L<Net::Server::Proto::SSLeay>.
 
 =head1 DESCRIPTION
 
-Experimental.  If anybody has any successes or ideas for
+This original SSL module was experimental.  It has been superceeded by
+Net::Server::Proto::SSLeay If anybody has any successes or ideas for
 improvment under SSL, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a
@@ -218,13 +228,13 @@ Net::Server.  However, Net::Server should also be able to
 maintain any number of TCP, UDP, or UNIX connections in
 addition to the one SSL connection.
 
-Additionally, getline support is very limited and writing
-directly to STDOUT will not work.  This is entirely dependent
-upon the implementation of IO::Socket::SSL.  getline may work
-but the client is not copied to STDOUT under SSL.  It is suggested
-that clients sysread and syswrite to the client handle
-(located in $self->{server}->{client} or passed to the process_request
-subroutine as the first argument).
+Additionally, getline support is very limited and writing directly to
+STDOUT will not work.  This is entirely dependent upon the
+implementation of IO::Socket::SSL.  getline may work but the client is
+not copied to STDOUT under SSL.  It is suggested that clients sysread
+and syswrite to the client handle (located in
+$self->{server}->{client} or passed to the process_request subroutine
+as the first argument).
 
 =head1 PARAMETERS
 
@@ -234,13 +244,14 @@ See L<IO::Socket::SSL> for information on setting this up.
 
 =head1 BUGS
 
-Christopher A Bongaarts pointed out that if the SSL negotiation is slow then
-the server won't be accepting for that period of time (because the locking
-of accept is around both the socket accept and the SSL negotiation).  This
-means that as it stands now the SSL implementation is susceptible to DOS attacks.
-To fix this will require deviding up the accept call a little bit more finely
-which may not yet be possible with IO::Socket::SSL.  Any ideas or patches on this
-bug are welcome.
+Christopher A Bongaarts pointed out that if the SSL negotiation is
+slow then the server won't be accepting for that period of time
+(because the locking of accept is around both the socket accept and
+the SSL negotiation).  This means that as it stands now the SSL
+implementation is susceptible to DOS attacks.  To fix this will
+require deviding up the accept call a little bit more finely which may
+not yet be possible with IO::Socket::SSL.  Any ideas or patches on
+this bug are welcome.
 
 =head1 LICENCE
 

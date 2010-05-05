@@ -80,7 +80,7 @@ sub object {
     $sock->NS_proto('SSLeay');
 
     for my $key (@ssl_args) {
-        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key() : undef;
+        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLeay') : undef;
         $sock->$key($val);
     }
 
