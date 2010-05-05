@@ -29,7 +29,7 @@ Net::Server - Extensible, general Perl server engine
  * Forking Mode
  * Multiplexing Mode using a single process
  * Multi port accepts on Single, Preforking, and Forking modes
- * Simultaneous accept/recv on tcp, udp, and unix sockets
+ * Simultaneous accept/recv on tcp, udp, and unix and ssl/tcp sockets
  * Safe signal handling in Fork/PreFork avoids perl signal trouble
  * User customizable hooks
  * Chroot ability after bind
@@ -441,7 +441,7 @@ base class.)
 
   no_close_by_child (1|undef)                undef
 
-  ## See Net::Server::Proto::(TCP|UDP|UNIX|etc)
+  ## See Net::Server::Proto::(TCP|UDP|UNIX|SSLeay|etc)
   ## for more sample parameters.
 
 =over 4
