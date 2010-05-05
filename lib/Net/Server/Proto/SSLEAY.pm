@@ -26,13 +26,15 @@ use vars qw($VERSION $AUTOLOAD @ISA);
 use IO::Socket::INET;
 use Tie::Handle;
 use Fcntl ();
-eval { require Net::SSLeay; };
-$@ && warn "Module Net::SSLeay is required for SSLeay.";
+use Errno ();
+use Socket ();
+
 BEGIN {
+    eval { require Net::SSLeay };
+    $@ && warn "Module Net::SSLeay is required for SSLeay.";
     # Net::SSLeay gets mad if we call these multiple times - the question is - who will call them multiple times?
     for my $sub (qw(load_error_strings SSLeay_add_ssl_algorithms ENGINE_load_builtin_engines ENGINE_register_all_complete randomize)) {
         Net::SSLeay->can($sub)->();
-        eval 'no warnings "redefine"; sub Net::SSLeay::$sub () {}';
     }
 }
 
@@ -68,6 +70,7 @@ sub object {
         SSL_ca_file
         SSL_cipher_list
         SSL_passwd_cb
+        SSL_error_callback
         SSL_max_getline_length
     );
     my %args;
@@ -77,10 +80,10 @@ sub object {
     my $sock = $class->new;
     $sock->NS_host($host);
     $sock->NS_port($port);
-    $sock->NS_proto('SSLeay');
+    $sock->NS_proto('SSLEAY');
 
     for my $key (@ssl_args) {
-        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLeay') : undef;
+        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLEAY') : undef;
         $sock->$key($val);
     }
 
@@ -196,20 +199,24 @@ sub SSLeay {
 }
 
 sub SSLeay_check_fatal {
-    my ($class, $msg) = @_;
-    if (my $err = $class->SSLeay_check_error) {
+    my ($client, $msg) = @_;
+    if (my $err = $client->SSLeay_check_error($msg, 1)) {
         my ($file, $pkg, $line) = caller;
         die "$msg at $file line $line\n  ".join('  ', @$err);
     }
 }
 
 sub SSLeay_check_error {
-    my $class = shift;
+    my ($client, $msg, $fatal) = @_;
     my @err;
     while (my $n = Net::SSLeay::ERR_get_error()) {
         push @err, "$n. ". Net::SSLeay::ERR_error_string($n) ."\n";
     }
-    return \@err if @err;
+    if (@err) {
+        my $cb = $client->SSL_error_callback;
+        $cb->($client, $msg, \@err, ($fatal ? 'is_fatal' : ())) if $cb;
+        return \@err;
+    }
     return;
 }
 
@@ -223,7 +230,8 @@ sub read_until {
     my $content = ${*$client}{'SSLeay_buffer'};
     $content = '' if ! defined $content;
     my $ok = 0;
-    $0 .= ' reading';
+
+    # the rough outline for this loop came from http://devpit.org/wiki/OpenSSL_with_nonblocking_sockets_%28in_Perl%29
     OUTER: while (1) {
         if (!length($content)) {
         }
@@ -246,14 +254,16 @@ sub read_until {
         while (1) {
             # 16384 is the maximum amount read() can return
             my $buf = Net::SSLeay::read($ssl, 16384); # read the most we can - continue reading until the buffer won't read any more
-            last OUTER if $client->SSLeay_check_error;
+            if ($client->SSLeay_check_error('SSLeay read_until read')) {
+                last OUTER;
+            }
             die "SSLeay read_until: $!\n" if ! defined($buf) && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
             last if ! defined($buf);
             last OUTER if !length($buf) && $n_empty++;
             $content .= $buf;
         }
     }
-    return ($ok, $content);
+    return wantarray ? ($ok, $content) : $content;
 }
 
 sub read {
@@ -265,7 +275,7 @@ sub read {
 
 sub getline {
     my $client = shift;
-    my ($ok, $line) = $client->read_until($client->SSL_max_getline_length || 2_000_000, $/);
+    my ($ok, $line) = $client->read_until($client->SSL_max_getline_length, $/);
     return $line;
 }
 
@@ -273,7 +283,7 @@ sub getlines {
     my $client = shift;
     my @lines;
     while (1) {
-        my ($ok, $line) = $client->read_until($client->SSL_max_getline_length || 2_000_000, $/);
+        my ($ok, $line) = $client->read_until($client->SSL_max_getline_length, $/);
         push @lines, $line;
         last if $ok != 1;
     }
@@ -300,13 +310,12 @@ sub write {
     my $buf    = shift;
     $buf = substr($buf, $_[1] || 0, $_[0]) if @_;
     my $ssl    = $client->SSLeay;
-    $0 .= ' writing';
     while (length $buf) {
         vec(my $vec = '', $client->fileno, 1) = 1;
         select(undef, $vec, undef, undef);
 
         my $write = Net::SSLeay::write($ssl, $buf);
-        return 0 if $client->SSLeay_check_error;
+        return 0 if $client->SSLeay_check_error('SSLeay write');
         die "SSLeay write: $!\n" if $write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
         substr($buf, 0, $write, "") if $write > 0;
     }
@@ -352,7 +361,7 @@ sub AUTOLOAD {
 
 =head1 NAME
 
-Net::Server::Proto::SSLeay - Custom Net::Server SSL protocol handler based on Net::SSLeay directly.
+Net::Server::Proto::SSLEAY - Custom Net::Server SSL protocol handler based on Net::SSLeay directly.
 
 =head1 SYNOPSIS
 
@@ -360,8 +369,9 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
-Experimental.  If anybody has any successes or ideas for
-improvment under SSLeay, please email <paul@seamons.com>.
+This is considered alpha level.  This module hasn't gone through use in production environments
+to the degree that the other protocol handlers have.  If anybody has any successes or ideas for
+improvment under SSLEAY, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a
 secure socket layer over tcp (also known as SSL).
@@ -369,10 +379,59 @@ See L<Net::Server::Proto>.
 
 =head1 PARAMETERS
 
+Currently there is support for the following:
+
+=over 4
+
+=item C<SSL_cert_file>
+
+Full path to the certificate file to be used for this server.  Should be in PEM format.
+
+=item C<SSL_key_file>
+
+Full path to the key file to be used for this server.  Should be in PEM format.
+
+=item C<SSL_max_getline_length>
+
+Used during getline to only read until this many bytes are found.  Default is undef which
+means unlimited.
+
+=item C<SSL_error_callback>
+
+Should be a code ref that will be called whenever error conditions are encountered.  It passes a source message
+and an arrayref of the errors.
+
+=back
+
+I'll add support for more as patches come in.
+
+=head1 METHODS
+
+This module implements most of the common file handle operations.  There are some additions though:
+
+=over 4
+
+=item C<read_until>
+
+Takes bytes and match qr.  If bytes is defined - it will read until
+that many bytes are found.  If match qr is defined, it will read until
+the buffer matches that qr.  If both are undefined, it will read until
+there is nothing left to read.
+
+=back
+
 =head1 BUGS
+
+There are probably many.
 
 =head1 LICENCE
 
 Distributed under the same terms as Net::Server
+
+=head1 THANKS
+
+Thanks to Bilbo at
+http://devpit.org/wiki/OpenSSL_with_nonblocking_sockets_%28in_Perl%29
+for documenting a more reliable way of accepting and reading SSL connections.
 
 =cut
