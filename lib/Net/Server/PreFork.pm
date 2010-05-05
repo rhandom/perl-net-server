@@ -336,6 +336,9 @@ sub run_parent {
     if( &check_sigs() ){
       last if $prop->{_HUP};
     }
+
+    $self->idle_loop_hook(\@fh);
+
     if( ! @fh ){
       $self->coordinate_children();
       next;
@@ -723,6 +726,12 @@ argument.
 This hook occurs if child_communication is true and the child
 has written to $self->{server}->{parent_sock}.  The first argument
 will be the open socket to the child.
+
+=item C<$self-E<gt>idle_loop_hook()>
+
+This hook is called in every pass through the main process wait loop, every
+C<check_for_waiting> seconds.  The first argument is a reference to an
+array of file descriptors that can be read at the moment.
 
 =back
 

@@ -343,6 +343,8 @@ sub run_parent {
       last if $prop->{_HUP};
     }
 
+    $self->idle_loop_hook();
+
     my $time = time();
 
     ### periodically make sure children are alive
@@ -386,6 +388,9 @@ sub run_parent {
   ### allow fall back to main run method
 
 }
+
+### allow tie into the idle loop
+sub idle_loop_hook {}
 
 ### Stub function in case check_for_dequeue is used.
 sub run_dequeue {
@@ -611,6 +616,10 @@ saving out logged information or other general cleanup.
 
 This hook only gets called in conjuction with the
 check_for_dequeue setting.
+
+=item C<$self-E<gt>idle_loop_hook()>
+
+This hook is called in every pass through the main process wait loop.
 
 =back
 
