@@ -708,11 +708,12 @@ sub post_accept {
   ### duplicate some handles and flush them
   ### maybe we should save these somewhere - maybe not
   if( defined $prop->{client} ){
-    if( ! $prop->{no_client_stdout} ){
-      my $fileno= fileno $prop->{client};
+    if (! $prop->{no_client_stdout}) {
       close STDIN;
       close STDOUT;
-      if( defined $fileno ){
+      if ($prop->{client}->can('bind_stdout')) {
+          $prop->{client}->bind_stdout($self);
+      } elsif (defined(my $fileno = fileno $prop->{client})) {
           open STDIN,  "<&$fileno" or die "Couldn't open STDIN to the client socket: $!";
           open STDOUT, ">&$fileno" or die "Couldn't open STDOUT to the client socket: $!";
       } else {
@@ -935,6 +936,7 @@ sub post_process_request {
     # close handles - but leave fd's around to prevent spurious messages (Rob Mueller)
     #close STDIN;
     #close STDOUT;
+    $prop->{'client'}->unbind_stdout($self) if $prop->{'client'}->can('unbind_stdout');
     open(STDIN,  '</dev/null') || die "Can't read /dev/null  [$!]";
     open(STDOUT, '>/dev/null') || die "Can't write /dev/null [$!]";
   }
