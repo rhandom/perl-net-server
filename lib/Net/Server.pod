@@ -689,6 +689,28 @@ the former parent but custom communication channels (open pipes from the child
 to the old parent) will no longer be available to the old child processes.  New
 child processes will still connect properly to the new parent.
 
+=item tie_client_stdout
+
+Default undef.  If set will use Net::Server::TiedHandle tied interface for
+STDIN and STDOUT.  This interface allows SSLEAY to work.  It also allows
+for intercepting read and write via the tied_stdin_callback and tied_stdout_callback.
+
+=item tied_stdin_callback
+
+Default undef.  Called during a read of STDIN data if tie_client_stdout has
+been set, or if the client handle's tie_stdout method returns true.  It is
+passed the client connection, the name of the method that would be called, and
+the arguments that are being passed.  The callback is then responsible for calling
+that method on the handle or for performing some other input operation.
+
+=item tied_stdout_callback
+
+Default undef.  Called during a write of data to STDOUT if tie_client_stdout has
+been set, or if the client handle's tie_stdout method returns true.  It is
+passed the client connection, the name of the method that would be called, and
+the arguments that are being passed.  The callback is then responsible for calling
+that method on the handle or for performing some other output operation.
+
 =back
 
 =head1 PROPERTIES
