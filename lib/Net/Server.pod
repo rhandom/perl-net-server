@@ -177,6 +177,13 @@ discussion of serialization see L<Net::Server::PreFork>.
 All methods fall back to Net::Server.  This personality is
 provided only as parallelism for Net::Server::MultiType.
 
+=item HTTP
+
+Not a distinct personality.  Provides a basic HTTP daemon.
+This can be combined with the SSLEAY proto to provide an
+HTTPS Daemon.
+See L<Net::Server::HTTP>.
+
 =back
 
 C<Net::Server> was partially written to make it easy to add
