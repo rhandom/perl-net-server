@@ -1484,6 +1484,8 @@ Thanks to Daniel Kahn Gillmor for adding the other_child_died_hook.
 
 Thanks to Dominic Humphries for helping not kill pid files on HUP.
 
+Thanks to Kristoffer Møllerhøj for fixing UDP on Multiplex.
+
 =head1 SEE ALSO
 
 Please see also
