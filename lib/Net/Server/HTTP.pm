@@ -281,7 +281,7 @@ the request is closed.
 
 =head1 TODO
 
-Add support for HTTP/1.1
+Add support for writing out HTTP/1.1.
 
 =head1 AUTHOR
 
