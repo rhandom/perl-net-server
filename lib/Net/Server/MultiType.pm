@@ -47,9 +47,7 @@ sub options {
 
 
 sub run {
-
-  ### pass package or object
-  my $self = ref($_[0]) ? shift() : (bless {}, shift());
+  my $self = ref($_[0]) ? shift() : shift->new;
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
   my $prop = $self->{server};
 
