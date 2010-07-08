@@ -279,6 +279,10 @@ the request is closed.
 
 =back
 
+=head1 TODO
+
+Add support for HTTP/1.1
+
 =head1 AUTHOR
 
 Paul T. Seamons paul@seamons.com
