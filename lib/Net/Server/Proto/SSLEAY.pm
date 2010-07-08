@@ -381,9 +381,8 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
-This is considered alpha level.  This module hasn't gone through use in production environments
-to the degree that the other protocol handlers have.  If anybody has any successes or ideas for
-improvment under SSLEAY, please email <paul@seamons.com>.
+This module is relatively new and has only served a couple of months in production environments.
+If anybody has any successes or ideas for improvment under SSLEAY, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a
 secure socket layer over tcp (also known as SSL).
