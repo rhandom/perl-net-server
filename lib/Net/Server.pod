@@ -1151,6 +1151,15 @@ run_client_connection method.  At this point all other methods
 and hooks that will run during the run_client_connection
 have finished and the client connection has already been closed.
 
+item C<$self-E<gt>other_child_died_hook($pid)>
+
+Net::Server takes control of signal handling and child process
+cleanup; this makes it difficult to tell when a child process
+terminates if that child process was not started by Net::Server
+itself.  If Net::Server notices another child process dying that it
+did not start, it will fire this hook with the PID of the terminated
+process.
+
 =item C<$self-E<gt>pre_server_close_hook()>
 
 This hook occurs before the server begins shutting down.
@@ -1470,6 +1479,8 @@ called post_client_connection_hook.
 
 Thanks to Graham Barr for adding the ability to set the check_for_spawn and min_child_ttl
 settings of the PreFork server.
+
+Thanks to Daniel Kahn Gillmor for adding the other_child_died_hook.
 
 =head1 SEE ALSO
 
