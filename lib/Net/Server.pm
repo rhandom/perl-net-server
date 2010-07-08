@@ -1002,9 +1002,9 @@ sub server_close {
   ### otherwise the parent continues with the shutdown
   ### this is safe for non standard forked child processes
   ### as they will not have server_close as a handler
-  if (defined $prop->{ppid}
+  if (defined($prop->{ppid})
       && $prop->{ppid} != $$
-      && ! defined $prop->{no_close_by_child}) {
+      && ! defined($prop->{no_close_by_child})) {
     $self->close_parent;
     exit;
   }
@@ -1014,7 +1014,7 @@ sub server_close {
 
   $self->log(2,$self->log_time . " Server closing!");
 
-  if (defined $prop->{_HUP} && $prop->{leave_children_open_on_hup}) {
+  if (defined($prop->{_HUP}) && $prop->{leave_children_open_on_hup}) {
       $self->hup_children;
 
   } else {
@@ -1028,14 +1028,15 @@ sub server_close {
   }
 
   ### remove files
-  if( defined $prop->{lock_file}
+  if( defined($prop->{lock_file})
       && -e $prop->{lock_file}
-      && defined $prop->{lock_file_unlink} ){
+      && defined($prop->{lock_file_unlink}) ){
     unlink($prop->{lock_file}) || $self->log(1, "Couldn't unlink \"$prop->{lock_file}\" [$!]");
   }
-  if( defined $prop->{pid_file}
+  if( defined($prop->{pid_file})
       && -e $prop->{pid_file}
-      && defined $prop->{pid_file_unlink} ){
+      && !defined($prop->{_HUP})
+      && defined($prop->{pid_file_unlink}) ){
     unlink($prop->{pid_file}) || $self->log(1, "Couldn't unlink \"$prop->{pid_file}\" [$!]");
   }
 
