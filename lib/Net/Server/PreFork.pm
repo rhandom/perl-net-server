@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2010
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -28,6 +28,7 @@ use POSIX qw(WNOHANG);
 use Net::Server::SIG qw(register_sig check_sigs);
 use IO::Select ();
 use IO::Socket::UNIX;
+use Time::HiRes qw(time);
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -44,6 +45,8 @@ sub options {
                spare_servers
                check_for_waiting
                child_communication
+               check_for_spawn
+               min_child_ttl
                ) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -79,10 +82,12 @@ information.
     min_spare_servers => 2,    # min num of servers just sitting there
     max_spare_servers => 10,   # max num of servers just sitting there
     check_for_waiting => 10,   # how often to see if children laying around
+    check_for_spawn   => 30,   # how often to see if more children are needed
+    min_child_ttl     => 10,   # min time between starting a child and killing one
   };
   foreach (keys %$d){
     $prop->{$_} = $d->{$_}
-    unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
+    unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+(?:\.\d+)?$/;
   }
 
   if( $prop->{min_spare_servers} > $prop->{max_spare_servers} ){
@@ -420,7 +425,7 @@ sub coordinate_children {
 
   ### re-tally the possible types (only twice a minute)
   ### this might not be even necessary but is a nice sanity check
-  if( $time - $prop->{tally}->{time} > 30 ){
+  if( $time - $prop->{tally}->{time} > $prop->{check_for_spawn} ){
     my $w = $prop->{tally}->{waiting};
     my $p = $prop->{tally}->{processing};
     $prop->{tally} = {time       => $time,
@@ -461,7 +466,7 @@ sub coordinate_children {
         && $total > $prop->{min_servers} ){
 
       ### see if we haven't started any in the last ten seconds
-      if( $time - $prop->{last_start} > 10 ){
+      if( $time - $prop->{last_start} > $prop->{min_child_ttl} ){
         my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
         my $n2 = $total - $prop->{min_servers};
         $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
@@ -631,6 +636,15 @@ apply to dequeue processes.
 
 Seconds to wait before checking to see if we can kill
 off some waiting servers.
+
+=item check_for_spawn
+
+Seconds between checking to see if we need to spawn more children
+
+=item min_child_ttl
+
+Minimum number of seconds between starting children and killing
+a child process
 
 =item child_communication
 
