@@ -9,6 +9,7 @@ lib/Net/Server.pm		Base Module containing core functionality
 lib/Net/Server.pod
 lib/Net/Server/Daemonize.pm	Module for managing daemonization
 lib/Net/Server/Fork.pm		Sub class allowing for fork upon accept
+lib/Net/Server/HTTP.pm		Sub class allowing for easy HTTP daemon creation
 lib/Net/Server/INET.pm		Sub class allowing for inetd process
 lib/Net/Server/Multiplex.pm	Sub class allowing for multiplexing connections
 lib/Net/Server/MultiType.pm	Sub class allowing for running any sub class
@@ -32,6 +33,7 @@ t/Options.t.conf
 t/Port_Configuration.t
 t/Server_BASE.t			Test script for Net::Server
 t/Server_Fork.t			Test script for Net::Server::Fork
+t/Server_http.t                 Test script for Net::Server::HTTP
 t/Server_INET.t			Test script for Net::Server::INET
 t/Server_Multiplex.t		Test script for Net::Server::Multiplex
 t/Server_MultiType.t		Test script for Net::Server::MultiType
