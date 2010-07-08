@@ -59,10 +59,14 @@ sub run {
 
   $self->configure_hook;      # user customizable hook
 
-  ### do the configuration now
   $self->configure(@_);
 
   ### don't do anything if I haven't specified a type
+  if (!defined $prop->{server_type} || ! @{ $prop->{server_type} }) {
+      if (my $ref = $self->can('default_server_type') && $self->default_server_type) {
+          $prop->{server_type} = ref($ref) ? $ref : [$ref];
+      }
+  }
   if( defined $prop->{server_type} ){
 
     ### make sure server_type is an array ref
@@ -93,7 +97,7 @@ sub run {
       require $package_file; # outside the eval block
       unshift @ISA, $package;
       if( !defined($prop->{setsid}) && !length($prop->{log_file}) ){
-        warn "Becoming sub class of \"$package\"\n";
+        warn "MultiType becoming sub class of \"$package\"\n";
       }
 
       ### success - skip any others
