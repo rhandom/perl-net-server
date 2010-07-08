@@ -712,6 +712,8 @@ sub post_accept {
       close STDIN;
       close STDOUT;
       if ($prop->{'tie_client_stdout'} || ($client->can('tie_stdout') && $client->tie_stdout)) {
+          open STDIN,  "<", "/dev/null" or die "Couldn't open STDIN to the client socket: $!";
+          open STDOUT, ">", "/dev/null" or die "Couldn't open STDOUT to the client socket: $!";
           tie *STDOUT, 'Net::Server::TiedHandle', $client, $prop->{'tied_stdout_callback'} or die "Couldn't tie STDOUT: $!";
           tie *STDIN,  'Net::Server::TiedHandle', $client, $prop->{'tied_stdin_callback'}  or die "Couldn't tie STDIN: $!";
       } elsif (defined(my $fileno = fileno $prop->{client})) {
