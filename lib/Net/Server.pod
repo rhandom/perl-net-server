@@ -1468,6 +1468,9 @@ versions of Sys::Syslog (>= 0.15).
 Thanks to Mihail Nasedkin for suggesting adding a hook that is now
 called post_client_connection_hook.
 
+Thanks to Graham Barr for adding the ability to set the check_for_spawn and min_child_ttl
+settings of the PreFork server.
+
 =head1 SEE ALSO
 
 Please see also
