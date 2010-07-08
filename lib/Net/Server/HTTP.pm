@@ -100,7 +100,7 @@ sub pre_bind {
             $copy->send_status(200, 'OK');
         }
         else {
-            $copy->send_501("Not sure what type of headers to send for <xmp style=color:red>$_[0]</xmp>");
+            $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
         }
         return $client->print($headers);
     };
@@ -203,7 +203,7 @@ sub process_headers {
 sub process_http_request {
     my $self = shift;
     print "Content-type: text/html\n\n";
-    print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>";
+    print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
 
     if (require Data::Dumper) {
         local $Data::Dumper::Sortkeys = 1;
@@ -230,7 +230,7 @@ Net::Server::HTTP - very basic Net::Server based HTTP server class
         my $self = shift;
 
         print "Content-type: text/html\n\n";
-        print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>";
+        print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
 
         if (require Data::Dumper) {
             local $Data::Dumper::Sortkeys = 1;
