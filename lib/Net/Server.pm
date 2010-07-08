@@ -1458,6 +1458,9 @@ sub process_conf {
   $self->process_args( $self->{server}->{conf_file_args}, $template );
 }
 
+### User-customizable hook to handle child dying
+sub other_child_died_hook {}
+
 ### remove a child from the children hash. Not to be called by user.
 ### if UNIX sockets are in use the socket is removed from the select object.
 sub delete_child {
@@ -1466,7 +1469,10 @@ sub delete_child {
   my $prop = $self->{server};
 
   ### don't remove children that don't belong to me (Christian Mock, Luca Filipozzi)
-  return unless exists $prop->{children}->{$pid};
+  if (! exists $prop->{children}->{$pid}) {
+      $self->other_child_died_hook($pid);
+      return;
+  }
 
   ### prefork server check to clear child communication
   if( $prop->{child_communication} ){
