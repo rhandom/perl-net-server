@@ -1,10 +1,23 @@
+# -*- perl -*-
+#
+#  Net::Server::HTTP - Extensible Perl HTTP base server
+#
+#  $Id$
+#
+#  Copyright (C) 2010
+#
+#    Paul Seamons
+#    paul@seamons.com
+#    http://seamons.com/
+#
+#  This package may be distributed under the terms of either the
+#  GNU General Public License
+#    or the
+#  Perl Artistic License
+#
+################################################################
+
 package Net::Server::HTTP;
-
-=head1 NAME
-
-Net::Server::HTTP - very basic Net::Server based HTTP server class
-
-=cut
 
 use strict;
 use warnings;
@@ -203,6 +216,10 @@ sub process_http_request {
 1;
 
 __END__
+
+=head1 NAME
+
+Net::Server::HTTP - very basic Net::Server based HTTP server class
 
 =HEAD SYNOPSIS
 
