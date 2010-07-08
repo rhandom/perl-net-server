@@ -29,7 +29,7 @@ Net::Server - Extensible, general Perl server engine
  * Forking Mode
  * Multiplexing Mode using a single process
  * Multi port accepts on Single, Preforking, and Forking modes
- * Basic HTTP Daemon handler (See L<Net::Server::HTTP>)
+ * Basic HTTP Daemon handler
  * Simultaneous accept/recv on tcp, udp, and unix and ssl/tcp sockets
  * Working SSL sockets
  * Safe signal handling in Fork/PreFork avoids perl signal trouble
@@ -277,7 +277,7 @@ C<--key=value>, and also C<key=value>.  In the conf file the
 parameter passing can best be shown by the following regular
 expression: ($key,$val)=~/^(\w+)\s+(\S+?)\s+$/.  Passing
 arguments to the run method is done as follows:
-C<Net::Server-E<gt>run(key1 => 'val1')>.  Passing arguments via
+C<<Net::Server-E<gt>run(key1 => 'val1')>>.  Passing arguments via
 a prebuilt object can best be shown in the following code:
 
     #!/usr/bin/perl -w -T
