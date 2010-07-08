@@ -347,8 +347,10 @@ sub pre_bind {
   ### set a default port, host, and proto
   $prop->{port} = [$prop->{port}] if defined($prop->{port}) && ! ref($prop->{port});
   if (! defined($prop->{port}) || ! @{ $prop->{port} }) {
-    $self->log(2,"Port Not Defined.  Defaulting to '20203'\n");
-    $prop->{port}  = [ 20203 ];
+    my $port = ($self->can('default_port') && $self->default_port) || 20203;
+    $port = [$port] if ! ref $port;
+    $self->log(2,"Port Not Defined.  Defaulting to '@$port'\n");
+    $prop->{port}  = $port;
   }
 
   $prop->{host} = []              if ! defined $prop->{host};
