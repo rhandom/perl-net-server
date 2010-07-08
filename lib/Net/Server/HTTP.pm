@@ -221,7 +221,11 @@ __END__
 
 Net::Server::HTTP - very basic Net::Server based HTTP server class
 
-=HEAD SYNOPSIS
+=head1 TEST ONE LINER
+
+    perl -e 'use Net::Server::HTTP; Net::Server::HTTP->run(port=>8080)'
+
+=head1 SYNOPSIS
 
     use base qw(Net::Server::HTTP);
     __PACKAGE__->run;

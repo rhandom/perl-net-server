@@ -29,7 +29,7 @@ Net::Server - Extensible, general Perl server engine
  * Forking Mode
  * Multiplexing Mode using a single process
  * Multi port accepts on Single, Preforking, and Forking modes
- * Basic HTTP Daemon handler
+ * Basic HTTP Daemon handler (See L<Net::Server::HTTP>)
  * Simultaneous accept/recv on tcp, udp, and unix and ssl/tcp sockets
  * Working SSL sockets
  * Safe signal handling in Fork/PreFork avoids perl signal trouble
@@ -1497,6 +1497,7 @@ L<Net::Server::PreForkSimple>,
 L<Net::Server::PreFork>,
 L<Net::Server::MultiType>,
 L<Net::Server::Single>
+L<Net::Server::HTTP>
 
 =head1 TODO
 
