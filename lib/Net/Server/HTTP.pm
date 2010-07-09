@@ -278,6 +278,14 @@ This method has been overridden in Net::Server::HTTP - you should not use it whi
 This method parses the environment and sets up request alarms and handles dying failures.  It calls
 process_http_request once the request is ready.
 
+=item C<send_status>
+
+Takes an HTTP status and a message.  Sends out the correct headers.
+
+=item C<send_501>
+
+Calls send_status with 501 and the argument passed to send_501.
+
 =head1 COMMAND LINE ARGUMENTS
 
 In addition to the command line arguments of the Net::Server
