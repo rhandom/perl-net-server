@@ -25,20 +25,13 @@ use strict;
 use vars qw($VERSION @ISA);
 use Net::Server;
 
-$VERSION = $Net::Server::VERSION; # done until separated
-
-### fall back to parent methods
-### we will start out with this, but it should be different if overriden
+$VERSION = $Net::Server::VERSION;
 @ISA = qw(Net::Server);
 
-### allow for override-able options
 sub options {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $ref  = shift;
-
+  my ($self, $ref) = @_;
   $self->SUPER::options($ref);
-
+  my $prop = $self->{server};
   foreach ( qw(server_type) ){
     $prop->{$_} = [] unless exists $prop->{$_};
     $ref->{$_} = $prop->{$_};
@@ -51,62 +44,38 @@ sub run {
   $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
   my $prop = $self->{server};
 
-  ### save for a HUP
+  # save for a HUP
   $self->commandline($self->_get_commandline)
       if ! eval { $self->commandline };
 
-  $self->configure_hook;      # user customizable hook
-
+  $self->configure_hook;
   $self->configure(@_);
 
-  ### don't do anything if I haven't specified a type
   if (!defined $prop->{server_type} || ! @{ $prop->{server_type} }) {
       if (my $ref = $self->can('default_server_type') && $self->default_server_type) {
           $prop->{server_type} = ref($ref) ? $ref : [$ref];
       }
   }
-  if( defined $prop->{server_type} ){
+  if (defined $prop->{server_type}) {
+    foreach my $type (@{ $prop->{server_type} }) {
+      next if $type eq 'MultiType';
+      $type = ($type =~ /^(\w+)$/) ? $1 : next; # satisfy taint
 
-    ### make sure server_type is an array ref
-    $prop->{server_type} = [$prop->{server_type}]
-      unless ref $prop->{server_type};
-
-    ### iterate on the passed types
-    foreach (@{ $prop->{server_type} }){
-
-      next if $_ eq 'MultiType';
-      next if ! /^(\w+)$/;
-      $_ = $1; # satisfy taint
-
-      my $package = "Net::Server::$_";
-      my $package_file = $package .'.pm';
-      $package_file =~ s{::}{/}g;
-
-      ### see if the package is available
-      eval { require $package_file; };
-
-      ### skip if there was an error
-      if( $@ ){
-        warn "Couldn't become server type \"$package\" [$@]\n";
+      my $pkg = ($type =~ /::/) ? $type : "Net::Server::$type";
+      (my $file = "$pkg.pm") =~ s{::}{/}g;
+      eval { require $file };
+      if ($@){
+        warn "Couldn't become server type \"$pkg\" [$@]\n";
         next;
       }
 
-      ### turn me into that package
-      require $package_file; # outside the eval block
-      unshift @ISA, $package;
-      if( !defined($prop->{setsid}) && !length($prop->{log_file}) ){
-        warn "MultiType becoming sub class of \"$package\"\n";
-      }
-
-      ### success - skip any others
+      @ISA = ($pkg);
       last;
-
     }
-
   }
 
-  ### now run as the new type of thingy
-  ### passing self, instead of package, doesn't instantiate a new object
+  # now run as the new type of thingy
+  # passing self, instead of package, doesn't instantiate a new object
   $self->SUPER::run(@_);
 
 }
