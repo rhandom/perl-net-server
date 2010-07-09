@@ -297,7 +297,7 @@ sub post_configure {
 
     ### completely remove myself from parent process - unless we are hup'ing
     if( $prop->{setsid} ){
-      &POSIX::setsid();
+      POSIX::setsid();
     }
   }
 
@@ -337,12 +337,10 @@ sub pre_bind {
   my $self = shift;
   my $prop = $self->{server};
 
-  my $ref   = ref($self);
-  no strict 'refs';
-  my $super = ${"${ref}::ISA"}[0];
-  use strict 'refs';
-  my $ns_type = (! $super || $ref eq $super) ? '' : " (type $super)";
-  $self->log(2,$self->log_time ." ". ref($self) .$ns_type. " starting! pid($$)");
+  my $super = do { no strict 'refs'; ${ref($self)."::ISA"}[0] };
+  $super = "$super -> MultiType -> $Net::Server::MultiType::ISA[0]" if $self->isa('Net::Server::MultiType');
+  $super = (! $super || ref($self) eq $super) ? '' : " (type $super)";
+  $self->log(2,$self->log_time ." ". ref($self) .$super. " starting! pid($$)");
 
   ### set a default port, host, and proto
   $prop->{port} = [$prop->{port}] if defined($prop->{port}) && ! ref($prop->{port});
