@@ -3,8 +3,10 @@ Revision history for Perl extension Net::Server.
 0.99   July 08 2010
         - Add customizable  check_for_spawn and min_child_ttl settings in PreFork (Graham Barr)
         - Add other_child_died_hook (Daniel Kahn Gillmor)
-        - Fix calling conventions of MultiType
         - Make Multiplex do $mux->add($sock) for UDP sockets (Kristoffer Møllerhøj)
+        - Change Net::Server::Daemonize to use kill 0 rather than the unportable `ps`
+        - Fix calling conventions of MultiType
+        - Avoid select in SSLEAY that was allowing for infinite spin loop
         - Fix tie_stdout mode to not warn about unopen handles.
         - Added Net::Server::HTTP base class for basic HTTP daemon handling.
 
