@@ -243,8 +243,9 @@ sub read_until {
             last;
         }
 
-        vec(my $vec = '', $client->fileno, 1) = 1;
-        select($vec, undef, undef, undef);
+        # this select appears to only cause read issues - in some cases the underlying select of Net::SSLeay enters into a spinloop
+        #vec(my $vec = '', $client->fileno, 1) = 1;
+        #select($vec, undef, undef, undef);
 
         my $n_empty = 0;
         while (1) {
