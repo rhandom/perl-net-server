@@ -60,40 +60,22 @@ sub check_pid_file ($) {
   close _PID;
   my $current_pid = $_current_pid =~ /^(\d{1,10})/ ? $1 : die "Couldn't find pid in existing pid_file";
 
-  my $exists = undef;
-
-  ### try a proc file system
-  if( -d '/proc' ) {
-    $exists = -e "/proc/$current_pid";
-
-  ### try ps
-  #}elsif( -x '/bin/ps' ){ # not as portable
-  # the ps command itself really isn't portable
-  # this follows BSD syntax ps (BSD's and linux)
-  # this will fail on Unix98 syntax ps (Solaris, etc)
-  }elsif( `ps h o pid p $$` =~ /^\s*$$\s*$/ ){ # can I play ps on myself ?
-    $exists = `ps h o pid p $current_pid`;
-
-  }
-
-  ### running process exists, ouch
-  if( $exists ){
-
-    if( $current_pid == $$ ){
-      warn "Pid_file created by this same process. Doing nothing.\n";
-      return 1;
-    }else{
-      die "Pid_file already exists for running process ($current_pid)... aborting\n";
-    }
-
-  ### remove the pid_file
-  }else{
-
-    warn "Pid_file \"$pid_file\" already exists.  Overwriting!\n";
-    unlink $pid_file || die "Couldn't remove pid_file \"$pid_file\" [$!]\n";
+  my $exists;
+  if ($$ == $current_pid) {
+    warn "Pid_file created by this same process. Doing nothing.\n";
     return 1;
-
+  } elsif (-d "/proc/$$") { # try a proc file system
+    $exists = -e "/proc/$current_pid";
+  } elsif (kill 0, $current_pid) {
+    $exists = 1;
   }
+  die "Pid_file already exists for running process ($current_pid)... aborting\n"
+    if $exists;
+
+  # remove the pid_file
+  warn "Pid_file \"$pid_file\" already exists.  Overwriting!\n";
+  unlink $pid_file || die "Couldn't remove pid_file \"$pid_file\" [$!]\n";
+  return 1;
 }
 
 ### actually create the pid_file, calls check_pid_file
@@ -104,13 +86,13 @@ sub create_pid_file ($) {
   ### see if the pid_file is already there
   check_pid_file( $pid_file );
 
-  if( ! open(PID, ">$pid_file") ){
+  if( ! open(_PID, ">$pid_file") ){
     die "Couldn't open pid file \"$pid_file\" [$!].\n";
   }
 
   ### save out the pid and exit
-  print PID "$$\n";
-  close PID;
+  print _PID "$$\n";
+  close _PID;
 
   die "Pid_file \"$pid_file\" not created.\n" unless -e $pid_file;
   return 1;
