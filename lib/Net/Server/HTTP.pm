@@ -35,6 +35,7 @@ sub options {
   foreach ( qw(timeout_header
                timeout_idle
                server_revision
+               max_header_size
                ) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -51,6 +52,7 @@ sub post_configure {
     timeout_header  => 15,
     timeout_idle    => 60,
     server_revision => __PACKAGE__."/$VERSION",
+    max_header_size => 100_000,
   };
   $prop->{$_} = $d->{$_} foreach grep {!defined($prop->{$_})} keys %$d;
 }
@@ -163,6 +165,8 @@ sub process_request {
 
 sub script_name { shift->{'script_name'} || $0 }
 
+sub max_header_size { shift->{'server'}->{'max_header_size'} }
+
 sub process_headers {
     my $self = shift;
 
@@ -172,7 +176,7 @@ sub process_headers {
     $ENV{'SERVER_ADDR'} = $self->{'server'}->{'sockaddr'};
     $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto eq 'SSLEAY';
 
-    my ($ok, $headers) = $self->{'server'}->{'client'}->read_until(100_000, qr{\n\r?\n});
+    my ($ok, $headers) = $self->{'server'}->{'client'}->read_until($self->max_header_size, qr{\n\r?\n});
     die "Couldn't parse headers successfully" if $ok != 1;
 
     my ($req, @lines) = split /\r?\n/, $headers;
@@ -292,6 +296,10 @@ In addition to the command line arguments of the Net::Server
 base classes you can also set the following options.
 
 =over 4
+
+=item max_header_size
+
+Defaults to 100_000.  Maximum number of bytes to read while parsing headers.
 
 =item server_revision
 
