@@ -57,9 +57,10 @@ sub post_configure {
   $prop->{$_} = $d->{$_} foreach grep {!defined($prop->{$_})} keys %$d;
 }
 
-sub timeout_header  { shift->{server}->{timeout_header} }
-sub timeout_idle    { shift->{server}->{timeout_idle} }
-sub server_revision { shift->{server}->{server_revision} }
+sub timeout_header  { shift->{'server'}->{'timeout_header'} }
+sub timeout_idle    { shift->{'server'}->{'timeout_idle'} }
+sub server_revision { shift->{'server'}->{'server_revision'} }
+sub max_header_size { shift->{'server'}->{'max_header_size'} }
 
 sub default_port { 80 }
 
@@ -164,8 +165,6 @@ sub process_request {
 }
 
 sub script_name { shift->{'script_name'} || $0 }
-
-sub max_header_size { shift->{'server'}->{'max_header_size'} }
 
 sub process_headers {
     my $self = shift;
