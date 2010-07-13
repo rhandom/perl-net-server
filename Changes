@@ -9,6 +9,7 @@ Revision history for Perl extension Net::Server.
         - Avoid select in SSLEAY that was allowing for infinite spin loop
         - Fix tie_stdout mode to not warn about unopen handles.
         - Added Net::Server::HTTP base class for basic HTTP daemon handling.
+        - Change examples/httpd to use Net::Server::HTTP
 
 0.98   May 05 2010
         - Add SSLeay proto - finally a workable SSL solution.
