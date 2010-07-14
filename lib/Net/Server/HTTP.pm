@@ -24,6 +24,7 @@ use warnings;
 use base qw(Net::Server::MultiType);
 use vars qw($VERSION);
 use Scalar::Util qw(weaken);
+use IO::Handle ();
 
 $VERSION = $Net::Server::VERSION; # done until separated
 
@@ -36,6 +37,7 @@ sub options {
                timeout_idle
                server_revision
                max_header_size
+               psgi_enabled
                ) ){
     $prop->{$_} = undef unless exists $prop->{$_};
     $ref->{$_} = \$prop->{$_};
@@ -61,6 +63,7 @@ sub timeout_header  { shift->{'server'}->{'timeout_header'} }
 sub timeout_idle    { shift->{'server'}->{'timeout_idle'} }
 sub server_revision { shift->{'server'}->{'server_revision'} }
 sub max_header_size { shift->{'server'}->{'max_header_size'} }
+sub psgi_enabled    { shift->{'server'}->{'psgi_enabled'} }
 
 sub default_port { 80 }
 
@@ -70,44 +73,50 @@ sub pre_bind {
     my $self = shift;
     my $prop = $self->{'server'};
 
-    # install a callback that will handle our outbound header negotiation for the clients similar to what apache does for us
-    my $copy = $self;
-    $prop->{'tie_client_stdout'} = 1;
-    $prop->{'tied_stdout_callback'} = sub {
-        my $client = shift;
-        my $method = shift;
-        alarm($copy->timeout_idle); # reset timeout
-        return $client->$method(@_) if ${*$client}{'headers_sent'};
-        if ($method ne 'print') {
-            $client->print("HTTP/1.0 501 Print\r\nContent-type:text/html\r\n\r\nHeaders may only be sent via print method ($method)");
-            die "All headers must be done via print";
-        }
-        my $headers = ${*$client}{'headers'} || '';
-        $headers .= join '', @_;
-        if ($headers !~ /\n\r?\n/) { # headers aren't finished yet
-            ${*$client}{'headers'} = $headers;
-            return;
-        }
-        ${*$client}{'headers_sent'} = 1;
-        delete ${*$client}{'headers'};
-        if ($headers =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)\r?\n}) {
-            # looks like they are sending their own status
-        }
-        elsif ($headers =~ /^Status:\s+(\d+) (?:|\s+(.+?))\s*$/im) {
-            $copy->send_status($1, $2 || '-');
-        }
-        elsif ($headers =~ /^Location:\s+/im) {
-            $copy->send_status(302, 'bouncing');
-        }
-        elsif ($headers =~ /^Content-type:\s+\S.*/im) {
-            $copy->send_status(200, 'OK');
-        }
-        else {
-            $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
-        }
-        return $client->print($headers);
-    };
-    weaken $copy;
+    if ($self->psgi_enabled) {
+        $prop->{'log_handle'} = IO::Handle->new;
+        $prop->{'log_handle'}->fdopen(fileno(STDERR),"w");
+
+    } else {
+        # install a callback that will handle our outbound header negotiation for the clients similar to what apache does for us
+        my $copy = $self;
+        $prop->{'tie_client_stdout'} = 1;
+        $prop->{'tied_stdout_callback'} = sub {
+            my $client = shift;
+            my $method = shift;
+            alarm($copy->timeout_idle); # reset timeout
+            return $client->$method(@_) if ${*$client}{'headers_sent'};
+            if ($method ne 'print') {
+                $client->print("HTTP/1.0 501 Print\r\nContent-type:text/html\r\n\r\nHeaders may only be sent via print method ($method)");
+                die "All headers must be done via print";
+            }
+            my $headers = ${*$client}{'headers'} || '';
+            $headers .= join '', @_;
+            if ($headers !~ /\n\r?\n/) { # headers aren't finished yet
+                ${*$client}{'headers'} = $headers;
+                return;
+            }
+            ${*$client}{'headers_sent'} = 1;
+            delete ${*$client}{'headers'};
+            if ($headers =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)\r?\n}) {
+                # looks like they are sending their own status
+            }
+            elsif ($headers =~ /^Status:\s+(\d+) (?:|\s+(.+?))\s*$/im) {
+                $copy->send_status($1, $2 || '-');
+            }
+            elsif ($headers =~ /^Location:\s+/im) {
+                $copy->send_status(302, 'bouncing');
+            }
+            elsif ($headers =~ /^Content-type:\s+\S.*/im) {
+                $copy->send_status(200, 'OK');
+            }
+            else {
+                $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
+            }
+            return $client->print($headers);
+        };
+        weaken $copy;
+    }
 
     return $self->SUPER::pre_bind(@_);
 }
@@ -151,7 +160,20 @@ sub process_request {
         $self->process_headers;
 
         alarm($self->timeout_idle);
-        $self->process_http_request;
+        if ($self->psgi_enabled) {
+            my $env = \%ENV;
+            $env->{'psgi.version'}       = [1, 0];
+            $env->{'psgi.url_scheme'}    = ($self->{'server'}->{'client'}->NS_proto eq 'SSLEAY') ? 'https' : 'http';
+            $env->{'psgi.input'}         = $self->{'server'}->{'client'};
+            $env->{'psgi.errors'}        = $self->{'server'}->{'log_handle'};
+            $env->{'psgi.multithread'}   = 1;
+            $env->{'psgi.multitprocess'} = 1;
+            $env->{'psgi.nonblocking'}   = 1; # need to make this false if we aren't of a forking type server
+            $env->{'psgi.streaming'}     = 1;
+            $self->process_psgi_request($env);
+        } else {
+            $self->process_http_request;
+        }
         alarm(0);
         1;
     };
@@ -164,7 +186,7 @@ sub process_request {
     }
 }
 
-sub script_name { shift->{'script_name'} || $0 }
+sub script_name { shift->{'script_name'} || '' }
 
 sub process_headers {
     my $self = shift;
@@ -214,6 +236,38 @@ sub process_http_request {
         if (require CGI) {  my $q = CGI->new; $form->{$_} = $q->param($_) for $q->param;  }
         print "<pre>".Data::Dumper->Dump([\%ENV, $form], ['*ENV', 'form'])."</pre>";
     }
+}
+
+sub process_psgi_request {
+    my ($self, $env) = @_;
+    my $app = $self->find_psgi_handler($env);
+    my $resp = $app->($env);
+    return $resp->(sub {
+        my $resp = shift;
+        $self->send_status($resp->[0]);
+        print $resp->[1]->[$_*2],': ', $resp->[1]->[$_*2 + 1], "\r\n" for 0 .. @{ $resp->[1] || [] } / 2 - 1;
+        print "\r\n";
+        return @$resp == 2 ? $self->{'client'} : 1;
+    }) if ref($resp) eq 'CODE';
+    $self->send_status($resp->[0]);
+    print $resp->[1]->[$_*2],': ', $resp->[1]->[$_*2 + 1], "\r\n" for 0 .. @{ $resp->[1] || [] } / 2 - 1;
+    print "\r\n";
+    print @{ $resp->[2] } if ref $resp->[2] eq 'ARRAY';
+}
+
+sub find_psgi_handler {
+    my ($self, $env) = @_;
+    return sub {
+        my $env = shift;
+        my $txt = "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
+        if (require Data::Dumper) {
+            local $Data::Dumper::Sortkeys = 1;
+            my $form = {};
+            if (require CGI::PSGI) {  my $q = CGI::PSGI->new($env); $form->{$_} = $q->param($_) for $q->param;  }
+            $txt .= "<pre>".Data::Dumper->Dump([$env, $form], ['env', 'form'])."</pre>";
+        }
+        return [200, ['Content-type', 'text/html'], [$txt]];
+    };
 }
 
 1;
