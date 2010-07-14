@@ -1512,6 +1512,7 @@ sub READ     { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'read',     @_) : $s-
 sub WRITE    { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'write',    @_) : $s->[0]->write(@_) }
 sub SYSREAD  { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'sysread',  @_) : $s->[0]->sysread(@_) }
 sub SYSWRITE { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'syswrite', @_) : $s->[0]->syswrite(@_) }
+sub SEEK     { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'seek',     @_) : $s->[0]->seek(@_) }
 
 1;
 
