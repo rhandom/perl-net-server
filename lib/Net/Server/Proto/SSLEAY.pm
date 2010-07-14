@@ -333,6 +333,21 @@ sub write {
 sub sysread  { die "sysread is not supported by Net::Server::Proto::SSLEAY" }
 sub syswrite { die "syswrite is not supported by Net::Server::Proto::SSLEAY" }
 
+sub seek {
+    my $client = shift;
+    my ($pos, $whence) = @_;
+    if ($whence) {
+        $! = "Seek from $whence of non-zero is not supported.";
+        return 0;
+    }
+    my $n = $client->read(my $buf, $pos);
+    if ($n != $pos) {
+        $| = "Couldn't seek to $pos ($n)\n";
+        return 0;
+    }
+    return 1;
+}
+
 ###----------------------------------------------------------------###
 
 sub hup_string {
