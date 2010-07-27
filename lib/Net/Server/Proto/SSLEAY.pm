@@ -348,6 +348,11 @@ sub seek {
     return 1;
 }
 
+sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropriately for Multipex
+    my ($self, $cb) = @_;
+    return $cb->($self);
+}
+
 ###----------------------------------------------------------------###
 
 sub hup_string {
