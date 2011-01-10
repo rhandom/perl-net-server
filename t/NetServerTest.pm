@@ -21,7 +21,7 @@ sub prepare_test {
     ok(can_fork(), "Can fork on this platform") || do { SKIP: { skip("Fork doesn't work on this platform", $N - 1) }; exit; };
 
     my $ports = $env{'ports'} = get_ports($args);
-    ok(+@$ports, "Got needed ports") || do { SKIP: { skip("Couldn't get the needed ports for testing", $N - 2) }; exit };
+    ok(scalar(@$ports), "Got needed ports (@$ports)") || do { SKIP: { skip("Couldn't get the needed ports for testing", $N - 2) }; exit };
 
     pipe(NST_READ, NST_WRITE);
     NST_READ->autoflush(1);
