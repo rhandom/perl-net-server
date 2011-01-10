@@ -1,4 +1,4 @@
-# -*- Mode: Perl; -*-
+#!/usr/bin/perl
 
 =head1 NAME
 
@@ -8,14 +8,14 @@ Options.t - Test commandline options and such
 
 package FooServer;
 
-use vars qw(@ISA);
 use strict;
-use Test::More tests => 66;
-#use CGI::Ex::Dump qw(debug);
+use FindBin qw($Bin);
+use lib $Bin;
+use NetServerTest qw(prepare_test ok is use_ok);
+prepare_test({n_tests => 66, plan_only => 1});
 
 use_ok('Net::Server');
-
-@ISA = qw(Net::Server);
+@FooServer::ISA = qw(Net::Server);
 
 ### override-able options for this package
 sub options {
@@ -191,29 +191,29 @@ ok($prop->{'an_arrayref_item'}->[2] eq 'two', "Right value");
 $prop = eval { local @ARGV = ('--group=cmdline'); FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'cmdline', "Right group \"$prop->{'group'}\"");
+is($prop->{'group'}, 'cmdline', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf', group => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'runargs', "Right group \"$prop->{'group'}\"");
+is($prop->{'group'}, 'runargs', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
+is($prop->{'group'}, 'confgroup', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'group'} eq 'defaultgroup', "Right group \"$prop->{'group'}\"");
-ok(@{ $prop->{'allow'} } == 2, "Defaults for allow are set also");
+is($prop->{'group'}, 'defaultgroup', "Right group \"$prop->{'group'}\"");
+is(scalar(@{ $prop->{'allow'} }), 2, "Defaults for allow are set also");
 
 ###----------------------------------------------------------------###
 
@@ -229,7 +229,7 @@ ok(@{ $prop->{'allow'} } == 2, "Defaults for allow are set also");
 
 $prop = eval { BarServer->run->{'server'} };
 $prop ||= {};
-ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
+is($prop->{'group'}, 'confgroup', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
@@ -239,4 +239,4 @@ $prop = eval { FooServer->new({
     conf_file => 'somefile_that_doesnot_exist',
 })->{'server'} };
 $prop ||= {};
-ok($prop->{'group'} eq 'confgroup', "Right group \"$prop->{'group'}\"");
+is($prop->{'group'}, 'confgroup', "Right group \"$prop->{'group'}\"");
