@@ -28,7 +28,7 @@ MANIFEST			This file
 MANIFEST.SKIP			Files to skip when making the dist
 META.yml			Module meta-data (added by MakeMaker)
 README				What it says
-t/net_server_test.pl
+t/NetServerTest.pm
 t/Options.t
 t/Options.t.conf
 t/Port_Configuration.t
