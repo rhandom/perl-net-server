@@ -28,12 +28,13 @@ MANIFEST			This file
 MANIFEST.SKIP			Files to skip when making the dist
 META.yml			Module meta-data (added by MakeMaker)
 README				What it says
+t/net_server_test.pl
 t/Options.t
 t/Options.t.conf
 t/Port_Configuration.t
 t/Server_BASE.t			Test script for Net::Server
 t/Server_Fork.t			Test script for Net::Server::Fork
-t/Server_http.t                 Test script for Net::Server::HTTP
+t/Server_http.t			Test script for Net::Server::HTTP
 t/Server_INET.t			Test script for Net::Server::INET
 t/Server_Multiplex.t		Test script for Net::Server::Multiplex
 t/Server_MultiType.t		Test script for Net::Server::MultiType
