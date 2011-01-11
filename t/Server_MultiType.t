@@ -13,7 +13,7 @@ use_ok('Net::Server::MultiType');
 
 sub accept {
     $env->{'signal_ready_to_test'}->();
-    diag("Net::Server::MultiType::ISA: (@Net::Server::MultiType::ISA)");
+    diag("Net::Server::MultiType::ISA: (".join(",",@Net::Server::MultiType::ISA).")");
     return shift->SUPER::accept(@_);
 }
 

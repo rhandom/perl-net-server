@@ -6,7 +6,7 @@ use POSIX qw(tmpnam);
 use English qw($UID $GID);
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok use_ok diag);
+use NetServerTest qw(prepare_test ok use_ok diag skip);
 my $env = prepare_test({n_tests => 5, start_port => 20800, n_ports => 1}); # runs three of its own tests
 
 if ($^O eq 'MSWin32') {
