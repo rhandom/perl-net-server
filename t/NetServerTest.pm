@@ -12,6 +12,7 @@ sub prepare_test {
     my $args = shift || {};
     my $N = $args->{'n_tests'} || die "Missing n_tests";
     print "1..$N\n";
+    return if $args->{'plan_only'};
 
     %env = map {/NET_SERVER_TEST_(\w+)/; lc($1) => $ENV{$_}} grep {/^NET_SERVER_TEST_\w+$/} keys %ENV;
     $env{'_ok_n'} = 0;

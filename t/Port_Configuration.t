@@ -8,14 +8,16 @@ Port_Configuration.t - Test different ways of specifying the port
 
 package FooServer;
 
-use vars qw(@ISA);
 use strict;
-use Test::More tests => 78;
+use FindBin qw($Bin);
+use lib $Bin;
+use NetServerTest qw(prepare_test ok is use_ok);
+prepare_test({n_tests => 78, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
 
-@ISA = qw(Net::Server);
+@FooServer::ISA = qw(Net::Server);
 
 #sub proto_object {
 #    my ($self, $host, $port, $proto) = @_;
