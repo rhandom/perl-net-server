@@ -1,168 +1,67 @@
-BEGIN { $| = 1; print "1..5\n"; }
+#!/usr/bin/perl
 
-
-### load the module
-END {print "not ok 1\n" unless $loaded;}
-use Net::Server;
-$loaded = 1;
-print "ok 1\n";
+package Net::Server::Test;
+use strict;
+use POSIX qw(tmpnam);
+use English qw($UID $GID);
+use FindBin qw($Bin);
+use lib $Bin;
+use NetServerTest qw(prepare_test ok use_ok diag);
+my $env = prepare_test({n_tests => 5, start_port => 20800, n_ports => 1}); # runs three of its own tests
 
 if ($^O eq 'MSWin32') {
-    print "ok $_ # skip UNIX Sockets will not work on Win32\n" for 2 .. 5;
+    SKIP: { skip("UNIX Sockets will not work on Win32", 2) };
     exit;
 }
 
-### test fork - don't care about platform
-my $fork = 0;
-eval {
-  my $pid = fork;
-  die unless defined $pid; # can't fork
-  exit unless $pid;        # can fork, exit child
-  $fork = 1;
-  print "ok 2\n";
-};
-print "not ok 2\n" if $@;
+use_ok('Net::Server');
+@Net::Server::Test::ISA = qw(Net::Server);
 
-
-### become a new type of server
-package Net::Server::Test;
-@ISA = qw(Net::Server);
-
-use IO::Socket ();
-use POSIX qw(tmpnam);
-use English qw($UID $GID);
-
-local $SIG{ALRM} = sub { die "timeout"; };
-my $alarm = 5;
-
-
-### test and setup pipe
-local *READ;
-local *WRITE;
-my $pipe = 0;
-eval {
-
-  ### prepare pipe
-  pipe( READ, WRITE );
-  READ->autoflush(  1 );
-  WRITE->autoflush( 1 );
-
-  ### test pipe
-  print WRITE "hi\n";
-  die unless scalar(<READ>) eq "hi\n";
-
-  $pipe = 1;
-  print "ok 3\n";
-
-};
-print "not ok 3\n" if $@;
-
-
-### find some open ports
-### This is a departure from previously hard
-### coded ports.  Each of the server tests
-### will use it's own unique ports to avoid
-### reuse problems on some systems.
-my $start_port = 20700;
-my $num_ports  = 1;
-my @ports      = ();
-for my $i (0..99){
-  my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
-				   PeerPort => ($start_port + $i),
-                                   Timeout  => 2,
-				   Proto    => 'tcp');
-  push @ports, ($start_port + $i) if ! defined $sock;
-  last if $num_ports == @ports;
-}
-if( $num_ports == @ports ){
-  print "ok 4\n";
-}else{
-  print "not ok 4\n";
-}
-
-SKIP: {
-if ($num_ports != @ports) {
-    print "ok 5 # skip Not attempting connections because ports not setup properly\n";
-    last SKIP;
-}
-
-### extend the accept method a little
-### we will use this to signal that
-### the server is ready to accept connections
 sub accept {
-  my $self = shift;
-
-  print WRITE "ready!\n";
-
-  return $self->SUPER::accept();
+    $env->{'signal_ready_to_test'}->();
+    return shift->SUPER::accept(@_);
 }
 
-
-### start up a vanilla server and connect to it
-if( $fork && $pipe ){
-
-  eval {
-    alarm $alarm;
-
-    my $socket_file = tmpnam; # must do before fork
+my $socket_file = tmpnam; # must do before fork
+my $ok = eval {
+    local $SIG{'ALRM'} = sub { die "Timeout\n" };
+    alarm $env->{'timeout'};
     my $pid = fork;
-
-    ### can't proceed unless we can fork
-    die unless defined $pid;
+    die "Trouble forking: $!" if ! defined $pid;
 
     ### parent does the client
-    if( $pid ){
+    if ($pid) {
+        $env->{'block_until_ready_to_test'}->();
 
-      close(WRITE);
-      <READ>; ### wait until the child writes to us
+        ### connect to child under unix
+        my $remote = IO::Socket::UNIX->new(Peer => $socket_file);
+        die "No socket returned [$!]" if ! defined $remote;
+        my $line = <$remote>;
+        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        print $remote "quite\n";
 
-      ### connect to child under unix
-      my $remote = IO::Socket::UNIX->new(Peer => $socket_file);
-      die "No socket returned [$!]" unless defined $remote;
-
-      ### sample a line
-      my $line = <$remote>;
-      die "No line returned" unless $line =~ /Net::Server/;
-
-      ### connect to child under tcp
-      $remote = IO::Socket::INET->new(PeerAddr => 'localhost',
-                                      PeerPort => $ports[0],
-                                      Proto    => 'tcp');
-      die "No socket returned [$!]" unless defined $remote;
-
-      ### sample a line
-      $line = <$remote>;
-      die "No line returned" unless $line =~ /Net::Server/;
-
-      ### shut down the server
-      print $remote "exit\n";
-      print "ok 5\n";
+        ### connect to child under tcp
+        $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'},
+                                        PeerPort => $env->{'ports'}->[0],
+                                        Proto    => 'tcp') || die "Couldn't open to sock: $!";
+        $line = <$remote>;
+        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        print $remote "exit\n";
+        return 1;
 
     ### child does the server
-    }else{
-
-      ### start the server
-      close STDERR;
-      Net::Server::Test->run(port  => "$ports[0]/tcp",
-                             port  => "$socket_file|unix",
-                             user  => $UID, # user  accepts id as well
-                             group => $GID, # group accepts id as well
-                             );
-      # we need to set the user and group to ourself so that
-      # the parent process can connect to the socket we opened
-
-      unlink $socket_file;
-      exit;
-
+    } else {
+        eval {
+            close STDERR;
+            Net::Server::Test->run(port  => "$env->{'ports'}->[0]/tcp",
+                                   port  => "$socket_file|unix",
+                                   user  => $UID, # user  accepts id as well
+                                   group => $GID, # group accepts id as well
+                                   host  => $env->{'hostname'}, background => 0, setsid => 0);
+        } || diag("Trouble running server: $@");
+        exit;
     }
-
-    alarm 0;
-  };
-
-  print "not ok 5\n" if $@;
-
-}else{
-  print "not ok 5\n";
-}
-
-} # end of SKIP
+    alarm(0);
+};
+alarm(0);
+ok($ok, "Got the correct output from the server") || diag("Error: $@");
