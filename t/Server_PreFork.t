@@ -42,6 +42,7 @@ my $ok = eval {
     ### child does the server
     } else {
         eval {
+            alarm $env->{'timeout'};
             close STDERR;
             Net::Server::Test->run(port => $env->{'ports'}->[0],
                                    port => "$env->{'hostname'}:$env->{'ports'}->[1]",

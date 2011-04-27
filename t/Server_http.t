@@ -43,6 +43,7 @@ my $ok = eval {
     ### child does the server
     } else {
         eval {
+            alarm $env->{'timeout'};
             close STDERR;
             Net::Server::Test->run(port => $env->{'ports'}->[0], host => $env->{'hostname'}, server_type => 'Single', background => 0, setsid => 0);
         } || diag("Trouble running server: $@");
