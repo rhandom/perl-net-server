@@ -7,14 +7,21 @@ use Exporter;
 @NetServerTest::EXPORT_OK = qw(prepare_test ok is use_ok skip diag);
 my %env;
 
+END {
+    warn "# number of tests ran ".($env{'_ok_n'} || 0)." did not match number of specified tests ".($env{'_ok_N'} || 0)."\n"
+        if ($env{'_ok_N'} || 0) ne ($env{'_ok_n'} || 0) && ($env{'_ok_pid'} || 0) == $$;
+}
+
 # most of our tests need forking, a certain number of ports, and some pipes
 sub prepare_test {
     my $args = shift || {};
     my $N = $args->{'n_tests'} || die "Missing n_tests";
     print "1..$N\n";
+    %env = map {/NET_SERVER_TEST_(\w+)/; lc($1) => $ENV{$_}} grep {/^NET_SERVER_TEST_\w+$/} keys %ENV;
+    $env{'_ok_N'} = $N;
+    $env{'_ok_pid'} = $$;
     return if $args->{'plan_only'};
 
-    %env = map {/NET_SERVER_TEST_(\w+)/; lc($1) => $ENV{$_}} grep {/^NET_SERVER_TEST_\w+$/} keys %ENV;
     $env{'_ok_n'} = 0;
     $env{'hostname'} ||= 'localhost';
     $env{'timeout'}  ||= 5;
