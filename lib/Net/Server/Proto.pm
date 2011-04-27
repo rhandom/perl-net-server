@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -28,49 +28,28 @@ $VERSION = $Net::Server::VERSION; # done until separated
 
 
 sub object {
-  my $type  = shift;
-  my $class = ref($type) || $type || __PACKAGE__;
+    my ($class, $default_host, $port, $default_proto, $server) = @_;
 
-  my ($default_host,$port,$default_proto,$server) = @_;
-  my $proto_class;
-
-  ### first find the proto
-  if( $port =~ s/[\/\|]([\w:]+)$// ){  # hate this regex, doesn't allow bare filenames
-    $proto_class = $1;
-  }else{
-    $proto_class = $default_proto;
-  }
-
-
-  ### using the proto, load up a module for that proto
-  ## for example, "tcp" will load up Net::Server::Proto::TCP.
-  ## "unix" will load Net::Server::Proto::UNIX.
-  ## "Net::Server::Proto::UDP" will load itself.
-  ## "Custom::Proto::TCP" will load itself.
-  if( $proto_class !~ /::/ ){
-    
-    if( $proto_class !~ /^\w+$/ ){
-      $server->fatal("Invalid Protocol class \"$proto_class\"");
+    my $proto_class;
+    if ($port =~ s/[\/\|]([\w:]+)$//) {  # hate this regex, doesn't allow bare filenames
+        $proto_class = $1;
+    }else{
+        $proto_class = $default_proto;
     }
 
-    $proto_class = "Net::Server::Proto::" .uc($proto_class);
+    ## using the proto, load up a module for that proto
+    # for example, "tcp" will load up Net::Server::Proto::TCP.
+    # "unix" will load Net::Server::Proto::UNIX.
+    # "Net::Server::Proto::UDP" will load itself.
+    # "Custom::Proto::TCP" will load itself.
+    if ($proto_class !~ /::/) {
+        $server->fatal("Invalid Protocol class \"$proto_class\"") if $proto_class !~ /^\w+$/;
+        $proto_class = "Net::Server::Proto::" .uc($proto_class);
+    }
+    (my $file = "${proto_class}.pm") =~ s|::|/|g;
+    $server->fatal("Unable to load module: $@") if ! eval { require $file };
 
-  }
-
-
-  ### get the module filename
-  my $proto_class_file = $proto_class .".pm";
-  $proto_class_file =~ s|::|/|g;
-  
-  ### try to load the module (this is before any forking so this is still shared)
-  if( ! eval{ require $proto_class_file } ){
-    $server->fatal("Unable to load module: $@");
-  }
-
-
-  ### return an object of that procol class
-  return $proto_class->object($default_host,$port,$server);
-
+    return $proto_class->object($default_host, $port, $server);
 }
 
 1;
