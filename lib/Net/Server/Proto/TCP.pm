@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,106 +22,65 @@
 package Net::Server::Proto::TCP;
 
 use strict;
-use vars qw($VERSION $AUTOLOAD @ISA);
-use IO::Socket ();
+use base qw(IO::Socket::INET);
 
-$VERSION = $Net::Server::VERSION; # done until separated
-@ISA = qw(IO::Socket::INET);
+our $VERSION = $Net::Server::VERSION;
+
+sub NS_proto { 'TCP' }
 
 sub object {
-  my $type  = shift;
-  my $class = ref($type) || $type || __PACKAGE__;
+    my ($class, $default_host, $port, $server) = @_;
 
-  my ($default_host,$port,$server) = @_;
-  my $host;
+    my $host;
+    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
+        ($host, $port) = ($1, $2);
+    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
+        ($host, $port) = ($default_host, $1);
+    } else {
+        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
+    }
 
-  ### allow for things like "domain.com:80"
-  if( $port =~ m/^([\w\.\-\*\/]+):(\w+)$/ ){
-    ($host,$port) = ($1,$2);
-
-  ### allow for things like "80"
-  }elsif( $port =~ /^(\w+)$/ ){
-    ($host,$port) = ($default_host,$1);
-
-  ### don't know that style of port
-  }else{
-    $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
-  }
-
-  ### create the handle under this package
-  my $sock = $class->SUPER::new();
-
-  ### store some properties
-  $sock->NS_host($host);
-  $sock->NS_port($port);
-  $sock->NS_proto('TCP');
-
-  return $sock;
+    my $sock = $class->SUPER::new();
+    $sock->NS_host($host);
+    $sock->NS_port($port);
+    return $sock;
 }
 
 sub log_connect {
-  my $sock = shift;
-  my $server = shift;
-  my $host   = $sock->NS_host; 
-  my $port   = $sock->NS_port;
-  my $proto  = $sock->NS_proto;
- $server->log(2,"Binding to $proto port $port on host $host\n");
+    my ($sock, $server) = @_;
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host);
 }
 
-### connect the first time
 sub connect {
-  my $sock   = shift;
-  my $server = shift;
-  my $prop   = $server->{server};
+    my ($sock, $server) = @_;
+    my $prop = $server->{'server'};
+    my $host = $sock->NS_host;
+    my $port = $sock->NS_port;
+    my %args = (
+        LocalPort => $port,
+        Proto     => 'tcp',
+        Listen    => $prop->{'listen'},
+        ReuseAddr => 1, Reuse => 1,  # allow us to rebind the port on a restart
+    );
+    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
 
-  my $host  = $sock->NS_host;
-  my $port  = $sock->NS_port;
+    $sock->SUPER::configure(\%args) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
-  my %args = ();
-  $args{LocalPort} = $port;                  # what port to bind on
-  $args{Proto}     = 'tcp';                  # what procol to use
-  $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
-  $args{Listen}    = $prop->{listen};        # how many connections for kernel to queue
-  $args{Reuse}     = 1;  # allow us to rebind the port on a restart
-
-  ### connect to the sock
-  $sock->SUPER::configure(\%args)
-    or $server->fatal("Can't connect to TCP port $port on $host [$!]");
-
-  if ($port == 0 && ($port = $sock->sockport)) {
-    $sock->NS_port($port);
-    $server->log(2,"Bound to auto-assigned port $port");
-  }
-
-  $server->fatal("Back sock [$!]!".caller())
-    unless $sock;
-
+    if ($port == 0 && ($port = $sock->sockport)) {
+        $sock->NS_port($port);
+        $server->log(2, "Bound to auto-assigned port $port");
+    }
 }
 
-### connect on a sig -HUP
-sub reconnect {
-  my $sock = shift;
-  my $fd   = shift;
-  my $server = shift;
-
-  $sock->fdopen( $fd, 'w' )
-    or $server->fatal("Error opening to file descriptor ($fd) [$!]");
-
+sub reconnect { # after a sig HUP
+    my ($sock, $fd, $server) = @_;
+    $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
-### allow for endowing the child
-sub accept {
-  my $sock = shift;
-  my $client = $sock->SUPER::accept();
-
-  ### pass items on
-  if( defined($client) ){
-    $client->NS_proto( $sock->NS_proto );
-  }
-
-  return $client;
+sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropriately for Multipex
+    my ($self, $cb) = @_;
+    return $cb->($self);
 }
-
 
 ###----------------------------------------------------------------###
 
@@ -135,8 +94,7 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
         if (defined($bytes) && length($content) >= $bytes) {
             $ok = 2;
             last;
-        }
-        elsif (defined($end_qr) && $content =~ $end_qr) {
+        } elsif (defined($end_qr) && $content =~ $end_qr) {
             $ok = 1;
             last;
         }
@@ -151,51 +109,25 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
 ### a newline is not allowed
 ### the hup_string must be a unique identifier based on configuration info
 sub hup_string {
-  my $sock = shift;
-  return join("|",
-              $sock->NS_host,
-              $sock->NS_port,
-              $sock->NS_proto,
-              );
+    my $sock = shift;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto;
 }
 
-### short routine to show what we think we are
 sub show {
-  my $sock = shift;
-  my $t = "Ref = \"" .ref($sock) . "\"\n";
-  foreach my $prop ( qw(NS_proto NS_port NS_host) ){
-    $t .= "  $prop = \"" .$sock->$prop()."\"\n";
-  }
-  return $t;
+    my $sock = shift;
+    return "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
 }
 
-### self installer
-sub AUTOLOAD {
-  my $sock = shift;
+sub NS_port {
+    my $sock = shift;
+    ${*$sock}{'NS_port'} = shift if @_;
+    return ${*$sock}{'NS_port'};
+}
 
-  my ($prop) = $AUTOLOAD =~ /::([^:]+)$/ ? $1 : '';
-  if( ! $prop ){
-    die "No property called.";
-  }
-
-  if( $prop =~ /^(NS_proto|NS_port|NS_host|NS_recv_len|NS_recv_flags)$/ ){
-    no strict 'refs';
-    * { __PACKAGE__ ."::". $prop } = sub {
-      my $sock = shift;
-      if( @_ ){
-        ${*$sock}{$prop} = shift;
-        return delete ${*$sock}{$prop} unless defined ${*$sock}{$prop};
-      }else{
-        return ${*$sock}{$prop};
-      }
-    };
-    use strict 'refs';
-
-    $sock->$prop(@_);
-
-  }else{
-    die "What method is that? [$prop]";
-  }
+sub NS_host {
+    my $sock = shift;
+    ${*$sock}{'NS_host'} = shift if @_;
+    return ${*$sock}{'NS_host'};
 }
 
 1;
@@ -220,6 +152,52 @@ See L<Net::Server::Proto>.
 
 There are no additional parameters that can be specified.
 See L<Net::Server> for more information on reading arguments.
+
+=head1 INTERNAL METHODS
+
+=over 4
+
+=item C<object>
+
+Returns an object with parameters suitable for eventual creation of
+a IO::Socket::INET object listining on UDP.
+
+=item C<log_connect>
+
+Called before binding the socket to provide useful information to the logs.
+
+=item C<connect>
+
+Called when actually binding the port.  Handles default parameters
+before calling parent method.
+
+=item C<reconnect>
+
+Called instead of connect method during a server hup.
+
+=item C<accept>
+
+Override of the parent class to make sure necessary parameters are passed down to client sockets.
+
+=item C<poll_cb>
+
+Allow for psgi compatible interface during HTTP server.
+
+=item C<read_until>
+
+Takes a regular expression, reads from the socket until the regular expression is matched.
+
+=item C<hup_string>
+
+Returns a unique identifier that can be passed to the re-exec'ed process during HUP.
+
+=item C<show>
+
+Basic dumper of properties stored in the glob.
+
+=item C<AUTOLOAD>
+
+Handle accessor methods.
 
 =head1 LICENCE
 
