@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -26,64 +26,52 @@ use vars qw($VERSION @ISA @EXPORT_OK
             %_SIG %_SIG_SUB);
 use Exporter ();
 
-$VERSION = '0.01';
-
-### fall back to parent methods
-@ISA = qw(Exporter);
+$VERSION   = '0.02';
+@ISA       = qw(Exporter);
 @EXPORT_OK = qw(register_sig unregister_sig check_sigs);
 
-
 sub register_sig {
-  die 'Usage: register_sig( SIGNAME => \&code_ref )' if @_ % 2;
-  if( @_ > 2 ){
-    register_sig(shift(),shift()) while @_;
-    return;
-  }
-  my $sig      = shift;
-  my $code_ref = shift;
-  my $ref = ref($code_ref);
-
-  if( ! $ref ){
-    if( $code_ref eq 'DEFAULT' ){
-      delete $_SIG{$sig};
-      delete $_SIG_SUB{$sig};
-      $SIG{$sig} = 'DEFAULT';
-    }elsif( $code_ref eq 'IGNORE' ){
-      delete $_SIG{$sig};
-      delete $_SIG_SUB{$sig};
-      $SIG{$sig} = 'IGNORE';
-    }else{
-      die "Scalar argument limited to \"DEFAULT\" and \"IGNORE\".";      
+    die 'Usage: register_sig( SIGNAME => \&code_ref )' if @_ % 2;
+    if (@_ > 2) {
+        register_sig(shift(),shift()) while @_;
+        return;
     }
+    my $sig      = shift;
+    my $code_ref = shift;
+    my $ref = ref($code_ref);
 
-  }elsif( $ref eq 'CODE' ){
-    
-    $_SIG{$sig} = 0;
-    $_SIG_SUB{$sig} = $code_ref;
-    $SIG{$sig} = sub{ $Net::Server::SIG::_SIG{$_[0]} = 1; };
-
-  }else{
-
-    die "Unsupported sig type -- must be 'DEFAULT' or a code ref.";
-  }
+    if (! $ref) {
+        if ($code_ref eq 'DEFAULT') {
+            delete $_SIG{$sig};
+            delete $_SIG_SUB{$sig};
+            $SIG{$sig} = 'DEFAULT';
+        } elsif ($code_ref eq 'IGNORE') {
+            delete $_SIG{$sig};
+            delete $_SIG_SUB{$sig};
+            $SIG{$sig} = 'IGNORE';
+        } else {
+            die "Scalar argument limited to \"DEFAULT\" and \"IGNORE\".";
+        }
+    } elsif ($ref eq 'CODE') {
+        $_SIG{$sig} = 0;
+        $_SIG_SUB{$sig} = $code_ref;
+        $SIG{$sig} = sub{ $Net::Server::SIG::_SIG{$_[0]} = 1; };
+    } else {
+        die "Unsupported sig type -- must be 'DEFAULT' or a code ref.";
+    }
 }
 
-### ui sub
-sub unregister_sig {
-  register_sig(shift(),'DEFAULT');
-}
-
+sub unregister_sig { register_sig(shift(), 'DEFAULT') }
 
 sub check_sigs {
-#  print "Checking signals\n";
-  my @found = ();
-  foreach (keys %_SIG){
-    next unless $_SIG{$_};
-    $_SIG{$_} = 0;
-    push @found, $_;
-    &{ $_SIG_SUB{$_} }($_);
-  }
-  return @found;
+    my @found;
+    foreach my $sig (keys %_SIG){
+        next if ! $_SIG{$sig};
+        $_SIG{$sig} = 0;
+        push @found, $sig;
+        $_SIG_SUB{$sig}->($sig);
+    }
+    return @found;
 }
 
 1;
@@ -104,14 +92,14 @@ Net::Server::SIG - adpf - Safer signal handling
                HUP  => 'DEFAULT',
                USR1 => sub { print "I got a SIG $_[0]\n"; },
                USR2 => sub { print "I got a SIG $_[0]\n"; },
-               CHLD => sub { 1 while (waitpid(-1, WNOHANG) > 0); },
+               CHLD => sub { 1 while waitpid(-1, WNOHANG) > 0; },
                );
 
   ### add some handles to the select
   $select->add(\*STDIN);
 
   ### loop forever trying to stay alive
-  while ( 1 ){
+  while (1) {
 
     ### do a timeout to see if any signals got passed us
     ### while we were processing another signal
@@ -121,8 +109,8 @@ Net::Server::SIG - adpf - Safer signal handling
     my $val;
 
     ### this is the handler for safe (fine under unsafe also)
-    if( &check_sigs() ){
-      # or my @sigs = &check_sigs();
+    if (check_sigs()) {
+      # or my @sigs = check_sigs();
       next unless @fh;
     }
 
@@ -134,14 +122,10 @@ Net::Server::SIG - adpf - Safer signal handling
 
 =head1 DESCRIPTION
 
-Signals in Perl 5 are unsafe.  Some future releases may be
-able to fix some of this (ie Perl 5.8 or 6.0), but it would
-be nice to have some safe, portable signal handling now.
-Clarification - much of the time, signals are safe enough.
-However, if the program employs forking or becomes a daemon
-which can receive many simultaneous signals, then the 
-signal handling of Perl is normally not sufficient for the
-task.
+Signals prior in Perl prior to 5.7 were unsafe.  Since then
+signals have been implemented in a more safe algorithm.
+Net::Server::SIG provides backwards compatibility, while still
+working reliably with newer releases.
 
 Using a property of the select() function, Net::Server::SIG
 attempts to fix the unsafe problem.  If a process is blocking on
