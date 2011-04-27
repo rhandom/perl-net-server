@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,59 +22,62 @@
 package Net::Server::INET;
 
 use strict;
-use vars qw(@ISA $VERSION);
-use Net::Server;
+use base qw(Net::Server);
+use Scalar::Util qw(blessed);
 
-
-$VERSION = $Net::Server::VERSION; # done until separated
-
-@ISA = qw(Net::Server);
+our $VERSION = $Net::Server::VERSION;
 
 sub post_configure {
-  my $self = shift;
-  $self->{server}->{_is_inet} = 1;
-  $self->SUPER::post_configure();
-  delete $self->{server}->{_is_inet};
+    my $self = shift;
+    $self->{'server'}->{'_is_inet'} = 1;
+    $self->SUPER::post_configure();
+    delete $self->{'server'}->{'_is_inet'};
 }
 
-### no need to prepare bind
-sub pre_bind {}
+sub pre_bind {} # no need to prepare bind
 
-### inet has no port to bind
-sub bind {}
+sub bind {} # inet has no port to bind
 
-### connection is already accepted
-sub accept { 
-  my $self = shift;
-  my $prop = $self->{server};
+sub accept { # connection is already accepted
+    my $self = shift;
+    my $prop = $self->{'server'};
 
-  ### Net::Server::INET will not do any determination of TCP,UDP,Unix
-  ### it is up to the programmer to keep these as separate processes
-  delete $prop->{udp_true};
-  ### receive a udp packet
-#  if( $prop->{udp_true} ){
-#    $prop->{client}   = *STDIN;
-#    $prop->{udp_peer} = STDIN->recv($prop->{udp_data},
-#                                    $prop->{udp_packet_size},
-#                                    $prop->{udp_packet_offset});
-#  }
+    ### Net::Server::INET will not do any determination of TCP,UDP,Unix
+    ### it is up to the programmer to keep these as separate processes
+    delete $prop->{'udp_true'}; # not sure if we can do UDP on INET
 
-  1;
+    1;
 }
 
-### accept only one connection per process
-sub done { 1 }
+sub get_client_info {
+    my $self = shift;
+    my $prop = $self->{'server'};
+    my $sock = $prop->{'client'};
 
-### set up handles
-sub post_accept {
-  my $self = shift;
+    if (blessed($sock) && $sock->can('NS_proto') && $sock->NS_proto eq 'UNIX') {
+        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_unix_path."\"\n");
+        return;
+    }
 
-  ### STDIN and STDOUT are already bound
+    $prop->{'sockaddr'} = $ENV{'REMOTE_HOST'} || '0.0.0.0';
+    $prop->{'peeraddr'} = '0.0.0.0';
+    $prop->{'sockhost'} = $prop->{'peerhost'} = 'inetd.server';
+    $prop->{'sockport'} = $prop->{'peerport'} = 0;
+    return;
+}
 
-  ### create a handle for those who want to use
-  ### an IO::Socket'ish handle - more portable
-  ### to just use STDIN and STDOUT though
-  $self->{server}->{client} = Net::Server::INET::Handle->new();
+
+sub done { 1 } # accept only one connection per process
+
+sub post_accept { # set up handles
+    my $self = shift;
+
+    ### STDIN and STDOUT are already bound
+
+    ### create a handle for those who want to use
+    ### an IO::Socket'ish handle - more portable
+    ### to just use STDIN and STDOUT though
+    $self->{'server'}->{'client'} = Net::Server::INET::Handle->new();
 
 }
 
@@ -88,81 +91,75 @@ sub hup_server {}
 ################################################################
 package Net::Server::INET::Handle;
 
-use vars qw(@ISA);
+use base qw(IO::Handle);
 use strict;
-use IO::Handle ();
-@ISA = qw(IO::Handle);
 
 sub new {
-  my $class = shift;
-  local *HAND;
-  STDIN->autoflush(1);
-  STDOUT->autoflush(1);
-  tie( *HAND, $class, *STDIN, *STDOUT)
-    or die "can't tie *HAND: $!";
-  bless \*HAND, $class;
-  return \*HAND;
-}  
-
-sub NS_proto {
-  return '';
+    my $class = shift;
+    local *HAND;
+    STDIN->autoflush(1);
+    STDOUT->autoflush(1);
+    tie *HAND, $class, *STDIN, *STDOUT or die "can't tie *HAND: $!";
+    bless \*HAND, $class;
+    return \*HAND;
 }
 
-### tied handle methods
+sub NS_proto { '' }
+
 sub TIEHANDLE {
   my ($class, $in, $out) = @_;
   bless [ \$in, \$out ], $class;
 }
 
 sub PRINT {
-  my $handle = shift()->[1];
-  local *FH = $$handle;
-  CORE::print FH @_;
+    my $handle = shift()->[1];
+    local *FH = $$handle;
+    CORE::print FH @_;
 }
 
 sub PRINTF {
-  my $handle = shift()->[1];
-  local *FH = $$handle;
-  CORE::printf FH @_;
+    my $handle = shift()->[1];
+    local *FH = $$handle;
+    CORE::printf FH @_;
 }
 
 sub WRITE {
-  my $handle = shift()->[1];
-  local *FH = $$handle;
-  local ($\) = "";
-  $_[1] = length($_[0]) unless defined $_[1];
-  CORE::print FH substr($_[0], $_[2] || 0, $_[1]);
+    my $handle = shift()->[1];
+    local *FH = $$handle;
+    local ($\) = "";
+    $_[1] = length($_[0]) unless defined $_[1];
+    CORE::print FH substr($_[0], $_[2] || 0, $_[1]);
 }
 
 sub READ {
-  my $handle = shift()->[0];
-  local *FH = $$handle;
-  CORE::read(FH, $_[0], $_[1], $_[2] || 0);
+    my $handle = shift()->[0];
+    local *FH = $$handle;
+    CORE::read(FH, $_[0], $_[1], $_[2] || 0);
 }
 
 sub READLINE {
-  my $handle = shift()->[0];
-  local *FH = $$handle;
-  return scalar <FH>;
+    my $handle = shift()->[0];
+    local *FH = $$handle;
+    return scalar <FH>;
 }
 
 sub GETC {
-  my $handle = shift()->[0];
-  local *FH = $$handle;
-  return CORE::getc(FH);
+    my $handle = shift()->[0];
+    local *FH = $$handle;
+    return CORE::getc(FH);
 }
 
 sub EOF {
-  my $handle = shift()->[0];
-  local *FH = $$handle;
-  return CORE::eof(FH);
+    my $handle = shift()->[0];
+    local *FH = $$handle;
+    return CORE::eof(FH);
 }
 
 sub OPEN {}
 
 sub CLOSE {
-  my $self = shift;
-  $self = undef;
+    my $self = shift;
+    $self = undef;
 }
 
 sub BINMODE {}
