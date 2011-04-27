@@ -28,6 +28,7 @@ my $ok = eval {
     ### child does the server
     } else {
         eval {
+            alarm $env->{'timeout'};
             # pretend we're inetd
             my $sock = IO::Socket::INET->new(LocalAddr => $env->{'hostname'},
                                              LocalPort => $env->{'ports'}->[0],
