@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok);
-prepare_test({n_tests => 66, plan_only => 1});
+prepare_test({n_tests => 67, plan_only => 1});
 
 use_ok('Net::Server');
 @FooServer::ISA = qw(Net::Server);
@@ -26,8 +26,7 @@ sub options {
   ### setup options in the parent classes
   $self->SUPER::options($template);
 
-  $prop->{'my_option'} = undef;
-  $template->{'my_option'} = \ $prop->{'my_option'};
+  $template->{'my_option'} = \$prop->{'my_option'};
 
   $prop->{'an_arrayref_item'} ||= [];
   $template->{'an_arrayref_item'} = $prop->{'an_arrayref_item'};
@@ -67,124 +66,129 @@ ok($obj, "Got an object ($@)");
 my $server = eval { FooServer->run };
 ok($server, "Got a server ($@)");
 my $prop = eval { $server->{'server'} } || {};
-ok($prop->{'log_level'} == 2,  "Correct default log_level");
-ok($prop->{'log_file'}  eq "", "Correct default log_file");
+is($prop->{'log_level'}, 2,  "Correct default log_level");
+is($prop->{'log_file'}, "", "Correct default log_file");
 ok(! $prop->{'user'},          "Correct default user");
-ok(@{ $prop->{'port'} } == 1,         "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,         "Had 1 configured socket");
+is(scalar(@{ $prop->{'port'} }), 1,         "Had 1 configured ports");
+is(scalar(@{ $prop->{'sock'} }), 1,         "Had 1 configured socket");
 my $sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq '*' },   "Right host");
-ok(eval { $sock->NS_port  == 20203 }, "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' }, "Right proto");
+is(eval { $sock->NS_host  }, '*',   "Right host");
+is(eval { $sock->NS_port  }, 20203, "Right port");
+is(eval { $sock->NS_proto }, 'TCP', "Right proto");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(port => 2201)->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
+is(scalar(@{ $prop->{'port'} }), 1,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(port => [2201, 2202])->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 2,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
-ok($prop->{'port'}->[1] == 2202, "Right port");
+is(scalar(@{ $prop->{'port'} }), 2,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
+is($prop->{'port'}->[1], 2202, "Right port");
+
+###----------------------------------------------------------------###
+
+$prop = eval { FooServer->run(port => qr{bam})->{'server'} };
+ok(!$prop, "Correctly didn't load server");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run({port => 2201})->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
+is(scalar(@{  $prop->{'port'} }), 1,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->new(port => 2201)->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
+is(scalar(@{  $prop->{'port'} }), 1,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->new({port => 2201})->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
+is(scalar(@{  $prop->{'port'} }), 1,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { local @ARGV = ('--port', '2201'); FooServer->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
+is(scalar(@{  $prop->{'port'} }), 1,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { local @ARGV = ('--port', '2201', '--port=2202'); FooServer->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 2,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 2201, "Right port");
-ok($prop->{'port'}->[1] == 2202, "Right port");
+is(scalar(@{  $prop->{'port'} }), 2,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 2201, "Right port");
+is($prop->{'port'}->[1], 2202, "Right port");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 3,    "Had 1 configured ports");
-ok($prop->{'port'}->[0] == 5401, "Right port");
-ok($prop->{'port'}->[1] == 5402, "Right port");
-ok($prop->{'port'}->[2] == 5403, "Right port");
-ok($prop->{'user'} eq 'foo',     "Right user");
+is(scalar(@{  $prop->{'port'} }), 3,    "Had 1 configured ports");
+is($prop->{'port'}->[0], 5401, "Right port");
+is($prop->{'port'}->[1], 5402, "Right port");
+is($prop->{'port'}->[2], 5403, "Right port");
+is($prop->{'user'}, 'foo',     "Right user");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { local @ARGV = ('--user=cmdline'); FooServer->run(conf_file => __FILE__.'.conf', user => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'user'} eq 'cmdline', "Right user \"$prop->{'user'}\"");
+is($prop->{'user'}, 'cmdline', "Right user \"$prop->{'user'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf', user => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'user'} eq 'runargs', "Right user \"$prop->{'user'}\"");
+is($prop->{'user'}, 'runargs', "Right user \"$prop->{'user'}\"");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(my_option => 'wow')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'my_option'} eq 'wow', 'Could use custom options');
+is($prop->{'my_option'}, 'wow', 'Could use custom options');
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(an_arrayref_item => 'wow')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'an_arrayref_item'} } == 1,     "Had 1 configured custom array option");
-ok($prop->{'an_arrayref_item'}->[0] eq 'wow', "Right value");
+is(scalar(@{  $prop->{'an_arrayref_item'} }), 1,     "Had 1 configured custom array option");
+is($prop->{'an_arrayref_item'}->[0], 'wow', "Right value");
 
 ###----------------------------------------------------------------###
 
 $prop = eval { FooServer->run(conf_file => __FILE__.'.conf', user => 'runargs')->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok($prop->{'my_option'} eq 'bar', "Right my_option \"$prop->{'my_option'}\"");
-ok(@{ $prop->{'an_arrayref_item'} } == 3,     "Had 3 configured custom array option");
-ok($prop->{'an_arrayref_item'}->[0] eq 'one', "Right value");
-ok($prop->{'an_arrayref_item'}->[1] eq 'three', "Right value");
-ok($prop->{'an_arrayref_item'}->[2] eq 'two', "Right value");
+is($prop->{'my_option'}, 'bar', "Right my_option \"$prop->{'my_option'}\"");
+is(scalar(@{  $prop->{'an_arrayref_item'} }), 3,     "Had 3 configured custom array option");
+is($prop->{'an_arrayref_item'}->[0], 'one',   "Right value");
+is($prop->{'an_arrayref_item'}->[1], 'three', "Right value");
+is($prop->{'an_arrayref_item'}->[2], 'two',   "Right value");
 
 ###----------------------------------------------------------------###
 
