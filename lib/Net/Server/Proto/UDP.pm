@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -25,75 +25,59 @@
 package Net::Server::Proto::UDP;
 
 use strict;
-use vars qw($VERSION);
 use base qw(Net::Server::Proto::TCP);
 
-$VERSION = $Net::Server::VERSION; # done until separated
+our $VERSION = $Net::Server::VERSION;
+
+sub NS_proto { 'UDP' }
 
 sub object {
-  my $type  = shift;
-  my $class = ref($type) || $type || __PACKAGE__;
+    my ($class, $default_host, $port, $server) = @_;
+    my $sock = $class->SUPER::object($default_host, $port, $server);
+    my $prop = $server->{'server'};
 
-  my $sock = $class->SUPER::object( @_ );
+    $server->configure({
+        udp_recv_len   => \$prop->{'udp_recv_len'},
+        udp_recv_flags => \$prop->{'udp_recv_flags'},
+        udp_broadcast  => \$prop->{'udp_broadcast'},
+    });
 
-  $sock->NS_proto('UDP');
+    $prop->{'udp_recv_len'}   = 4096 if ! defined($prop->{'udp_recv_len'})   || $prop->{'udp_recv_len'}   !~ /^\d+$/;
+    $prop->{'udp_recv_flags'} = 0    if ! defined($prop->{'udp_recv_flags'}) || $prop->{'udp_recv_flags'} !~ /^\d+$/;
+    $sock->NS_recv_len($prop->{'udp_recv_len'});
+    $sock->NS_recv_flags($prop->{'udp_recv_flags'});
 
-  ### set a few more parameters
-  my($default_host,$port,$server) = @_;
-  my $prop = $server->{server};
-
-  ### read any additional protocol specific arguments
-  $server->configure({
-    udp_recv_len   => \$prop->{udp_recv_len},
-    udp_recv_flags => \$prop->{udp_recv_flags},
-    udp_broadcast  => \$prop->{udp_broadcast},
-  });
-
-  $prop->{udp_recv_len} = 4096
-    unless defined($prop->{udp_recv_len})
-    && $prop->{udp_recv_len} =~ /^\d+$/;
-
-  $prop->{udp_recv_flags} = 0
-    unless defined($prop->{udp_recv_flags})
-    && $prop->{udp_recv_flags} =~ /^\d+$/;
-
-  $prop->{udp_broadcast} = undef
-    unless defined($prop->{udp_broadcast})
-    && $prop->{udp_broadcast};
-
-  $sock->NS_recv_len(   $prop->{udp_recv_len} );
-  $sock->NS_recv_flags( $prop->{udp_recv_flags} );
-
-  return $sock;
+    return $sock;
 }
 
-
-### connect the first time
-### doesn't support the listen or the reuse option
 sub connect {
-  my $sock   = shift;
-  my $server = shift;
-  my $prop   = $server->{server};
+    my ($sock, $server) = @_;
+    my $prop = $server->{'server'};
+    my $host = $sock->NS_host;
+    my $port = $sock->NS_port;
 
-  my $host  = $sock->NS_host;
-  my $port  = $sock->NS_port;
+    my %args = (
+        LocalPort => $port,
+        Proto     => 'udp',
+        ReuseAddr => 1, Reuse => 1, # may not be needed on UDP
+    );
+    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
+    $args{'Broadcast'} = 1 if $prop->{'udp_broadcast'};
 
-  my %args = ();
-  $args{LocalPort} = $port;                  # what port to bind on
-  $args{Proto}     = 'udp';                  # what procol to use
-  $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
-  $args{Reuse}     = 1;  # allow us to rebind the port on a restart
-  $args{Broadcast} = 1 if $prop->{udp_broadcast};
-
-  ### connect to the sock
-  $sock->SUPER::configure(\%args)
-    or $server->fatal("Can't connect to UDP port $port on $host [$!]");
-
-  $server->fatal("Back sock [$!]!".caller())
-    unless $sock;
-
+    $sock->SUPER::configure(\%args) or $server->fatal("Can't connect to UDP port $port on $host [$!]");
 }
 
+sub NS_recv_len {
+    my $sock = shift;
+    ${*$sock}{'NS_recv_len'} = shift if @_;
+    return ${*$sock}{'NS_recv_len'};
+}
+
+sub NS_recv_flags {
+    my $sock = shift;
+    ${*$sock}{'NS_recv_flags'} = shift if @_;
+    return ${*$sock}{'NS_recv_flags'};
+}
 
 1;
 
@@ -124,7 +108,7 @@ L<Net::Server> for more information on reading arguments.
 =item udp_recv_len
 
 Specifies the number of bytes to read from the UDP connection
-handle.  Data will be read into $self->{server}->{udp_data}.
+handle.  Data will be read into $self->{'server'}->{'udp_data'}.
 Default is 4096.  See L<IO::Socket::INET> and L<recv>.
 
 =item udp_recv_flags
@@ -141,6 +125,22 @@ See L<recv>.  Default is 0.
   udp_recv_len      \d+                      4096
   udp_recv_flags    \d+                      0
   udp_broadcast     bool                     undef
+
+=head1 INTERNAL METHODS
+
+=over 4
+
+=item C<object>
+
+Returns an object with parameters suitable for eventual creation of
+a IO::Socket::INET object listining on UDP.
+
+=item C<connect>
+
+Called when actually binding the port.  Handles default parameters
+before calling parent method.
+
+=back
 
 =head1 LICENCE
 
