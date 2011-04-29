@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2010
+#  Copyright (C) 2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -40,25 +40,22 @@ BEGIN {
 $VERSION = $Net::Server::VERSION; # done until separated
 @ISA = qw(IO::Socket::INET);
 
+sub NS_proto { 'SSLEAY' }
+
 sub object {
-    my $type  = shift;
-    my $class = ref($type) || $type || __PACKAGE__;
+    my ($class, $default_host, $port, $server) = @_;
 
-    my ($default_host,$port,$server) = @_;
-    my $prop = $server->{'server'};
     my $host;
-
-    if ($port =~ m/^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
+    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
         ($host, $port) = ($1, $2);
-    }
-    elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
+    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
         ($host, $port) = ($default_host, $1);
-    }
-    else {
-        $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
+    } else {
+        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
     }
 
     # read any additional protocol specific arguments
+    my $prop = $server->{'server'};
     my @ssl_args = qw(
         SSL_server
         SSL_use_cert
@@ -79,7 +76,6 @@ sub object {
     my $sock = $class->new;
     $sock->NS_host($host);
     $sock->NS_port($port);
-    $sock->NS_proto('SSLEAY');
 
     for my $key (@ssl_args) {
         my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLEAY') : undef;
@@ -166,7 +162,6 @@ sub accept {
     my $sock = shift;
     my $client = $sock->SUPER::accept;
     if (defined $client) {
-        $client->NS_proto($sock->NS_proto);
         $client->SSLeay_context($sock->SSLeay_context);
         $client->SSLeay_is_client(1);
     }
@@ -373,7 +368,7 @@ sub AUTOLOAD {
     my $sock = shift;
     my $prop = $AUTOLOAD =~ /::([^:]+)$/ ? $1 : die "Missing property in AUTOLOAD.";
     die "Unknown method or property [$prop]"
-        if $prop !~ /^(NS_proto|NS_port|NS_host|SSLeay_context|SSLeay_is_client|SSL_\w+)$/;
+        if $prop !~ /^(NS_port|NS_host|SSLeay_context|SSLeay_is_client|SSL_\w+)$/;
 
     no strict 'refs';
     *{__PACKAGE__."::${prop}"} = sub {
