@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,35 +22,26 @@
 package Net::Server::Proto::SSL;
 
 use strict;
-use vars qw($VERSION $AUTOLOAD @ISA);
-use Net::Server::Proto::TCP ();
 eval { require IO::Socket::SSL; };
 $@ && warn "Module IO::Socket::SSL is required for SSL.";
+our @ISA = qw(IO::Socket::SSL);
 
-$VERSION = $Net::Server::VERSION; # done until separated
-@ISA = qw(IO::Socket::SSL);
+our $VERSION = $Net::Server::VERSION; # done until separated
 
+sub NS_proto { 'SSL' }
 
 sub object {
-  my $type  = shift;
-  my $class = ref($type) || $type || __PACKAGE__;
+    my ($class, $default_host, $port, $server) = @_;
+    my $prop = $server->{'server'};
+    my $host;
 
-  my ($default_host,$port,$server) = @_;
-  my $prop = $server->{server};
-  my $host;
-
-  ### allow for things like "domain.com:80"
-  if( $port =~ m/^([\w\.\-\*\/]+):(\w+)$/ ){
-    ($host,$port) = ($1,$2);
-
-  ### allow for things like "80"
-  }elsif( $port =~ /^(\w+)$/ ){
-    ($host,$port) = ($default_host,$1);
-
-  ### don't know that style of port
-  }else{
-    $server->fatal("Undeterminate port \"$port\" under ".__PACKAGE__);
-  }
+    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
+        ($host, $port) = ($1, $2);
+    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
+        ($host, $port) = ($default_host, $1);
+    } else {
+        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
+    }
 
   # read any additional protocol specific arguments
   my @ssl_args = qw(
@@ -65,138 +56,82 @@ sub object {
       SSL_passwd_cb
       SSL_max_getline_length
   );
-  my %args;
-  $args{$_} = \$prop->{$_} for @ssl_args;
-  $server->configure(\%args);
+    my %args = map {$_ => \$prop->{$_}} @ssl_args;
+    $server->configure(\%args);
 
-  my $sock = $class->new;
-  $sock->NS_host($host);
-  $sock->NS_port($port);
-  $sock->NS_proto('SSL');
+    my $sock = $class->new;
+    $sock->NS_host($host);
+    $sock->NS_port($port);
 
-  for my $key (@ssl_args) {
-    my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSL') : undef;
-    $sock->$key($val);
-  }
+    for my $key (@ssl_args) {
+        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSL') : undef;
+        $sock->$key($val);
+    }
 
-  return $sock;
+    return $sock;
 }
 
 sub log_connect {
-  my $sock = shift;
-  my $server = shift;
-  my $host   = $sock->NS_host;
-  my $port   = $sock->NS_port;
-  my $proto  = $sock->NS_proto;
- $server->log(2,"Binding to $proto port $port on host $host\n");
+    my ($sock, $server) = @_;
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host);
 }
 
-### connect the first time
 sub connect {
-  my $sock   = shift;
-  my $server = shift;
-  my $prop   = $server->{server};
+    my ($sock, $server) = @_;
+    my $prop = $server->{'server'};
+    my $host = $sock->NS_host;
+    my $port = $sock->NS_port;
 
-  my $host  = $sock->NS_host;
-  my $port  = $sock->NS_port;
+    my %args = (
+        LocalPort => $port,
+        Proto     => 'tcp',
+        Listen    => $prop->{'listen'},
+        ReuseAddr => 1, Reuse => 1,
+    );
+    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
+    $args{$_} = $prop->{$_} for grep {/^SSL_/} keys %$prop;
 
-  my %args = ();
-  $args{LocalPort} = $port;                  # what port to bind on
-  $args{Proto}     = 'tcp';                  # what procol to use
-  $args{LocalAddr} = $host if $host !~ /\*/; # what local address (* is all)
-  $args{Listen}    = $prop->{listen};        # how many connections for kernel to queue
-  $args{Reuse}     = 1;  # allow us to rebind the port on a restart
-
-  ### add in any ssl specific properties
-  foreach ( keys %$prop ){
-    next unless /^SSL_/;
-    $args{$_} = $prop->{$_};
-  }
-
-  ### connect to the sock
-  $sock->SUPER::configure(\%args)
-    or $server->fatal("Can't connect to SSL port $port on $host [$!]");
-
-  $server->fatal("Back sock [$!]!".caller())
-    unless $sock;
-
+    $sock->SUPER::configure(\%args) or $server->fatal("Can't connect to SSL port $port on $host [$!]");
 }
 
-### connect on a sig -HUP
-sub reconnect {
-  my $sock = shift;
-  my $fd   = shift;
-  my $server = shift;
-
-  $sock->fdopen( $fd, 'w' )
-    or $server->fatal("Error opening to file descriptor ($fd) [$!]");
-
+sub reconnect { # after a sig HUP
+    my ($sock, $fd, $server) = @_;
+    $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
-### allow for endowing the child
 sub accept {
-  my $sock = shift;
-  my $client = $sock->SUPER::accept();
-
-  ### pass items on
-  if( defined($client) ){
-    bless $client, ref($sock);
-    $client->NS_proto( $sock->NS_proto );
-  }
-
-  return $client;
+    my $sock = shift;
+    if (wantarray) {
+        my ($client, $peername) = $sock->SUPER::accept();
+        bless $client, ref($sock);
+        return ($client, $peername);
+    } else {
+        my $client = $sock->SUPER::accept();
+        bless $client, ref($sock);
+        return $client;
+    }
 }
 
-### a string containing any information necessary for restarting the server
-### via a -HUP signal
-### a newline is not allowed
-### the hup_string must be a unique identifier based on configuration info
 sub hup_string {
-  my $sock = shift;
-  return join("|",
-              $sock->NS_host,
-              $sock->NS_port,
-              $sock->NS_proto,
-              );
+    my $sock = shift;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto;
 }
 
-### short routine to show what we think we are
 sub show {
-  my $sock = shift;
-  my $t = "Ref = \"" .ref($sock) . "\"\n";
-  foreach my $prop ( qw(NS_proto NS_port NS_host) ){
-    $t .= "  $prop = \"" .$sock->$prop()."\"\n";
-  }
-  return $t;
+    my $sock = shift;
+    return "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
 }
 
-### self installer
-sub AUTOLOAD {
-  my $sock = shift;
+sub NS_port {
+    my $sock = shift;
+    ${*$sock}{'NS_port'} = shift if @_;
+    return ${*$sock}{'NS_port'};
+}
 
-  my ($prop) = $AUTOLOAD =~ /::([^:]+)$/ ? $1 : '';
-  if( ! $prop ){
-    die "No property called.";
-  }
-
-  if( $prop =~ /^(NS_proto|NS_port|NS_host)$/ ){
-    no strict 'refs';
-    * { __PACKAGE__ ."::". $prop } = sub {
-      my $sock = shift;
-      if( @_ ){
-        ${*$sock}{$prop} = shift;
-        return delete ${*$sock}{$prop} unless defined ${*$sock}{$prop};
-      }else{
-        return ${*$sock}{$prop};
-      }
-    };
-    use strict 'refs';
-
-    $sock->$prop(@_);
-
-  }else{
-    die "What method is that? [$prop]";
-  }
+sub NS_host {
+    my $sock = shift;
+    ${*$sock}{'NS_host'} = shift if @_;
+    return ${*$sock}{'NS_host'};
 }
 
 1;
@@ -233,7 +168,7 @@ STDOUT will not work.  This is entirely dependent upon the
 implementation of IO::Socket::SSL.  getline may work but the client is
 not copied to STDOUT under SSL.  It is suggested that clients sysread
 and syswrite to the client handle (located in
-$self->{server}->{client} or passed to the process_request subroutine
+$self->{'server'}->{'client'} or passed to the process_request subroutine
 as the first argument).
 
 =head1 PARAMETERS
