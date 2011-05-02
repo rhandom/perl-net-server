@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -21,221 +21,176 @@
 
 package Net::Server::PreForkSimple;
 
-use base qw(Net::Server);
 use strict;
-use vars qw($VERSION);
+use base qw(Net::Server);
+use Net::Server::SIG qw(register_sig check_sigs);
 use POSIX qw(WNOHANG EINTR);
 use Fcntl ();
-use Net::Server::SIG qw(register_sig check_sigs);
 
-$VERSION = $Net::Server::VERSION; # done until separated
+our $VERSION = $Net::Server::VERSION;
 
-
-### override-able options for this package
 sub options {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $ref  = shift;
+    my $self = shift;
+    my $ref  = $self->SUPER::options(@_);
+    my $prop = $self->{'server'};
 
-  $self->SUPER::options($ref);
-
-  foreach ( qw(max_servers max_requests max_dequeue
-               check_for_dead check_for_dequeue
-               lock_file serialize) ){
-    $prop->{$_} = undef unless exists $prop->{$_};
-    $ref->{$_} = \$prop->{$_};
-  }
-
+    $ref->{$_} = \$prop->{$_} for qw(max_servers     max_requests      max_dequeue
+                                     check_for_dead  check_for_dequeue
+                                     lock_file       serialize         sig_passthrough);
+    return $ref;
 }
 
-### make sure some defaults are set
 sub post_configure {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
+    $self->SUPER::post_configure;
 
-  ### let the parent do the rest
-  ### must do this first so that ppid reflects backgrounded process
-  $self->SUPER::post_configure;
+    ### some default values to check for
+    my $d = {
+        max_servers       => 50,   # max num of servers to run
+        max_requests      => 1000, # num of requests for each child to handle
+        check_for_dead    => 30,   # how often to see if children are alive
+    };
+    foreach (keys %$d){
+        $prop->{$_} = $d->{$_}
+            unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
+    }
 
-  ### some default values to check for
-  my $d = {max_servers       => 50,   # max num of servers to run
-           max_requests      => 1000, # num of requests for each child to handle
-           check_for_dead    => 30,   # how often to see if children are alive
-           };
-  foreach (keys %$d){
-    $prop->{$_} = $d->{$_}
-    unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+$/;
-  }
-
-  ### I need to know who is the parent
-  $prop->{ppid} = $$;
+    $prop->{'ppid'} = $$;
 }
 
 
-### now that we are bound, prepare serialization
 sub post_bind {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
+    $self->SUPER::post_bind;
 
-  ### do the parents
-  $self->SUPER::post_bind;
-
-  ### clean up method to use for serialization
-  if( ! defined($prop->{serialize})
-      || $prop->{serialize} !~ /^(flock|semaphore|pipe)$/i ){
-    $prop->{serialize} = ($^O eq 'MSWin32') ? 'pipe' : 'flock';
-  }
-  $prop->{serialize} =~ tr/A-Z/a-z/;
-
-  ### set up lock file
-  if( $prop->{serialize} eq 'flock' ){
-    $self->log(3,"Setting up serialization via flock");
-    if( defined($prop->{lock_file}) ){
-      $prop->{lock_file_unlink} = undef;
-    }else{
-      $prop->{lock_file} = POSIX::tmpnam();
-      $prop->{lock_file_unlink} = 1;
+    if (! defined($prop->{'serialize'})
+        || $prop->{'serialize'} !~ /^(flock|semaphore|pipe)$/i) {
+        $prop->{'serialize'} = ($^O eq 'MSWin32') ? 'pipe' : 'flock';
     }
+    $prop->{'serialize'} =~ tr/A-Z/a-z/;
 
-  ### set up semaphore
-  }elsif( $prop->{serialize} eq 'semaphore' ){
-    $self->log(3,"Setting up serialization via semaphore");
-    require IPC::SysV;
-    require IPC::Semaphore;
-    my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(),
-                                1,
-                                IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT(),
-                                ) || $self->fatal("Semaphore error [$!]");
-    $s->setall(1) || $self->fatal("Semaphore create error [$!]");
-    $prop->{sem} = $s;
+    if ($prop->{'serialize'} eq 'flock') {
+        $self->log(3, "Setting up serialization via flock");
+        if (defined $prop->{'lock_file'}) {
+            $prop->{'lock_file_unlink'} = undef;
+        } else {
+            $prop->{'lock_file'} = POSIX::tmpnam();
+            $prop->{'lock_file_unlink'} = 1;
+        }
 
-  ### set up pipe
-  }elsif( $prop->{serialize} eq 'pipe' ){
-    pipe( _WAITING, _READY );
-    _READY->autoflush(1);
-    _WAITING->autoflush(1);
-    $prop->{_READY}   = *_READY;
-    $prop->{_WAITING} = *_WAITING;
-    print _READY "First\n";
+    } elsif ($prop->{'serialize'} eq 'semaphore') {
+        $self->log(3, "Setting up serialization via semaphore");
+        require IPC::SysV;
+        require IPC::Semaphore;
+        my $s = IPC::Semaphore->new(IPC::SysV::IPC_PRIVATE(), 1, IPC::SysV::S_IRWXU() | IPC::SysV::IPC_CREAT())
+             or $self->fatal("Semaphore error [$!]");
+        $s->setall(1) or $self->fatal("Semaphore create error [$!]");
+        $prop->{'sem'} = $s;
 
-  }else{
-    $self->fatal("Unknown serialization type \"$prop->{serialize}\"");
-  }
+    } elsif ($prop->{'serialize'} eq 'pipe') {
+        $self->log(3, "Setting up serialization via pipe");
+        pipe(my $waiting, my $ready);
+        $ready->autoflush(1);
+        $waiting->autoflush(1);
+        $prop->{'_READY'}   = $ready;
+        $prop->{'_WAITING'} = $waiting;
+        print $ready "First\n";
+
+    } else {
+        $self->fatal("Unknown serialization type \"$prop->{'serialize'}\"");
+    }
 
 }
 
-### prepare for connections
 sub loop {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
 
-  ### get ready for children
-  $prop->{children} = {};
-  if ($ENV{HUP_CHILDREN}) {
-      my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
-      $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
-      $prop->{children} = \%children;
-  }
-
-  $self->log(3,"Beginning prefork ($prop->{max_servers} processes)\n");
-
-  ### start up the children
-  $self->run_n_children( $prop->{max_servers} );
-
-  ### finish the parent routines
-  $self->run_parent;
-
-}
-
-### subroutine to start up a specified number of children
-sub run_n_children {
-  my $self  = shift;
-  my $prop  = $self->{server};
-  my $n     = shift;
-  return unless $n > 0;
-
-  $self->run_n_children_hook;
-
-  $self->log(3,"Starting \"$n\" children");
-
-  for( 1..$n ){
-    my $pid = fork;
-
-    ### trouble
-    if( not defined $pid ){
-      $self->fatal("Bad fork [$!]");
-
-    ### parent
-    }elsif( $pid ){
-      $prop->{children}->{$pid}->{status} = 'processing';
-
-    ### child
-    }else{
-      $self->run_child;
-
+    $prop->{'children'} = {};
+    if ($ENV{'HUP_CHILDREN'}) {
+        my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{'HUP_CHILDREN'});
+        $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
+        $prop->{'children'} = \%children;
     }
-  }
+
+    $self->log(3, "Beginning prefork ($prop->{'max_servers'} processes)");
+
+    $self->run_n_children($prop->{'max_servers'});
+
+    $self->run_parent;
+
 }
 
-### let the parent have more accounting upon startup of children
+sub run_n_children {
+    my ($self, $n) = @_;
+    return if $n <= 0;
+    my $prop = $self->{'server'};
+
+    $self->run_n_children_hook;
+
+    $self->log(3, "Starting \"$n\" children");
+
+    for (1 .. $n) {
+        my $pid = fork;
+        $self->fatal("Bad fork [$!]") if ! defined $pid;
+
+        if ($pid) {
+            $prop->{'children'}->{$pid}->{'status'} = 'processing';
+        } else {
+            $self->run_child;
+        }
+    }
+}
+
 sub run_n_children_hook {}
 
-### child process which will accept on the port
 sub run_child {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
 
-  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
-    $self->child_finish_hook;
-    exit;
-  };
-  $SIG{PIPE} = 'IGNORE';
-  $SIG{CHLD} = 'DEFAULT';
-  $SIG{HUP}  = sub {
-    if (! $prop->{connected}) {
-      $self->child_finish_hook;
-      exit;
+    $SIG{'INT'} = $SIG{'TERM'} = $SIG{'QUIT'} = sub {
+        $self->child_finish_hook;
+        exit;
+    };
+    $SIG{'PIPE'} = 'IGNORE';
+    $SIG{'CHLD'} = 'DEFAULT';
+    $SIG{'HUP'}  = sub {
+        if (! $prop->{'connected'}) {
+            $self->child_finish_hook;
+            exit;
+        }
+        $prop->{'SigHUPed'} = 1;
+    };
+
+    open($prop->{'lock_fh'}, ">", $prop->{'lock_file'})
+        or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+
+    $self->log(4, "Child Preforked ($$)");
+    delete $prop->{'children'};
+
+    $self->child_init_hook;
+
+    while ($self->accept()) {
+        $prop->{'connected'} = 1;
+        $self->run_client_connection;
+        $prop->{'connected'} = 0;
+        last if $self->done;
     }
-    $prop->{SigHUPed} = 1;
-  };
 
-  # Open in child at start
-  open($prop->{lock_fh}, ">$prop->{lock_file}")
-    || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
+    $self->child_finish_hook;
 
-  $self->log(4,"Child Preforked ($$)\n");
+    close($prop->{'lock_fh'}) if $prop->{'lock_fh'};
 
-  delete $prop->{children};
-
-  $self->child_init_hook;
-
-  ### accept connections
-  while( $self->accept() ){
-
-    $prop->{connected} = 1;
-
-    $self->run_client_connection;
-
-    last if $self->done;
-
-    $prop->{connected} = 0;
-
-  }
-
-  $self->child_finish_hook;
-
-  close($prop->{lock_fh}) if $prop->{lock_fh};
-
-  $self->log(4,"Child leaving ($prop->{max_requests})");
-  exit;
+    $self->log(4, "Child leaving ($prop->{'max_requests'})");
+    exit;
 
 }
 
-### hooks at the beginning and end of forked child processes
 sub child_init_hook {}
 sub child_finish_hook {}
 sub is_prefork { 1 }
-
 
 ### We can only let one process do the selecting at a time
 ### this override makes sure that nobody else can do it
@@ -243,159 +198,124 @@ sub is_prefork { 1 }
 ### and getting an exclusive lock (this will block all others
 ### until we release it) or by using semaphores to block
 sub accept {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
 
-  ### serialize the child accepts
-  if( $prop->{serialize} eq 'flock' ){
-    while (! flock($prop->{lock_fh}, Fcntl::LOCK_EX())) {
-      next if $! == EINTR;
-      $self->fatal("Couldn't get lock on file \"$prop->{lock_file}\" [$!]");
-    }
-
-  }elsif( $prop->{serialize} eq 'semaphore' ){
-    $prop->{sem}->op( 0, -1, IPC::SysV::SEM_UNDO() )
-      || $self->fatal("Semaphore Error [$!]");
-
-  }elsif( $prop->{serialize} eq 'pipe' ){
-    scalar <_WAITING>; # read one line - kernel says who gets it
-  }
-
-
-  ### now do the accept method
-  my $accept_val = $self->SUPER::accept();
-
-
-  ### unblock serialization
-  if( $prop->{serialize} eq 'flock' ){
-    flock($prop->{lock_fh}, Fcntl::LOCK_UN());
-
-  }elsif( $prop->{serialize} eq 'semaphore' ){
-    $prop->{sem}->op( 0, 1, IPC::SysV::SEM_UNDO() )
-      || $self->fatal("Semaphore Error [$!]");
-
-  }elsif( $prop->{serialize} eq 'pipe' ){
-    print _READY "Next!\n";
-  }
-
-  ### return our success
-  return $accept_val;
-
-}
-
-
-### is the looping done (non zero value says its done)
-sub done {
-  my $self = shift;
-  my $prop = $self->{server};
-  $prop->{done} = shift if @_;
-  return 1 if $prop->{done};
-
-  return 1 if $prop->{requests} >= $prop->{max_requests};
-  return 1 if $prop->{SigHUPed};
-  if( ! kill(0,$prop->{ppid}) ){
-    $self->log(3,"Parent process gone away. Shutting down");
-    return 1;
-  }
-}
-
-
-### now the parent will wait for the kids
-sub run_parent {
-  my $self=shift;
-  my $prop = $self->{server};
-
-  $self->log(4,"Parent ready for children.\n");
-
-  ### set some waypoints
-  $prop->{last_checked_for_dead}
-  = $prop->{last_checked_for_dequeue}
-  = time();
-
-  ### register some of the signals for safe handling
-  register_sig(PIPE => 'IGNORE',
-               INT  => sub { $self->server_close() },
-               TERM => sub { $self->server_close() },
-               QUIT => sub { $self->server_close() },
-               HUP  => sub { $self->sig_hup() },
-               CHLD => sub {
-                 while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
-                   last unless $chld > 0;
-                   $self->delete_child($chld);
-                 }
-               },
-### uncomment this area to allow SIG USR1 to give some runtime debugging
-#               USR1 => sub {
-#                 require "Data/Dumper.pm";
-#                 print Data::Dumper::Dumper($self);
-#               },
-               );
-
-  ### loop forever
-  while( 1 ){
-
-    ### sleep up to 10 seconds
-    select(undef,undef,undef,10);
-
-    ### check for any signals
-    my @sigs = &check_sigs();
-    if( @sigs ){
-      last if $prop->{_HUP};
-    }
-
-    $self->idle_loop_hook();
-
-    my $time = time();
-
-    ### periodically make sure children are alive
-    if( $time - $prop->{last_checked_for_dead} > $prop->{check_for_dead} ){
-      $prop->{last_checked_for_dead} = $time;
-      foreach (keys %{ $prop->{children} }){
-        ### see if the child can be killed
-        kill(0,$_) or $self->delete_child($_);
-      }
-    }
-
-    ### make sure we always have max_servers
-    my $total_n = 0;
-    my $total_d = 0;
-    foreach (values %{ $prop->{children} }){
-      if( $_->{status} eq 'dequeue' ){
-        $total_d ++;
-      }else{
-        $total_n ++;
-      }
-    }
-
-    if( $prop->{max_servers} > $total_n ){
-      $self->run_n_children( $prop->{max_servers} - $total_n );
-    }
-
-    ### periodically check to see if we should clear the queue
-    if( defined $prop->{check_for_dequeue} ){
-      if( $time - $prop->{last_checked_for_dequeue}
-          > $prop->{check_for_dequeue} ){
-        $prop->{last_checked_for_dequeue} = $time;
-        if( defined($prop->{max_dequeue})
-            && $total_d < $prop->{max_dequeue} ){
-          $self->run_dequeue();
+    if ($prop->{'serialize'} eq 'flock') {
+        while (! flock $prop->{'lock_fh'}, Fcntl::LOCK_EX()) {
+            next if $! == EINTR;
+            $self->fatal("Couldn't get lock on file \"$prop->{'lock_file'}\" [$!]");
         }
-      }
+        my $v = $self->SUPER::accept();
+        flock $prop->{'lock_fh'}, Fcntl::LOCK_UN();
+        return $v;
+    } elsif ($prop->{'serialize'} eq 'semaphore') {
+        $prop->{'sem'}->op(0, -1, IPC::SysV::SEM_UNDO()) or $self->fatal("Semaphore Error [$!]");
+        my $v = $self->SUPER::accept();
+        $prop->{'sem'}->op(0, 1, IPC::SysV::SEM_UNDO()) or $self->fatal("Semaphore Error [$!]");
+        return $v;
+    } elsif ($prop->{'serialize'} eq 'pipe') {
+        my $waiting = $prop->{'_WAITING'};
+        scalar <$waiting>; # read one line - kernel says who gets it
+        my $v = $self->SUPER::accept();
+        print { $prop->{'ready'} } "Next!\n";
+        return $v;
     }
-
-  }
-
-  ### allow fall back to main run method
-
 }
 
-### allow tie into the idle loop
+sub done {
+    my $self = shift;
+    my $prop = $self->{'server'};
+    $prop->{'done'} = shift if @_;
+    return 1 if $prop->{'done'};
+    return 1 if $prop->{'requests'} >= $prop->{'max_requests'};
+    return 1 if $prop->{'SigHUPed'};
+    if (! kill(0,$prop->{'ppid'})) {
+        $self->log(3, "Parent process gone away. Shutting down");
+        return 1;
+    }
+}
+
+sub run_parent {
+    my $self=shift;
+    my $prop = $self->{'server'};
+
+    $self->log(4, "Parent ready for children.");
+
+    $prop->{'last_checked_for_dead'} = $prop->{'last_checked_for_dequeue'} = time();
+
+    $self->register_sig_pass;
+
+    register_sig(PIPE => 'IGNORE',
+                 INT  => sub { $self->server_close() },
+                 TERM => sub { $self->server_close() },
+                 QUIT => sub { $self->server_close() },
+                 HUP  => sub { $self->sig_hup() },
+                 CHLD => sub {
+                     while (defined(my $chld = waitpid(-1, WNOHANG))) {
+                         last unless $chld > 0;
+                         $self->delete_child($chld);
+                     }
+                 });
+
+    if ($ENV{'HUP_CHILDREN'}) {
+        while (defined(my $chld = waitpid(-1, WNOHANG))) {
+            last unless $chld > 0;
+            $self->delete_child($chld);
+        }
+    }
+
+    while (1) {
+        select undef, undef, undef, 10;
+
+        if (check_sigs()){
+            last if $prop->{'_HUP'};
+        }
+
+        $self->idle_loop_hook();
+
+        # periodically make sure children are alive
+        my $time = time();
+        if ($time - $prop->{'last_checked_for_dead'} > $prop->{'check_for_dead'}) {
+            $prop->{'last_checked_for_dead'} = $time;
+            foreach (keys %{ $prop->{'children'} }) {
+                kill(0,$_) or $self->delete_child($_);
+            }
+        }
+
+        # make sure we always have max_servers
+        my $total_n = 0;
+        my $total_d = 0;
+        foreach (values %{ $prop->{'children'} }){
+            if( $_->{'status'} eq 'dequeue' ){
+                $total_d ++;
+            }else{
+                $total_n ++;
+            }
+        }
+
+        if( $prop->{'max_servers'} > $total_n ){
+            $self->run_n_children( $prop->{'max_servers'} - $total_n );
+        }
+
+        # periodically check to see if we should clear the queue
+        if( defined $prop->{'check_for_dequeue'} ){
+            if( $time - $prop->{'last_checked_for_dequeue'}
+            > $prop->{'check_for_dequeue'} ){
+                $prop->{'last_checked_for_dequeue'} = $time;
+                if( defined($prop->{'max_dequeue'})
+                && $total_d < $prop->{'max_dequeue'} ){
+                    $self->run_dequeue();
+                }
+            }
+        }
+
+    }
+}
+
 sub idle_loop_hook {}
 
-### Stub function in case check_for_dequeue is used.
-sub run_dequeue {
-  die "run_dequeue: virtual method not defined";
-}
+sub run_dequeue { die "run_dequeue: virtual method not defined" }
 
 sub close_children {
     my $self = shift;

@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2010
+#  Copyright (C) 2001-2011
 #
 #    Rob Brown bbb@cpan,org
 #
@@ -22,15 +22,13 @@
 package Net::Server::Multiplex;
 
 use strict;
-use vars qw($VERSION @ISA);
-use Net::Server;
+use base qw(Net::Server);
 use Net::Server::SIG qw(register_sig check_sigs);
 use Carp qw(confess);
 eval { require IO::Multiplex; import IO::Multiplex 1.05; };
 $@ && warn "Module IO::Multiplex is required for Multiplex.";
 
-$VERSION = $Net::Server::VERSION;
-@ISA = qw(Net::Server);
+our $VERSION = $Net::Server::VERSION;
 
 sub loop {
   my $self = shift;
@@ -128,17 +126,17 @@ sub setup_client_connection {
 
 # Compatibility interface for Net::Server
 sub run_dequeue {
-  confess "&$Net::Server::Multiplex::MUX::ISA[0]\::run_dequeue never defined";
+    confess "&$Net::Server::Multiplex::MUX::ISA[0]\::run_dequeue never defined";
 }
 
 sub mux_connection {}
 sub mux_input {
-  confess "&$Net::Server::Multiplex::MUX::ISA[0]\::mux_input never defined";
+    confess "&$Net::Server::Multiplex::MUX::ISA[0]\::mux_input never defined";
 }
 sub mux_eof {}
 sub mux_close {}
 sub mux_timeout {
-  confess "&$Net::Server::Multiplex::MUX::ISA[0]\::mux_timeout never defined";
+    confess "&$Net::Server::Multiplex::MUX::ISA[0]\::mux_timeout never defined";
 }
 
 package Net::Server::Multiplex::MUX;
@@ -147,13 +145,12 @@ package Net::Server::Multiplex::MUX;
 # Multiplex callback_object hooks
 
 use strict;
-use vars qw($VERSION @ISA);
 
-$VERSION = $Net::Server::Multiplex::VERSION;
+our $VERSION = $Net::Server::Multiplex::VERSION;
 # This temporary @ISA should always be overridden
 # at runtime when init() is called.  This module should
 # really ISA whatever module ISA Net::Server::Multiplex.
-@ISA = qw(Net::Server::Multiplex);
+our @ISA = qw(Net::Server::Multiplex);
 
 # This subroutine is meant to create the main callback
 # object to be used for all listen file descriptors.
