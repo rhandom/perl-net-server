@@ -62,7 +62,7 @@ __END__
 
 =head1 SYNOPSIS
 
-  # Net::Server::Proto and its accompianying modules are not
+  # Net::Server::Proto and its accompanying modules are not
   # intended to be used outside the scope of Net::Server.
 
   # That being said, here is how you use them.  This is
@@ -79,9 +79,9 @@ __END__
     $server_obj,      # Net::Server object
     );
 
-  
+
   ### Net::Server::Proto will attempt to interface with
-  ### sub modules named simillar to Net::Server::Proto::TCP
+  ### sub modules named similar to Net::Server::Proto::TCP
   ### Individual sub modules will be loaded by
   ### Net::Server::Proto as they are needed.
 
@@ -203,10 +203,25 @@ properties were found.  Can be used at any time.
 
 The port is the most important argument passed to the sub
 module classes and to Net::Server::Proto itself.  For tcp,
-udp, and ssl style ports, the form is generally
-host:port/protocol, host|port|protocol, host/port, or port.
-For unix the form is generally socket_file|type|unix or 
-socket_file.  
+
+udp, and ssl style ports, the form is generally host:port/protocol
+or [host]:port/protocol, host|port|protocol, host/port, or port.
+If I<host> is a numerical IPv6 address it must be enclosed in square
+brackets to avoid ambiguity in parsing a port number, e.g.: "[::1]:80".
+For unix sockets the form is generally socket_file|type|unix or socket_file.
+
+A socket protocol family PF_INET or PF_INET6 is derived from a specified
+address family of the binding address. A PF_INET socket can only accept
+IPv4 connections. A PF_INET6 socket accepts IPv6 connections, but may also
+accept IPv4 connections, depending on OS and its settings. For example,
+on FreeBSD systems setting a sysctl net.inet6.ip6.v6only to 0 will allow
+IPv4 connections to a PF_INET6 socket.
+
+The Net::Server::Proto::object method returns a list of objects corresponding
+to created sockets. For Unix and INET sockets the list typically contains
+just one element, but may return multiple objects when multiple protocol
+families are allowed or when a host name resolves to multiple local
+binding addresses.
 
 You can see what Net::Server::Proto parsed out by looking at
 the logs to see what log_connect said.  You could also include
