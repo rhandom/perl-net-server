@@ -58,6 +58,7 @@ sub connect {
     my $prop = $server->{'server'};
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
+    my $pfamily = $sock->NS_family || 0;
 
     my %args = (
         LocalPort => $port,
@@ -66,8 +67,9 @@ sub connect {
     );
     $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
     $args{'Broadcast'} = 1 if $prop->{'udp_broadcast'};
+    $args{'Domain'}    = $pfamily  if $Net::Server::Proto::TCP::have_inet6 && $pfamily;
 
-    $sock->SUPER::configure(\%args) or $server->fatal("Can't connect to UDP port $port on $host [$!]");
+    $sock->SUPER::configure(\%args) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
 }
 
 sub NS_recv_len {
