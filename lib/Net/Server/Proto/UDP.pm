@@ -33,7 +33,7 @@ sub NS_proto { 'UDP' }
 
 sub object {
     my ($class, $default_host, $port, $server) = @_;
-    my $sock = $class->SUPER::object($default_host, $port, $server);
+    my @sock = $class->SUPER::object($default_host, $port, $server); # it is possible that multiple connections will be returned if INET6 is in effect
     my $prop = $server->{'server'};
 
     $server->configure({
@@ -44,10 +44,13 @@ sub object {
 
     $prop->{'udp_recv_len'}   = 4096 if ! defined($prop->{'udp_recv_len'})   || $prop->{'udp_recv_len'}   !~ /^\d+$/;
     $prop->{'udp_recv_flags'} = 0    if ! defined($prop->{'udp_recv_flags'}) || $prop->{'udp_recv_flags'} !~ /^\d+$/;
-    $sock->NS_recv_len($prop->{'udp_recv_len'});
-    $sock->NS_recv_flags($prop->{'udp_recv_flags'});
 
-    return $sock;
+    foreach my $sock (@sock) {
+        $sock->NS_recv_len($prop->{'udp_recv_len'});
+        $sock->NS_recv_flags($prop->{'udp_recv_flags'});
+    }
+
+    return wantarray ? @sock : $sock[0];
 }
 
 sub connect {
