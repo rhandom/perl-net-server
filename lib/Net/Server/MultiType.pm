@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2007
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,62 +22,49 @@
 package Net::Server::MultiType;
 
 use strict;
-use vars qw($VERSION @ISA);
-use Net::Server;
+use base qw(Net::Server);
 
-$VERSION = $Net::Server::VERSION;
-@ISA = qw(Net::Server);
+our $VERSION = $Net::Server::VERSION;
 
 sub options {
-  my ($self, $ref) = @_;
-  $self->SUPER::options($ref);
-  my $prop = $self->{server};
-  foreach ( qw(server_type) ){
-    $prop->{$_} = [] unless exists $prop->{$_};
-    $ref->{$_} = $prop->{$_};
-  }
+    my $self = shift;
+    my $ref  = $self->SUPER::options(@_);
+    $ref->{'server_type'} = $self->{'server'}->{'server_type'} ||= [];
+    return $ref;
 }
 
 
 sub run {
-  my $self = ref($_[0]) ? shift() : shift->new;
-  $self->{server} = {} unless defined($self->{server}) && ref($self->{server});
-  my $prop = $self->{server};
+    my $self = ref($_[0]) ? shift() : shift->new;
+    $self->_initialize(@_ == 1 ? %{$_[0]} : @_);
+    my $prop = $self->{'server'};
 
-  # save for a HUP
-  $self->commandline($self->_get_commandline)
-      if ! eval { $self->commandline };
-
-  $self->configure_hook;
-  $self->configure(@_);
-
-  if (!defined $prop->{server_type} || ! @{ $prop->{server_type} }) {
-      if (my $ref = $self->can('default_server_type') && $self->default_server_type) {
-          $prop->{server_type} = ref($ref) ? $ref : [$ref];
-      }
-  }
-  if (defined $prop->{server_type}) {
-    foreach my $type (@{ $prop->{server_type} }) {
-      next if $type eq 'MultiType';
-      $type = ($type =~ /^(\w+)$/) ? $1 : next; # satisfy taint
-
-      my $pkg = ($type =~ /::/) ? $type : "Net::Server::$type";
-      (my $file = "$pkg.pm") =~ s{::}{/}g;
-      eval { require $file };
-      if ($@){
-        warn "Couldn't become server type \"$pkg\" [$@]\n";
-        next;
-      }
-
-      @ISA = ($pkg);
-      last;
+    if (!defined $prop->{'server_type'} || ! @{ $prop->{'server_type'} }) {
+        if (my $ref = $self->can('default_server_type') && $self->default_server_type) {
+            $prop->{'server_type'} = ref($ref) ? $ref : [$ref];
+        }
     }
-  }
+    foreach my $type (@{ $prop->{'server_type'} || []}) {
+        next if $type eq 'MultiType';
+        $type = ($type =~ /^(\w+)$/) ? $1 : next; # satisfy taint
 
-  # now run as the new type of thingy
-  # passing self, instead of package, doesn't instantiate a new object
-  $self->SUPER::run(@_);
+        my $pkg = ($type =~ /::/) ? $type : "Net::Server::$type";
+        (my $file = "$pkg.pm") =~ s{::}{/}g;
+        eval { require $file };
+        if ($@){
+            warn "Couldn't become server type \"$pkg\" [$@]\n";
+            next;
+        }
 
+        # cludgy - doesn't allow multiple Net::Server::MultiType servers within same process
+        # but it is probably better than modifying our child's class for it
+        @Net::Server::MultiType::ISA = ($pkg);
+        last;
+    }
+
+    # now run as the new type of thingy
+    # passing self, instead of package, doesn't instantiate a new object
+    $self->SUPER::run(@_);
 }
 
 1;
@@ -90,16 +77,15 @@ Net::Server::MultiType - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use Net::Server::MultiType;
-  @ISA = qw(Net::Server::MultiType);
+    use base qw(Net::Server::MultiType);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        #...code...
+    }
 
-  my @types = qw(PreFork Fork Single);
+    my @types = qw(PreFork Fork Single);
 
-  Net::Server::MultiType->run(server_type=>\@types);
+    Net::Server::MultiType->run(server_type => \@types);
 
 =head1 DESCRIPTION
 
