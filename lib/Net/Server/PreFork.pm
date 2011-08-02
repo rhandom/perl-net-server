@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2010
+#  Copyright (C) 2001-2011
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -21,520 +21,422 @@
 
 package Net::Server::PreFork;
 
-use base qw(Net::Server::PreForkSimple);
 use strict;
-use vars qw($VERSION);
-use POSIX qw(WNOHANG);
+use base qw(Net::Server::PreForkSimple);
 use Net::Server::SIG qw(register_sig check_sigs);
+use POSIX qw(WNOHANG);
 use IO::Select ();
-use IO::Socket::UNIX;
 use Time::HiRes qw(time);
 
-$VERSION = $Net::Server::VERSION; # done until separated
+our $VERSION = $Net::Server::VERSION;
 
-### override-able options for this package
 sub options {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $ref  = shift;
-
-  $self->SUPER::options($ref);
-
-  foreach ( qw(min_servers
-               min_spare_servers max_spare_servers
-               spare_servers
-               check_for_waiting
-               child_communication
-               check_for_spawn
-               min_child_ttl
-               ) ){
-    $prop->{$_} = undef unless exists $prop->{$_};
-    $ref->{$_} = \$prop->{$_};
-  }
-
+    my $self = shift;
+    my $ref  = $self->SUPER::options(@_);
+    my $prop = $self->{'server'};
+    $ref->{$_} = \$prop->{$_} for qw(min_servers min_spare_servers max_spare_servers spare_servers
+                                     check_for_waiting child_communication check_for_spawn min_child_ttl);
+    return $ref;
 }
 
-### make sure some defaults are set
+
 sub post_configure {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
+    $self->SUPER::post_configure;
 
-  ### legacy check
-  if( defined($prop->{spare_servers}) ){
-    die "The Net::Server::PreFork argument \"spare_servers\" has been
-deprecated as of version '0.75' in order to implement greater child
-control.  The new arguments to take \"spare_servers\" place are
-\"min_spare_servers\" and \"max_spare_servers\".  The defaults are 5
-and 15 respectively.  Please remove \"spare_servers\" from your
-argument list.  See the Perldoc Net::Server::PreFork for more
-information.
-";
-  }
+    my $d = {
+        # max_servers is set in the PreForkSimple server and defaults to 50
+        min_servers       => 5,    # min num of servers to always have running
+        min_spare_servers => 2,    # min num of servers just sitting there
+        max_spare_servers => 10,   # max num of servers just sitting there
+        check_for_waiting => 10,   # how often to see if children laying around
+        check_for_spawn   => 30,   # how often to see if more children are needed
+        min_child_ttl     => 10,   # min time between starting a child and killing one
+    };
+    $prop->{'min_servers'} = $prop->{'max_servers'}
+        if !!defined($prop->{'min_servers'}) && $d->{'min_servers'} > $prop->{'max_servers'};
+    $prop->{'max_spare_servers'} = $prop->{'max_servers'} - 1
+        if !defined($prop->{'max_spare_servers'}) && $d->{'max_spare_servers'} >= $prop->{'max_servers'};
+    if (! defined $prop->{'min_spare_servers'}) {
+        my $min = defined($prop->{'min_servers'}) ? $prop->{'min_servers'} : $d->{'min_servers'};
+        $prop->{'min_spare_servers'} = $min if $prop > $min;
+    }
 
-  ### let the parent do the rest
-  ### must do this first so that ppid reflects backgrounded process
-  $self->SUPER::post_configure;
+    foreach (keys %$d){
+        $prop->{$_} = $d->{$_} if !defined($prop->{$_}) || $prop->{$_} !~ /^\d+(?:\.\d+)?$/;
+    }
 
-  ### some default values to check for
-  my $d = {
-    # max_servers is set in the PreForkSimple server and defaults to 50
-    min_servers       => 5,    # min num of servers to always have running
-    min_spare_servers => 2,    # min num of servers just sitting there
-    max_spare_servers => 10,   # max num of servers just sitting there
-    check_for_waiting => 10,   # how often to see if children laying around
-    check_for_spawn   => 30,   # how often to see if more children are needed
-    min_child_ttl     => 10,   # min time between starting a child and killing one
-  };
-  foreach (keys %$d){
-    $prop->{$_} = $d->{$_}
-    unless defined($prop->{$_}) && $prop->{$_} =~ /^\d+(?:\.\d+)?$/;
-  }
+    if( $prop->{'max_spare_servers'} >= $prop->{'max_servers'} ){
+        $self->fatal("Error: \"max_spare_servers\" must be less than \"max_servers\"");
+    }
 
-  if( $prop->{min_spare_servers} > $prop->{max_spare_servers} ){
-    $self->fatal("Error: \"min_spare_servers\" must be less than "
-                 ."\"max_spare_servers\"");
-  }
-
-  if( $prop->{min_spare_servers} > $prop->{min_servers} ){
-    $self->fatal("Error: \"min_spare_servers\" must be less than "
-                 ."\"min_servers\"");
-  }
-
-  if( $prop->{max_spare_servers} >= $prop->{max_servers} ){
-    $self->fatal("Error: \"max_spare_servers\" must be less than "
-                 ."\"max_servers\"");
-  }
-
+    if ($prop->{'min_spare_servers'}) {
+        $self->fatal("Error: \"min_spare_servers\" ($prop->{'min_spare_servers'}) must be less than \"$_\" ($prop->{$_})")
+            for grep {$prop->{'min_spare_servers'} > $prop->{$_}} qw(min_servers max_spare_servers);
+    }
 }
 
 
-### prepare for connections
 sub loop {
-  my $self = shift;
-  my $prop = $self->{server};
+    my $self = shift;
+    my $prop = $self->{'server'};
 
-  ### get ready for child->parent communication
-  pipe(_READ,_WRITE);
-  _READ->autoflush(1); # ASAP, before first child is ever forked
-  _WRITE->autoflush(1);
-  $prop->{_READ}  = *_READ;
-  $prop->{_WRITE} = *_WRITE;
+    pipe(my $read, my $write); # get ready for child->parent communication
+    $read->autoflush(1);
+    $write->autoflush(1);
+    $prop->{'_READ'}  = $read;
+    $prop->{'_WRITE'} = $write;
 
-  ### get ready for children
-  $prop->{child_select} = IO::Select->new(\*_READ);
-  $prop->{children} = {};
-  $prop->{reaped_children} = {};
-  if ($ENV{HUP_CHILDREN}) {
-      my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{HUP_CHILDREN});
-      $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
-      $prop->{children} = \%children;
-  }
+    # get ready for children
+    $prop->{'child_select'} = IO::Select->new($read);
+    $prop->{'children'} = {};
+    $prop->{'reaped_children'} = {};
+    if ($ENV{'HUP_CHILDREN'}) {
+        my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{'HUP_CHILDREN'});
+        $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
+        $prop->{'children'} = \%children;
+    }
 
-  my $start = $prop->{min_servers};
+    $prop->{'tally'} = {
+        time       => time(),
+        waiting    => scalar(grep {$_->{'status'} eq 'waiting'}    values %{ $prop->{'children'} }),
+        processing => scalar(grep {$_->{'status'} eq 'processing'} values %{ $prop->{'children'} }),
+        dequeue    => scalar(grep {$_->{'status'} eq 'dequeue'}    values %{ $prop->{'children'} }),
+    };
 
-  $self->log(3,"Beginning prefork ($start processes)\n");
+    my $start = $prop->{'min_servers'};
+    $self->log(3, "Beginning prefork ($start processes)");
+    $self->run_n_children($start);
 
-  ### keep track of the status
-  $prop->{tally} = {time       => time(),
-                    waiting    => scalar(grep {$_->{'status'} eq 'waiting'}    values %{ $prop->{children} }),
-                    processing => scalar(grep {$_->{'status'} eq 'processing'} values %{ $prop->{children} }),
-                    dequeue    => scalar(grep {$_->{'status'} eq 'dequeue'}    values %{ $prop->{children} }),};
-
-  ### start up the children
-  $self->run_n_children( $start );
-
-  ### finish the parent routines
-  $self->run_parent;
-
+    $self->run_parent;
 }
 
-### sub to kill of a specified number of children
+
 sub kill_n_children {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $n    = shift;
-  return unless $n > 0;
+    my ($self, $n) = @_;
+    my $prop = $self->{'server'};
+    return unless $n > 0;
 
-  my $time = time;
-  return unless $time - $prop->{last_kill} > 10;
-  $prop->{last_kill} = $time;
+    my $time = time;
+    return unless $time - $prop->{'last_kill'} > 10;
+    $prop->{'last_kill'} = $time;
 
-  $self->log(3,"Killing \"$n\" children");
+    $self->log(3, "Killing \"$n\" children");
 
-  foreach my $pid (keys %{ $prop->{children} }){
-    # Only kill waiting children
-    # XXX: This is race condition prone as the child may have
-    # started handling a connection, but will have to do for now
-    my $child = $prop->{children}->{$pid};
-    next unless $child->{status} eq 'waiting';
+    foreach my $pid (keys %{ $prop->{'children'} }){
+        # Only kill waiting children
+        # XXX: This is race condition prone as the child may have
+        # started handling a connection, but will have to do for now
+        my $child = $prop->{'children'}->{$pid};
+        next if $child->{'status'} ne 'waiting';
 
-    $n--;
+        $n--;
 
-    ### try to kill the child
-    if (! kill('HUP', $pid)) {
-      $self->delete_child($pid);
-    }
-
-    last if $n <= 0;
-  }
-}
-
-### subroutine to start up a specified number of children
-sub run_n_children {
-  my $self  = shift;
-  my $prop  = $self->{server};
-  my $n     = shift;
-  return unless $n > 0;
-
-  $self->run_n_children_hook;
-
-  my ($parentsock, $childsock);
-
-  $self->log(3,"Starting \"$n\" children");
-  $prop->{last_start} = time();
-
-  for( 1..$n ){
-
-    if( $prop->{child_communication} ) {
-      ($parentsock, $childsock) =
-        IO::Socket::UNIX->socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
-    }
-
-    my $pid = fork;
-
-    ### trouble
-    if( not defined $pid ){
-      if( $prop->{child_communication} ){
-        $parentsock->close();
-        $childsock->close();
-      }
-
-      $self->fatal("Bad fork [$!]");
-
-    ### parent
-    }elsif( $pid ){
-      if( $prop->{child_communication} ){
-	$prop->{child_select}->add($parentsock);
-        $prop->{children}->{$pid}->{sock} = $parentsock;
-      }
-
-      $prop->{children}->{$pid}->{status} = 'waiting';
-      $prop->{tally}->{waiting} ++;
-
-    ### child
-    }else{
-      if( $prop->{child_communication} ){
-        $prop->{parent_sock} = $childsock;
-      }
-      $self->run_child;
-
-    }
-  }
-}
-
-### let the parent have more accounting upon startup of children
-sub run_n_children_hook {}
-
-### child process which will accept on the port
-sub run_child {
-  my $self = shift;
-  my $prop = $self->{server};
-
-  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
-    $self->child_finish_hook;
-    exit;
-  };
-  $SIG{PIPE} = 'IGNORE';
-  $SIG{CHLD} = 'DEFAULT';
-  $SIG{HUP}  = sub {
-    if (! $prop->{connected}) {
-      $self->child_finish_hook;
-      exit;
-    }
-    $prop->{SigHUPed} = 1;
-  };
-
-  # Open in child at start
-  open($prop->{lock_fh}, ">$prop->{lock_file}")
-    || $self->fatal("Couldn't open lock file \"$prop->{lock_file}\"[$!]");
-
-  $self->log(4,"Child Preforked ($$)\n");
-
-  delete $prop->{$_} foreach qw(children tally last_start last_process);
-
-  $self->child_init_hook;
-
-  ### accept connections
-  while( $self->accept() ){
-
-    $prop->{connected} = 1;
-    print _WRITE "$$ processing\n";
-
-    eval { $self->run_client_connection };
-    if ($@) {
-      print _WRITE "$$ exiting\n";
-      die $@;
-    }
-
-    last if $self->done;
-
-    $prop->{connected} = 0;
-    print _WRITE "$$ waiting\n";
-
-  }
-
-  $self->child_finish_hook;
-
-  print _WRITE "$$ exiting\n";
-  exit;
-
-}
-
-
-### now the parent will wait for the kids
-sub run_parent {
-  my $self=shift;
-  my $prop = $self->{server};
-  my $id;
-
-  $self->log(4,"Parent ready for children.\n");
-
-  ### prepare to read from children
-  local *_READ = $prop->{_READ};
-
-  ### set some waypoints
-  $prop->{last_checked_for_dead}
-  = $prop->{last_checked_for_waiting}
-  = $prop->{last_checked_for_dequeue}
-  = $prop->{last_process}
-  = $prop->{last_kill}
-  = time();
-
-  ### register some of the signals for safe handling
-  register_sig(PIPE => 'IGNORE',
-               INT  => sub { $self->server_close() },
-               TERM => sub { $self->server_close() },
-               QUIT => sub { $self->server_close() },
-               HUP  => sub { $self->sig_hup() },
-               CHLD => sub {
-                 while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
-                   last unless $chld > 0;
-                   # We'll deal with this in coordinate_children to avoid a race
-                   $self->{reaped_children}->{$chld} = 1;
-                 }
-               },
-### uncomment this area to allow SIG USR1 to give some runtime debugging
-#               USR1 => sub {
-#                 require "Data/Dumper.pm";
-#                 print Data::Dumper::Dumper($self);
-#               },
-               );
-
-  ### loop on reading info from the children
-  while( 1 ){
-
-    ### Wait to read.
-    ## Normally it is not good to do selects with
-    ## getline or <$fh> but this is controlled output
-    ## where everything that comes through came from us.
-    my @fh = $prop->{child_select}->can_read($prop->{check_for_waiting});
-    if( &check_sigs() ){
-      last if $prop->{_HUP};
-    }
-
-    $self->idle_loop_hook(\@fh);
-
-    if( ! @fh ){
-      $self->coordinate_children();
-      next;
-    }
-
-    ### process every readable handle
-    foreach my $fh (@fh) {
-
-      ### preforking server data
-      if ($fh == \*_READ) {
-
-        ### read a line
-        my $line = <$fh>;
-        next if not defined $line;
-
-        ### optional test by user hook
-        last if $self->parent_read_hook($line);
-
-        ### child should say "$pid status\n"
-        next unless $line =~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
-        my ($pid,$status) = ($1,$2);
-
-        # Check child details still exist
-        if (my $child = $prop->{children}->{$pid}) {
-
-          # Delete child if it tells us it's exiting
-          if ($status eq 'exiting') {
+        if (! kill('HUP', $pid)) {
             $self->delete_child($pid);
-
-          # Changing state
-          } else {
-
-            # Decrement tally of state pid was in (plus sanity check)
-            my $old_status = $child->{status}
-              || $self->log(2, "No status for $pid when changing to $status\n");
-            --$prop->{tally}->{$old_status} >= 0
-              || $self->log(2, "Tally for $status < 0 changing pid $pid from $old_status to $status\n");
-
-            # Set child status and increment tally
-            $child->{status} = $status;
-            ++$prop->{tally}->{$status};
-
-            $prop->{last_process} = time()
-              if $status eq 'processing';
-          }
         }
 
-      ### user defined handler
-      }else{
-        $self->child_is_talking_hook($fh);
-      }
+        last if $n <= 0;
+    }
+}
+
+sub run_n_children {
+    my ($self, $n) = @_;
+    my $prop  = $self->{'server'};
+    return unless $n > 0;
+
+    $self->run_n_children_hook($n);
+
+    my ($parentsock, $childsock);
+    $self->log(3, "Starting \"$n\" children");
+    $prop->{'last_start'} = time();
+
+    for (1 .. $n) {
+
+        if ($prop->{'child_communication'}) {
+            require IO::Socket::UNIX;
+            ($parentsock, $childsock) = IO::Socket::UNIX->socketpair(IO::Socket::AF_UNIX, IO::Socket::SOCK_STREAM, IO::Socket::PF_UNSPEC);
+        }
+
+        my $pid = fork;
+        if (! defined $pid) {
+            if ($prop->{'child_communication'}) {
+                $parentsock->close();
+                $childsock->close();
+            }
+            $self->fatal("Bad fork [$!]");
+        }
+
+        if ($pid) { # parent
+            if( $prop->{'child_communication'} ){
+                $prop->{'child_select'}->add($parentsock);
+                $prop->{'children'}->{$pid}->{'sock'} = $parentsock;
+            }
+
+            $prop->{'children'}->{$pid}->{'status'} = 'waiting';
+            $prop->{'tally'}->{'waiting'} ++;
+
+        } else { # child
+            if ($prop->{'child_communication'}) {
+                $prop->{'parent_sock'} = $childsock;
+            }
+            $self->run_child;
+        }
+    }
+}
+
+sub run_n_children_hook {}
+
+sub run_child {
+    my $self = shift;
+    my $prop = $self->{'server'};
+
+    $SIG{'INT'} = $SIG{'TERM'} = $SIG{'QUIT'} = sub {
+        $self->child_finish_hook;
+        exit;
+    };
+    $SIG{'PIPE'} = 'IGNORE';
+    $SIG{'CHLD'} = 'DEFAULT';
+    $SIG{'HUP'}  = sub {
+        if (! $prop->{'connected'}) {
+            $self->child_finish_hook;
+            exit;
+        }
+        $prop->{'SigHUPed'} = 1;
+    };
+
+    # Open in child at start
+    open $prop->{'lock_fh'}, ">", $prop->{'lock_file'}
+        or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+
+    $self->log(4, "Child Preforked ($$)");
+
+    delete @{ $prop }{qw(children tally last_start last_process)};
+
+    $self->child_init_hook;
+    my $write = $prop->{'_WRITE'};
+
+    while ($self->accept()) {
+        $prop->{'connected'} = 1;
+        print $write "$$ processing\n";
+
+        my $ok = eval { $self->run_client_connection; 1 };
+        if (! $ok) {
+            print $write "$$ exiting\n";
+            die $@;
+        }
+
+        last if $self->done;
+
+        $prop->{'connected'} = 0;
+        print $write "$$ waiting\n";
     }
 
-    ### check up on the children
-    $self->coordinate_children();
+    $self->child_finish_hook;
 
-  }
-
-  ### allow fall back to main run method
+    print $write "$$ exiting\n";
+    exit;
 }
 
 
-### routine to determine if more children need to be started or stopped
+sub run_parent {
+    my $self = shift;
+    my $prop = $self->{'server'};
+    my $id;
+
+    $self->log(4, "Parent ready for children.");
+    my $read_fh = $prop->{'_READ'};
+
+    @{ $prop }{qw(last_checked_for_dead last_checked_for_waiting last_checked_for_dequeue last_process last_kill)} = (time) x 5;
+
+    $self->register_sig_pass;
+
+    register_sig(
+        PIPE => 'IGNORE',
+        INT  => sub { $self->server_close() },
+        TERM => sub { $self->server_close() },
+        QUIT => sub { $self->server_close() },
+        HUP  => sub { $self->sig_hup() },
+        CHLD => sub {
+            while (defined(my $chld = waitpid(-1, WNOHANG))) {
+                last unless $chld > 0;
+                $self->{'reaped_children'}->{$chld} = 1; # We'll deal with this in coordinate_children to avoid a race
+            }
+        },
+    );
+
+    if ($ENV{'HUP_CHILDREN'}) {
+        while (defined(my $chld = waitpid(-1, WNOHANG))) {
+            last unless $chld > 0;
+            $self->{'reaped_children'}->{$chld} = 1;
+        }
+    }
+
+    while (1) {
+        ### Wait to read.
+        ## Normally it is not good to do selects with
+        ## getline or <$fh> but this is controlled output
+        ## where everything that comes through came from us.
+        my @fh = $prop->{'child_select'}->can_read($prop->{'check_for_waiting'});
+        if (check_sigs()) {
+            last if $prop->{'_HUP'};
+        }
+
+        $self->idle_loop_hook(\@fh);
+
+        if (! @fh) {
+            $self->coordinate_children();
+            next;
+        }
+
+        foreach my $fh (@fh) {
+            if ($fh != $read_fh) { # preforking server data
+                $self->child_is_talking_hook($fh);
+                next;
+            }
+
+            my $line = <$fh>;
+            next if ! defined $line;
+
+            last if $self->parent_read_hook($line); # optional test by user hook
+
+            # child should say "$pid status\n"
+            next if $line !~ /^(\d+)\ +(waiting|processing|dequeue|exiting)$/;
+            my ($pid, $status) = ($1, $2);
+
+            if (my $child = $prop->{'children'}->{$pid}) {
+                if ($status eq 'exiting') {
+                    $self->delete_child($pid);
+
+                } else {
+                    # Decrement tally of state pid was in (plus sanity check)
+                    my $old_status = $child->{'status'}    || $self->log(2, "No status for $pid when changing to $status");
+                    --$prop->{'tally'}->{$old_status} >= 0 || $self->log(2, "Tally for $status < 0 changing pid $pid from $old_status to $status");
+
+                    $child->{'status'} = $status;
+                    ++$prop->{'tally'}->{$status};
+
+                    $prop->{'last_process'} = time() if $status eq 'processing';
+                }
+            }
+        }
+        $self->coordinate_children();
+    }
+}
+
+
 sub coordinate_children {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $time = time();
+    my $self = shift;
+    my $prop = $self->{'server'};
+    my $time = time();
 
-  ### deleted SIG{CHLD} repeaped children
-  foreach my $pid (keys %{ $self->{reaped_children} }) {
-    # delete each pid one by one to avoid another race
-    delete $self->{reaped_children}->{$pid};
-
-    # Only delete if not already deleted
-    next if ! $prop->{children}->{$pid};
-
-    $self->delete_child($pid);
-  }
-
-  ### re-tally the possible types (only twice a minute)
-  ### this might not be even necessary but is a nice sanity check
-  if( $time - $prop->{tally}->{time} > $prop->{check_for_spawn} ){
-    my $w = $prop->{tally}->{waiting};
-    my $p = $prop->{tally}->{processing};
-    $prop->{tally} = {time       => $time,
-                      waiting    => 0,
-                      processing => 0,
-                      dequeue    => 0};
-    foreach (values %{ $prop->{children} }){
-      $prop->{tally}->{$_->{status}} ++;
-    }
-    $w -= $prop->{tally}->{waiting};
-    $p -= $prop->{tally}->{processing};
-    $self->log(3,"Processing diff ($p), Waiting diff ($w)")
-      if $p || $w;
-  }
-
-  my $total = $prop->{tally}->{waiting} + $prop->{tally}->{processing};
-
-  ### need more min_servers
-  if( $total < $prop->{min_servers} ){
-    $self->run_n_children( $prop->{min_servers} - $total );
-
-  ### need more min_spare_servers (up to max_servers)
-  }elsif( $prop->{tally}->{waiting} < $prop->{min_spare_servers}
-          && $total < $prop->{max_servers} ){
-    my $n1 = $prop->{min_spare_servers} - $prop->{tally}->{waiting};
-    my $n2 = $prop->{max_servers} - $total;
-    $self->run_n_children( ($n2 > $n1) ? $n1 : $n2 );
-
-  }
-
-
-  ### check to see if we should kill off some children
-  if( $time - $prop->{last_checked_for_waiting} > $prop->{check_for_waiting} ){
-    $prop->{last_checked_for_waiting} = $time;
-
-    ### need fewer max_spare_servers (down to min_servers)
-    if( $prop->{tally}->{waiting} > $prop->{max_spare_servers}
-        && $total > $prop->{min_servers} ){
-
-      ### see if we haven't started any in the last ten seconds
-      if( $time - $prop->{last_start} > $prop->{min_child_ttl} ){
-        my $n1 = $prop->{tally}->{waiting} - $prop->{max_spare_servers};
-        my $n2 = $total - $prop->{min_servers};
-        $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-      }
-
-    ### how did this happen?
-    }elsif( $total > $prop->{max_servers} ){
-      $self->kill_n_children( $total - $prop->{max_servers} );
-
-    }
-  }
-
-  ### periodically make sure children are alive
-  if ($time - $prop->{last_checked_for_dead} > $prop->{check_for_dead}) {
-    $prop->{last_checked_for_dead} = $time;
-    foreach my $pid (keys %{ $prop->{children} }) {
-      ### see if the child can be killed
-      if (! kill(0, $pid)) {
+    # deleted SIG{'CHLD'} reaped children
+    foreach my $pid (keys %{ $self->{'reaped_children'} }) {
+        delete $self->{'reaped_children'}->{$pid}; # delete each pid one by one to avoid another race
+        next if ! $prop->{'children'}->{$pid};
         $self->delete_child($pid);
-      }
     }
-  }
 
-  ### take us down to min if we haven't had a request in a while
-  if( $time - $prop->{last_process} > 30 && $prop->{tally}->{waiting} > $prop->{min_spare_servers} ){
-    my $n1 = $prop->{tally}->{waiting} - $prop->{min_spare_servers};
-    my $n2 = $total - $prop->{min_servers};
-    $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
-  }
-
-  ### periodically check to see if we should clear the queue
-  if( defined $prop->{check_for_dequeue} ){
-    if( $time - $prop->{last_checked_for_dequeue} > $prop->{check_for_dequeue} ){
-      $prop->{last_checked_for_dequeue} = $time;
-      if( defined($prop->{max_dequeue})
-          && $prop->{tally}->{dequeue} < $prop->{max_dequeue} ){
-        $self->run_dequeue();
-      }
+    # re-tally the possible types (only twice a minute)
+    # this might not be even necessary but is a nice sanity check
+    my $tally = $prop->{'tally'} ||= {};
+    if ($time - $tally->{'time'} > $prop->{'check_for_spawn'}) {
+        my $w = $tally->{'waiting'};
+        my $p = $tally->{'processing'};
+        $tally = $prop->{'tally'} = {
+            time       => $time,
+            waiting    => 0,
+            processing => 0,
+            dequeue    => 0,
+        };
+        foreach (values %{ $prop->{'children'} }) {
+            $tally->{$_->{'status'}}++;
+        }
+        $w -= $tally->{'waiting'};
+        $p -= $tally->{'processing'};
+        $self->log(3, "Processing diff ($p), Waiting diff ($w)") if $p || $w;
     }
-  }
 
+    my $total = $tally->{'waiting'} + $tally->{'processing'};
+
+    if ($total < $prop->{'min_servers'}) {
+        $self->run_n_children($prop->{'min_servers'} - $total); # need more min_servers
+
+    } elsif ($tally->{'waiting'} < $prop->{'min_spare_servers'}
+             && $total < $prop->{'max_servers'}) { # need more min_spare_servers (up to max_servers)
+        my $n1 = $prop->{'min_spare_servers'} - $tally->{'waiting'};
+        my $n2 = $prop->{'max_servers'} - $total;
+        $self->run_n_children(($n2 > $n1) ? $n1 : $n2);
+    }
+
+    # check to see if we should kill off some children
+    if ($time - $prop->{'last_checked_for_waiting'} > $prop->{'check_for_waiting'}) {
+        $prop->{'last_checked_for_waiting'} = $time;
+
+        # need fewer max_spare_servers (down to min_servers)
+        if ($tally->{'waiting'} > $prop->{'max_spare_servers'}
+            && $total > $prop->{'min_servers'}) {
+
+            ### see if we haven't started any in the last ten seconds
+            if ($time - $prop->{'last_start'} > $prop->{'min_child_ttl'}) {
+                my $n1 = $tally->{'waiting'} - $prop->{'max_spare_servers'};
+                my $n2 = $total - $prop->{'min_servers'};
+                $self->kill_n_children(($n2 > $n1) ? $n1 : $n2);
+            }
+
+        } elsif ($total > $prop->{'max_servers'}) { # how did this happen?
+            $self->kill_n_children($total - $prop->{'max_servers'});
+        }
+    }
+
+    # periodically make sure children are alive
+    if ($time - $prop->{'last_checked_for_dead'} > $prop->{'check_for_dead'}) {
+        $prop->{'last_checked_for_dead'} = $time;
+        foreach my $pid (keys %{ $prop->{'children'} }) {
+            kill(0, $pid) || $self->delete_child($pid);
+        }
+    }
+
+    # take us down to min if we haven't had a request in a while
+    if ($time - $prop->{'last_process'} > 30 && $tally->{'waiting'} > $prop->{'min_spare_servers'}) {
+        my $n1 = $tally->{'waiting'} - $prop->{'min_spare_servers'};
+        my $n2 = $total - $prop->{'min_servers'};
+        $self->kill_n_children( ($n2 > $n1) ? $n1 : $n2 );
+    }
+
+    # periodically check to see if we should clear the queue
+    if (defined $prop->{'check_for_dequeue'}) {
+        if ($time - $prop->{'last_checked_for_dequeue'} > $prop->{'check_for_dequeue'}) {
+            $prop->{'last_checked_for_dequeue'} = $time;
+            if (defined($prop->{'max_dequeue'})
+                && $tally->{'dequeue'} < $prop->{'max_dequeue'}) {
+                $self->run_dequeue();
+            }
+        }
+    }
 }
 
 ### delete_child and other modifications contributed by Rob Mueller
 sub delete_child {
-  my $self = shift;
-  my $prop = $self->{server};
-  my $pid = shift;
+    my ($self, $pid) = @_;
+    my $prop = $self->{'server'};
 
-  my $child = $prop->{children}->{$pid};
-  if (! $child) {
-    $self->log(2, "Attempt to delete already deleted child $pid\n");
-    return;
-  }
+    my $child = $prop->{'children'}->{$pid};
+    if (! $child) {
+        $self->log(2, "Attempt to delete already deleted child $pid");
+        return;
+    }
 
-  # Already gone?
-  return if ! exists $prop->{children}->{$pid};
+    return if ! exists $prop->{'children'}->{$pid}; # Already gone?
 
-  my $status = $child->{status}
-    || $self->log(2, "No status for $pid when deleting child\n");
-  --$prop->{tally}->{$status} >= 0
-    || $self->log(2, "Tally for $status < 0 deleting pid $pid\n");
-  $prop->{tally}->{time} = 0 if $child->{hup};
+    my $status = $child->{'status'}    || $self->log(2, "No status for $pid when deleting child");
+    --$prop->{'tally'}->{$status} >= 0 || $self->log(2, "Tally for $status < 0 deleting pid $pid");
+    $prop->{'tally'}->{'time'} = 0 if $child->{'hup'};
 
-  $self->SUPER::delete_child($pid);
+    $self->SUPER::delete_child($pid);
 }
 
-### allow for other process to tie in to the parent read
 sub parent_read_hook {}
 
 sub child_is_talking_hook {}
@@ -549,8 +451,7 @@ Net::Server::PreFork - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use Net::Server::PreFork;
-  @ISA = qw(Net::Server::PreFork);
+  use base qw(Net::Server::PreFork);
 
   sub process_request {
      #...code...
@@ -650,10 +551,10 @@ a child process
 
 Enable child communication to parent via unix sockets.  If set
 to true, will let children write to the socket contained in
-$self->{server}->{parent_sock}.  The parent will be notified through
+$self->{'server'}->{'parent_sock'}.  The parent will be notified through
 child_is_talking_hook where the first argument is the socket
 to the child.  The child's socket is stored in
-$self->{server}->{children}->{$child_pid}->{sock}.
+$self->{'server'}->{'children'}->{$child_pid}->{'sock'}.
 
 =back
 
@@ -738,7 +639,7 @@ argument.
 =item C<$self-E<gt>child_is_talking_hook()>
 
 This hook occurs if child_communication is true and the child
-has written to $self->{server}->{parent_sock}.  The first argument
+has written to $self->{'server'}->{'parent_sock'}.  The first argument
 will be the open socket to the child.
 
 =item C<$self-E<gt>idle_loop_hook()>
