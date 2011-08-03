@@ -24,7 +24,7 @@
 package Net::Server;
 
 use strict;
-use Socket qw(inet_aton inet_ntoa AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM);
+use Socket qw(AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM);
 use IO::Socket ();
 use IO::Select ();
 use POSIX ();
@@ -165,8 +165,8 @@ sub post_configure {
 
     if (! $prop->{'_is_inet'}) { # completetly daemonize by closing STDIN, STDOUT (should be done before fork)
         if ($prop->{'setsid'} || length($prop->{'log_file'})) {
-            open(STDIN,  '<', '/dev/null') || die "Can't read /dev/null  [$!]";
-            open(STDOUT, '>', '/dev/null') || die "Can't write /dev/null [$!]";
+            open(STDIN,  '<', '/dev/null') || die "Cannot read /dev/null  [$!]";
+            open(STDOUT, '>', '/dev/null') || die "Cannot write /dev/null [$!]";
         }
     }
 
@@ -182,9 +182,9 @@ sub post_configure {
     }
 
     if (length($prop->{'log_file'}) && $prop->{'log_file'} ne 'Sys::Syslog') { # completely daemonize by closing STDERR (should be done after fork)
-        open STDERR, '>&_SERVER_LOG' || die "Can't open STDERR to _SERVER_LOG [$!]";
+        open STDERR, '>&_SERVER_LOG' || die "Cannot open STDERR to _SERVER_LOG [$!]";
     } elsif ($prop->{'setsid'}) {
-        open STDERR, '>&STDOUT' || die "Can't open STDERR to STDOUT [$!]";
+        open STDERR, '>&STDOUT' || die "Cannot open STDERR to STDOUT [$!]";
     }
 
     # allow for a pid file (must be done after backgrounding and chrooting)
@@ -224,8 +224,13 @@ sub pre_bind { # make sure we have good port parameters
     $prop->{'host'} = [$prop->{'host'}] if ! ref     $prop->{'host'};
     push @{ $prop->{'host'} }, (($prop->{'host'}->[-1]) x (@{ $prop->{'port'} } - @{ $prop->{'host'}})); # augment hosts with as many as port
     foreach my $host (@{ $prop->{'host'} }) {
-        $host = '*' if ! defined $host || ! length $host;;
-        $host = ($host =~ /^([\w\.\-\*\/]+)$/) ? $1 : $self->fatal("Unsecure host \"$host\"");
+        if (!defined($host) || $host eq '' || $host eq '*') {
+            $host = '*';
+        } elsif ($host =~ /^\[([\w\/.:-]+)\]$/ || $host =~ /^([\w\/.:-]+)$/) {
+            $host = $1;
+        } else {
+            $self->fatal("Unsecure host \"$host\"");
+        }
     }
 
     $prop->{'proto'} = []                 if ! $prop->{'proto'};
@@ -243,12 +248,11 @@ sub pre_bind { # make sure we have good port parameters
         my $port  = $prop->{'port'}->[$i];
         my $host  = $prop->{'host'}->[$i];
         my $proto = $prop->{'proto'}->[$i];
-        if ($port ne 0 && $bound{"$host/$port/$proto"}++) {
+        if ($port ne "0" && $bound{"$host/$port/$proto"}++) {
             $self->log(2, "Duplicate configuration (".(uc $proto)." port $port on host $host - skipping");
             next;
         }
-        my $obj = $self->proto_object($host, $port, $proto) || next;
-        push @{ $prop->{'sock'} }, $obj;
+        push @{ $prop->{'sock'} }, grep {$_} $self->proto_object($host, $port, $proto);
     }
     if (! @{ $prop->{'sock'} }) {
         $self->fatal("No valid socket parameters found");
@@ -295,9 +299,9 @@ sub bind { # bind to the port (This should serve all but INET)
         }
     }
 
-    if (@{ $prop->{'port'} } > 1 || $prop->{'multi_port'}) {
+    if (@{ $prop->{'sock'} } > 1 || $prop->{'multi_port'}) {
         $prop->{'multi_port'} = 1;
-        $prop->{'select'} = IO::Select->new; # if more than one port we'll need to select on it
+        $prop->{'select'} = IO::Select->new; # if more than one socket we'll need to select on it
         $prop->{'select'}->add($_) for @{ $prop->{'sock'} };
     } else {
         $prop->{'multi_port'} = undef;
@@ -487,30 +491,44 @@ sub get_client_info {
         return;
     }
 
-    if (my $sockname = getsockname($sock)) {
-        ($prop->{'sockport'}, my $addr) = Socket::unpack_sockaddr_in($sockname);
-        $prop->{'sockaddr'} = inet_ntoa($addr);
+    if (my $sockname = $sock->sockname) {
+        $prop->{'sockaddr'} = $sock->sockhost;
+        $prop->{'sockport'} = $sock->sockport;
     } else {
         @{ $prop }{qw(sockaddr sockhost sockport)} = ($ENV{'REMOTE_HOST'} || '0.0.0.0', 'inet.test', 0); # commandline
     }
 
-    my $proto_type;
+    my $addr;
     if ($prop->{'udp_true'}) {
-        $proto_type = 'UDP';
-        ($prop->{'peerport'}, my $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
-        $prop->{'peeraddr'} = inet_ntoa($addr);
-        $prop->{'peerhost'} = $prop->{'reverse_lookups'} ? gethostbyaddr($addr, AF_INET) || '' : '';
-    } elsif ($prop->{'peername'} = getpeername($sock)) {
-        ($prop->{'peerport'}, my $addr) = Socket::unpack_sockaddr_in($prop->{'peername'});
-        $prop->{'peeraddr'} = inet_ntoa($addr);
-        $prop->{'peerhost'} = $prop->{'reverse_lookups'} ? gethostbyaddr($addr, AF_INET) || '' : '';
+        if ($sock->sockdomain == AF_INET) {
+            ($prop->{'peerport'}, $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
+            $prop->{'peeraddr'} = Socket::inet_ntoa($addr);
+        } else {
+            ($prop->{'peerport'}, $addr) = Socket6::sockaddr_in6($prop->{'udp_peer'});
+            $prop->{'peeraddr'} = Socket6->can('inet_ntop')
+                                ? Socket6::inet_ntop($sock->sockdomain, $addr)
+                                : Socket::inet_ntoa($addr);
+        }
+    } elsif ($prop->{'peername'} = $sock->peername) {
+        $addr               = $sock->peeraddr;
+        $prop->{'peeraddr'} = $sock->peerhost;
+        $prop->{'peerport'} = $sock->peerport;
     } else {
         @{ $prop }{qw(peeraddr peerhost peerport)} = ('0.0.0.0', 'inet.test', 0); # commandline
     }
 
+    if ($addr && defined $prop->{'reverse_lookups'}) {
+        if ($INC{'Socket6.pm'} && Socket6->can('getnameinfo')) {
+            my @res = Socket6::getnameinfo($addr, 0);
+            $prop->{'peerhost'} = $res[0] if @res > 1;
+        }else{
+            $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
+        }
+    }
+
     $self->log(3, $self->log_time
-               ." CONNECT ".($proto_type||'TCP')." Peer: \"$prop->{'peeraddr'}:$prop->{'peerport'}\""
-               ." Local: \"$prop->{'sockaddr'}:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
+               ." CONNECT ".($prop->{'udp_true'}?'UDP':'TCP')." Peer: \"$prop->{'peeraddr'}:$prop->{'peerport'}\""
+               ." Local: \"[$prop->{'sockaddr'}]:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
 }
 
 sub post_accept_hook {}
@@ -599,8 +617,8 @@ sub post_process_request {
     if (! $prop->{'no_client_stdout'}) {
         untie *STDOUT if tied *STDOUT;
         untie *STDIN  if tied *STDIN;
-        open(STDIN,  '<', '/dev/null') || die "Can't read /dev/null  [$!]";
-        open(STDOUT, '>', '/dev/null') || die "Can't write /dev/null [$!]";
+        open(STDIN,  '<', '/dev/null') || die "Cannot read /dev/null  [$!]";
+        open(STDOUT, '>', '/dev/null') || die "Cannot write /dev/null [$!]";
     }
     $prop->{'client'}->close;
 }
@@ -750,17 +768,19 @@ sub sig_hup {
     my @fd;
     $prop->{'_HUP'} = [];
     foreach my $sock (@{ $prop->{'sock'} }) {
-        my $fd = POSIX::dup($sock->fileno) || $self->fatal("Can't duplicate the socket [$!]");
+        my $fd = POSIX::dup($sock->fileno) || $self->fatal("Cannot duplicate the socket [$!]");
 
-        # hold on to the socket copy until exec
+        # hold on to the socket copy until exec;
+        # just temporary: any socket domain will do,
+        # forked process will decide to use IO::Socket::INET6 if necessary
         $prop->{'_HUP'}->[$i] = IO::Socket::INET->new;
-        $prop->{'_HUP'}->[$i]->fdopen($fd, 'w') || $self->fatal("Can't open to file descriptor [$!]");
+        $prop->{'_HUP'}->[$i]->fdopen($fd, 'w') || $self->fatal("Cannot open to file descriptor [$!]");
 
         # turn off the FD_CLOEXEC bit to allow reuse on exec
         require Fcntl;
         $prop->{'_HUP'}->[$i]->fcntl(Fcntl::F_SETFD(), my $flags = "");
 
-        push @fd, $fd .'|'. $sock->hup_string; # save host,port,proto, and file descriptor
+        push @fd, $fd .'|'. $sock->hup_string; # save host|port|proto|family, and file descriptor
 
         $sock->close();
         $i++;
