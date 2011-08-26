@@ -25,7 +25,8 @@ use strict;
 use base qw(IO::Socket::INET);
 
 our $VERSION = $Net::Server::VERSION;
-
+our $have_inet6;
+our $NS_bam = 1;
 sub NS_proto { 'TCP' }
 
 sub object {
@@ -48,7 +49,7 @@ sub object {
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host);
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with PF ".($sock->NS_family || 0));
 }
 
 sub connect {
@@ -56,6 +57,8 @@ sub connect {
     my $prop = $server->{'server'};
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
+    my $pfamily = $sock->NS_family;
+
     my %args = (
         LocalPort => $port,
         Proto     => 'tcp',
@@ -63,6 +66,7 @@ sub connect {
         ReuseAddr => 1, Reuse => 1,  # allow us to rebind the port on a restart
     );
     $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
+    $args{'Domain'}    = $pfamily if $have_inet6 && $pfamily;
 
     $sock->SUPER::configure(\%args) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
@@ -74,6 +78,7 @@ sub connect {
 
 sub reconnect { # after a sig HUP
     my ($sock, $fd, $server) = @_;
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", PF ".$sock->NS_family);
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
@@ -110,7 +115,7 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
 ### the hup_string must be a unique identifier based on configuration info
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_family;
 }
 
 sub show {
@@ -129,6 +134,8 @@ sub NS_host {
     ${*$sock}{'NS_host'} = shift if @_;
     return ${*$sock}{'NS_host'};
 }
+
+sub NS_family { 0 }
 
 1;
 

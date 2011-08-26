@@ -27,27 +27,25 @@ package Net::Server::Proto::UDP;
 use strict;
 use base qw(Net::Server::Proto::TCP);
 
-our $VERSION = $Net::Server::VERSION;
-
 sub NS_proto { 'UDP' }
 
 sub object {
-    my ($class, $default_host, $port, $server) = @_;
-    my @sock = $class->SUPER::object($default_host, $port, $server); # it is possible that multiple connections will be returned if INET6 is in effect
-    my $prop = $server->{'server'};
+    my ($class, $host, $port, $server) = @_;
+    my @sock = $class->SUPER::object($host, $port, $server); # it is possible that multiple connections will be returned if INET6 is in effect
 
+    my ($len, $flags, $broadcast);
     $server->configure({
-        udp_recv_len   => \$prop->{'udp_recv_len'},
-        udp_recv_flags => \$prop->{'udp_recv_flags'},
-        udp_broadcast  => \$prop->{'udp_broadcast'},
+        udp_recv_len   => \$len,
+        udp_recv_flags => \$flags,
+        udp_broadcast  => \$broadcast,
     });
-
-    $prop->{'udp_recv_len'}   = 4096 if ! defined($prop->{'udp_recv_len'})   || $prop->{'udp_recv_len'}   !~ /^\d+$/;
-    $prop->{'udp_recv_flags'} = 0    if ! defined($prop->{'udp_recv_flags'}) || $prop->{'udp_recv_flags'} !~ /^\d+$/;
+    $len   = 4096 if !defined($len)   || $len   !~ /^\d+$/;
+    $flags = 0    if !defined($flags) || $flags !~ /^\d+$/;
 
     foreach my $sock (@sock) {
-        $sock->NS_recv_len($prop->{'udp_recv_len'});
-        $sock->NS_recv_flags($prop->{'udp_recv_flags'});
+        $sock->NS_recv_len($len);
+        $sock->NS_recv_flags($flags);
+        $sock->NS_broadcast($broadcast);
     }
 
     return wantarray ? @sock : $sock[0];
@@ -55,34 +53,25 @@ sub object {
 
 sub connect {
     my ($sock, $server) = @_;
-    my $prop = $server->{'server'};
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
-    my $pfamily = $sock->NS_family || 0;
+    my $pfamily = $sock->NS_family;
 
     my %args = (
         LocalPort => $port,
         Proto     => 'udp',
         ReuseAddr => 1, Reuse => 1, # may not be needed on UDP
     );
-    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
-    $args{'Broadcast'} = 1 if $prop->{'udp_broadcast'};
+    $args{'LocalAddr'} = $host if $host ne '*'; # * is all
+    $args{'Broadcast'} = 1 if $sock->NS_broadcast;
     $args{'Domain'}    = $pfamily  if $Net::Server::Proto::TCP::have_inet6 && $pfamily;
 
-    $sock->SUPER::configure(\%args) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
+    return $sock->SUPER::configure(\%args) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
 }
 
-sub NS_recv_len {
-    my $sock = shift;
-    ${*$sock}{'NS_recv_len'} = shift if @_;
-    return ${*$sock}{'NS_recv_len'};
-}
-
-sub NS_recv_flags {
-    my $sock = shift;
-    ${*$sock}{'NS_recv_flags'} = shift if @_;
-    return ${*$sock}{'NS_recv_flags'};
-}
+sub NS_recv_len   { my $sock = shift; ${*$sock}{'NS_recv_len'}   = shift if @_; return ${*$sock}{'NS_recv_len'}   }
+sub NS_recv_flags { my $sock = shift; ${*$sock}{'NS_recv_flags'} = shift if @_; return ${*$sock}{'NS_recv_flags'} }
+sub NS_broadcast  { my $sock = shift; ${*$sock}{'NS_broadcast'}  = shift if @_; return ${*$sock}{'NS_broadcast'}  }
 
 1;
 
@@ -119,6 +108,10 @@ Default is 4096.  See L<IO::Socket::INET> and L<recv>.
 =item udp_recv_flags
 
 See L<recv>.  Default is 0.
+
+=item udp_broadcast
+
+Default is undef.
 
 =back
 

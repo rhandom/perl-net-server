@@ -30,18 +30,11 @@ our $VERSION = $Net::Server::VERSION; # done until separated
 
 sub NS_proto { 'SSL' }
 
-sub object {
-    my ($class, $default_host, $port, $server) = @_;
-    my $prop = $server->{'server'};
-    my $host;
+sub NS_family { 0 }
 
-    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
-        ($host, $port) = ($1, $2);
-    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
-        ($host, $port) = ($default_host, $1);
-    } else {
-        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
-    }
+sub object {
+    my ($class, $host, $port, $server) = @_;
+    my $prop = $server->{'server'};
 
   # read any additional protocol specific arguments
   my @ssl_args = qw(

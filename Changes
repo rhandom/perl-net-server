@@ -1,6 +1,9 @@
 Revision history for Perl extension Net::Server.
 
-0.99   July 13 2010
+1.01   Apr 26 2011
+        - 
+
+0.99   Jul 13 2010
         - Add customizable  check_for_spawn and min_child_ttl settings in PreFork (Graham Barr)
         - Add other_child_died_hook (Daniel Kahn Gillmor)
         - Make Multiplex do $mux->add($sock) for UDP sockets (Kristoffer Møllerhøj)

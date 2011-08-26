@@ -44,6 +44,8 @@ sub p_c { # port check
     my ($args, $hash, $args_to_new) = @_;
     my $prop = eval { ($args_to_new ? FooServer->new(@$args)->run : FooServer->run(@$args))->{'server'} }
         || do { diag "$@ at line $line"; {} };
+#    use CGI::Ex::Dump qw(debug);
+#    debug $prop;
     my $got = {_bind => $prop->{'_bind'}};
     if ($hash->{'sock'}) {
         push @{ $got->{'sock'} }, NS_props($_) for @{ $prop->{'sock'} || [] };
@@ -146,3 +148,33 @@ p_c([port => [2201, "foo.com:2202/tcp"], host => 'bar.com', proto => 'UDP'], {_b
    {host => 'bar.com', port => 2201, proto => 'UDP'},
    {host => 'foo.com', port => 2202, proto => 'tcp'},
 ]});
+
+
+p_c([port => ["localhost|2202|tcp"]], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'tcp'}],
+});
+
+
+p_c([port => ["localhost,2202,tcp"]], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'tcp'}],
+});
+
+
+p_c([port => ["localhost,2202,Net::Server::Proto::TCP"]], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'Net::Server::Proto::TCP'}],
+});
+
+
+p_c([port => [{port => 2201}]], {
+    _bind => [{host => '*', port => 2201, proto => 'tcp'}],
+});
+
+
+p_c([port => [{port => 2201, host => 'foo.com', proto => 'udp'}]], {
+    _bind => [{host => 'foo.com', port => 2201, proto => 'udp'}],
+});
+
+
+p_c([port => [{port => 2201}], host => 'foo.com', proto => 'udp'], {
+    _bind => [{host => 'foo.com', port => 2201, proto => 'udp'}],
+});

@@ -22,34 +22,50 @@
 package Net::Server::Proto;
 
 use strict;
-use vars qw($VERSION $AUTOLOAD);
 
-$VERSION = $Net::Server::VERSION; # done until separated
-
-
-sub object {
-    my ($class, $default_host, $port, $default_proto, $server) = @_;
-
-    my $proto_class;
-    if ($port =~ s/[\/\|]([\w:]+)$//) {  # hate this regex, doesn't allow bare filenames
-        $proto_class = $1;
-    }else{
-        $proto_class = $default_proto;
+sub parse_info {
+    my ($class, $port, $host, $proto, $server) = @_;
+    if ($port && ref($port) ne 'HASH' && $port =~ m{ (.+) [,|/] (\w+ (?:::\w+)*) $ }x) {
+        ($port, $proto) = ($1, $2);
     }
 
-    ## using the proto, load up a module for that proto
-    # for example, "tcp" will load up Net::Server::Proto::TCP.
-    # "unix" will load Net::Server::Proto::UNIX.
-    # "Net::Server::Proto::UDP" will load itself.
-    # "Custom::Proto::TCP" will load itself.
+    my $info;
+    if (ref($port) eq 'HASH') {
+        die "Missing port in hashref passed in port argument.\n" if ! $port->{'port'};
+        $info = $port;
+    } else {
+        $info = {port => $port};
+        if (     $port =~ m{^ \[ ([\w/.\-:]+ | \*) \] [,|:](\w+) $ }x) { # allow for things like "[::1]:80" or "[host.example.com]:80"
+            @$info{qw(host port)} = ($1, $2);
+        } elsif ($port =~ m{^    ([\w/.\-:]+ | \*)    [,|:](\w+) $ }x) { # allow for things like "127.0.0.1:80" or "host.example.com:80"
+            @$info{qw(host port)} = ($1, $2);
+        }
+    }
+
+    $info->{'host'} ||= (!defined($host) || $host eq '' || $host eq '*') ? '*'
+        : ($host =~ m{^ \[ ([\w/.\-:]+ | \*) \] $ }x) ? $1
+        : ($host =~ m{^    ([\w/.\-:]+ | \*)    $ }x) ? $1
+        : $server->fatal("Could not determine host from \"$host\"");
+
+    $info->{'proto'} ||= !$proto ? 'tcp'
+        : ($proto =~ /^(\w+ (?:::\w+)*)$/x) ? $1
+        : $server->fatal("Could not determine proto from \"$proto\"");
+
+    $info->{'ipv6'} = 1 if $info->{'host'} =~ /:/;
+
+    return $info;
+}
+
+sub object {
+    my ($class, $info, $server) = @_;
+    my $proto_class = $info->{'proto'};
     if ($proto_class !~ /::/) {
-        $server->fatal("Invalid Protocol class \"$proto_class\"") if $proto_class !~ /^\w+$/;
+        $server->fatal("Invalid proto class \"$proto_class\"") if $proto_class !~ /^\w+$/;
         $proto_class = "Net::Server::Proto::" .uc($proto_class);
     }
     (my $file = "${proto_class}.pm") =~ s|::|/|g;
-    $server->fatal("Unable to load module: $@") if ! eval { require $file };
-
-    return $proto_class->object($default_host, $port, $server);
+    $server->fatal("Unable to load module for proto \"$proto_class\": $@") if ! eval { require $file };
+    return $proto_class->object($info->{'host'}, $info->{'port'}, $server);
 }
 
 1;

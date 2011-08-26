@@ -22,40 +22,50 @@
 package Net::Server::Proto::SSLEAY;
 
 use strict;
-use vars qw($VERSION $AUTOLOAD @ISA);
+use vars qw($AUTOLOAD @ISA $have_inet6);
 use IO::Socket::INET;
 use Fcntl ();
 use Errno ();
 use Socket ();
 
 BEGIN {
-    eval { require Net::SSLeay };
-    $@ && warn "Module Net::SSLeay is required for SSLeay.";
-    # Net::SSLeay gets mad if we call these multiple times - the question is - who will call them multiple times?
+    eval {
+        require Socket6; import Socket6 qw(AF_INET6);
+        require IO::Socket::INET6;
+        @ISA = qw(IO::Socket::INET6);
+        $have_inet6 = 1;
+    } or do {
+        require IO::Socket::INET;
+        @ISA = qw(IO::Socket::INET);
+    };
+
+    eval { require Net::SSLeay; 1 }
+        or warn "Module Net::SSLeay is required for SSLeay.";
     for my $sub (qw(load_error_strings SSLeay_add_ssl_algorithms ENGINE_load_builtin_engines ENGINE_register_all_complete randomize)) {
         Net::SSLeay->can($sub)->();
     }
 }
 
-$VERSION = $Net::Server::VERSION; # done until separated
-@ISA = qw(IO::Socket::INET);
+my @ssl_args = qw(
+    SSL_use_cert
+    SSL_verify_mode
+    SSL_key_file
+    SSL_cert_file
+    SSL_ca_path
+    SSL_ca_file
+    SSL_cipher_list
+    SSL_passwd_cb
+    SSL_max_getline_length
+    SSL_error_callback);
 
 sub NS_proto { 'SSLEAY' }
 
+sub NS_family { 0 }
+
 sub object {
-    my ($class, $default_host, $port, $server) = @_;
-
-    my $host;
-    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
-        ($host, $port) = ($1, $2);
-    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
-        ($host, $port) = ($default_host, $1);
-    } else {
-        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
-    }
-
-    # read any additional protocol specific arguments
+    my ($class, $host, $port, $server, $pfamily) = @_;
     my $prop = $server->{'server'};
+
     my @ssl_args = qw(
         SSL_server
         SSL_use_cert
@@ -83,15 +93,6 @@ sub object {
     }
 
     return $sock;
-}
-
-sub log_connect {
-    my $sock = shift;
-    my $server = shift;
-    my $host   = $sock->NS_host;
-    my $port   = $sock->NS_port;
-    my $proto  = $sock->NS_proto;
-    $server->log(2,"Binding to $proto port $port on host $host\n");
 }
 
 ###----------------------------------------------------------------###

@@ -43,18 +43,6 @@ sub new {
 sub get_property { $_[0]->{'server'}->{$_[1]} }
 sub set_property { $_[0]->{'server'}->{$_[1]} = $_[2] }
 
-sub _initialize {
-    my $self = shift;
-    my $prop = $self->{'server'} ||= {};
-
-    $self->commandline($self->_get_commandline) if ! eval { $self->commandline }; # save for a HUP
-    $self->configure_hook;      # user customizable hook
-    $self->configure(@_);       # allow for reading of commandline, program, and configuration file parameters
-
-    my @defaults = %{ $self->default_values || {} }; # allow yet another way to pass defaults
-    $self->process_args(\@defaults) if @defaults;
-}
-
 sub run {
     my $self = ref($_[0]) ? shift() : shift->new;  # pass package or object
     $self->_initialize(@_ == 1 ? %{$_[0]} : @_);     # configure all parameters
@@ -94,6 +82,24 @@ sub run_client_connection {
 
 ###----------------------------------------------------------------###
 
+sub _initialize {
+    my $self = shift;
+    my $prop = $self->{'server'} ||= {};
+
+    $self->commandline($self->_get_commandline) if ! eval { $self->commandline }; # save for a HUP
+    $self->configure_hook;      # user customizable hook
+    $self->configure(@_);       # allow for reading of commandline, program, and configuration file parameters
+
+    my @defaults = %{ $self->default_values || {} }; # allow yet another way to pass defaults
+    $self->process_args(\@defaults) if @defaults;
+}
+
+sub commandline {
+    my $self = shift;
+    $self->{'server'}->{'commandline'} = ref($_[0]) ? shift : \@_ if @_;
+    return $self->{'server'}->{'commandline'} || die "commandline was not set during initialization";
+}
+
 sub _get_commandline {
     my $self = shift;
     if (open my $fh, "<", "/proc/$$/cmdline") { # see if we can find the full command line - unix specific
@@ -106,14 +112,6 @@ sub _get_commandline {
     $script =~ /^(.+)$/; # untaint for later use in hup
     return [$1, @ARGV]
 }
-
-sub commandline {
-    my $self = shift;
-    $self->{'server'}->{'commandline'} = ref($_[0]) ? shift : \@_ if @_;
-    return $self->{'server'}->{'commandline'} || die "commandline was not set during initialization";
-}
-
-sub default_values { {} }
 
 sub configure_hook {}
 
@@ -133,6 +131,7 @@ sub configure {
     }
 }
 
+sub default_values { {} }
 
 sub post_configure {
     my $self = shift;
@@ -145,6 +144,12 @@ sub post_configure {
         $prop->{'log_file'} = ''; # log to STDERR
 
     } elsif ($prop->{'log_file'} eq 'Sys::Syslog') {
+        $self->configure({
+            syslog_logsock  => \$prop->{'syslog_logsock'},
+            syslog_ident    => \$prop->{'syslog_ident'},
+            syslog_logopt   => \$prop->{'syslog_logopt'},
+            syslog_facility => \$prop->{'syslog_facility'},
+        });
         $self->open_syslog; # log to syslog
 
     } elsif ($prop->{'log_file'}) {
@@ -212,51 +217,8 @@ sub pre_bind { # make sure we have good port parameters
     $super = (! $super || ref($self) eq $super) ? '' : " (type $super)";
     $self->log(2, $self->log_time ." ".ref($self)."$super starting! pid($$)");
 
-    $prop->{'port'} = [$prop->{'port'}] if $prop->{'port'} && ! ref($prop->{'port'});
-    if (! @{ $prop->{'port'} }) {
-        my $port = ($self->can('default_port') && $self->default_port) || 20203;
-        $port = [$port] if ! ref $port;
-        $self->log(2, "Port Not Defined.  Defaulting to '@$port'");
-        $prop->{'port'} = $port;
-    }
-
-    $prop->{'host'} = []                if ! defined $prop->{'host'};
-    $prop->{'host'} = [$prop->{'host'}] if ! ref     $prop->{'host'};
-    push @{ $prop->{'host'} }, (($prop->{'host'}->[-1]) x (@{ $prop->{'port'} } - @{ $prop->{'host'}})); # augment hosts with as many as port
-    foreach my $host (@{ $prop->{'host'} }) {
-        if (!defined($host) || $host eq '' || $host eq '*') {
-            $host = '*';
-        } elsif ($host =~ /^\[([\w\/.:-]+)\]$/ || $host =~ /^([\w\/.:-]+)$/) {
-            $host = $1;
-        } else {
-            $self->fatal("Unsecure host \"$host\"");
-        }
-    }
-
-    $prop->{'proto'} = []                 if ! $prop->{'proto'};
-    $prop->{'proto'} = [$prop->{'proto'}] if ! ref $prop->{'proto'};
-    push @{ $prop->{'proto'} }, (($prop->{'proto'}->[-1]) x (@{ $prop->{'port'} } - @{ $prop->{'proto'}}));
-    foreach my $proto (@{ $prop->{'proto'} }) {
-        $proto ||= 'tcp';
-        $proto = ($proto =~ /^(\w+)$/) ? $1 : $self->fatal("Unsecure proto \"$proto\"");
-    }
-
-    # loop through the passed ports
-    # set up parallel arrays of hosts, ports, and protos
-    my %bound;
-    foreach (my $i = 0; $i < @{ $prop->{'port'} }; $i++) {
-        my $port  = $prop->{'port'}->[$i];
-        my $host  = $prop->{'host'}->[$i];
-        my $proto = $prop->{'proto'}->[$i];
-        if ($port ne "0" && $bound{"$host/$port/$proto"}++) {
-            $self->log(2, "Duplicate configuration (".(uc $proto)." port $port on host $host - skipping");
-            next;
-        }
-        push @{ $prop->{'sock'} }, grep {$_} $self->proto_object($host, $port, $proto);
-    }
-    if (! @{ $prop->{'sock'} }) {
-        $self->fatal("No valid socket parameters found");
-    }
+    $prop->{'sock'} = [grep {$_} map { $self->proto_object($_) } @{ $self->prepared_ports }];
+    $self->fatal("No valid socket parameters found") if ! @{ $prop->{'sock'} };
 
     if (!$prop->{'listen'} || $prop->{'listen'} !~ /^\d+$/) {
         my $max = Socket::SOMAXCONN();
@@ -266,9 +228,45 @@ sub pre_bind { # make sure we have good port parameters
     }
 }
 
+sub prepared_ports {
+    my $self = shift;
+    my $prop = $self->{'server'};
+    my $bind = $prop->{'_bind'} = [];
+
+    my ($ports, $hosts, $protos) = @$prop{qw(port host proto)};
+    $ports ||= $prop->{'ports'};
+    if (!defined($ports) || (ref($ports) && !@$ports)) {
+        $ports = $self->default_port;
+        if (!defined($ports) || (ref($ports) && !@$ports)) {
+            $ports = default_port();
+            $self->log(2, "Port Not Defined.  Defaulting to '$ports'");
+        }
+    }
+
+    my %bound;
+    for my $_port (ref($ports) ? @$ports : $ports) {
+        my $_host  = ref($hosts)  ? $hosts->[ @$bind >= @$hosts  ? -1 : $#$bind + 1] : $hosts; # if ports are greater than hosts - augment with the last host
+        my $_proto = ref($protos) ? $protos->[@$bind >= @$protos ? -1 : $#$bind + 1] : $protos;
+        my $info   = $self->proto_info($_port, $_host, $_proto);
+        my ($port, $host, $proto) = @$info{qw(port host proto)}; # use cleaned values
+        if ($port ne "0" && $bound{"$host/$port/$proto"}++) {
+            $self->log(2, "Duplicate configuration (".(uc $proto)." on [$host]:$port - skipping");
+            next;
+        }
+        push @$bind, $info;
+    }
+
+    return $bind;
+}
+
+sub proto_info {
+    my ($self, $port, $host, $proto) = @_;
+    return Net::Server::Proto->parse_info($port, $host, $proto, $self);
+}
+
 sub proto_object {
-    my ($self, $host, $port, $proto) = @_;
-    return Net::Server::Proto->object($host, $port, $proto, $self);
+    my ($self, $info) = @_;
+    return Net::Server::Proto->object($info, $self);
 }
 
 sub bind { # bind to the port (This should serve all but INET)
@@ -642,6 +640,8 @@ sub run_dequeue { # fork off a child process to handle dequeuing
     $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue';
 }
 
+sub default_port { 20203 }
+
 sub dequeue {}
 
 sub pre_server_close_hook {}
@@ -695,6 +695,7 @@ sub server_close {
     }
 
     $self->shutdown_sockets;
+    return $self if $prop->{'no_exit_on_close'};
     $self->server_exit($exit_val);
 }
 
@@ -928,8 +929,6 @@ sub options {
                 user group chroot log_level
                 log_file pid_file background setsid
                 listen reverse_lookups
-                syslog_logsock syslog_ident
-                syslog_logopt syslog_facility
                 no_close_by_child
                 no_client_stdout tie_client_stdout tied_stdout_callback tied_stdin_callback
                 leave_children_open_on_hup
@@ -959,27 +958,24 @@ sub process_args {
                     $val = 1; # allow for options such as --setsid
                 } else {
                     $val = splice @$args, $i, 1;
-                    if (ref($val) && $key !~ /_callback$/) {
-                        die "Found an invalid configuration value for \"$key\" ($val)" if ref($val) ne 'ARRAY';
-                        $val = $val->[0] if @$val == 1;
-                    }
+                    $val = $val->[0] if ref($val) eq 'ARRAY' && @$val == 1 && ref($template->{$key}) ne 'ARRAY';
                 }
             }
             $i--;
-            $val =~ s/%([A-F0-9])/chr(hex $1)/eig if ! ref $val;;
+            $val =~ s/%([A-F0-9])/chr(hex $1)/eig if ! ref $val;
 
             if (ref $template->{$key} eq 'ARRAY') {
                 if (! defined $previously_set{$key}) {
                     $previously_set{$key} = scalar @{ $template->{$key} };
                 }
                 next if $previously_set{$key};
-                push @{ $template->{$key} }, ref($val) ? @$val : $val;
+                push @{ $template->{$key} }, ref($val) eq 'ARRAY' ? @$val : $val;
             } else {
                 if (! defined $previously_set{$key}) {
                     $previously_set{$key} = defined(${ $template->{$key} }) ? 1 : 0;
                 }
                 next if $previously_set{$key};
-                die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref($val) && $key !~ /_callback$/;
+                die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref($val) eq 'ARRAY';
                 ${ $template->{$key} } = $val;
             }
         }

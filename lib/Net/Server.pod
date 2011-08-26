@@ -555,21 +555,48 @@ Local port/socket on which to bind.  If low port, process must
 start as root.  If multiple ports are given, all will be
 bound at server startup.  May be of the form
 C<host:port/proto>, C<host:port>, C<port/proto>, or C<port>,
-where I<host> represents a hostname residing on the local
-box, where I<port> represents either the number of the port
-(eg. "80") or the service designation (eg.  "http"), and
-where I<proto> represents the protocol to be used.  See
-L<Net::Server::Proto>.  If you are working with unix sockets,
-you may also specify C<socket_file|unix> or
-C<socket_file|type|unix> where type is SOCK_DGRAM or
-SOCK_STREAM.  If the protocol is not specified, I<proto> will
+where I<host> represents a hostname residing on the local box,
+where I<port> represents either the number of the port (eg. "80")
+or the service designation (eg. "http"), and where I<proto>
+represents the protocol to be used. See L<Net::Server::Proto>.
+
+An explicit I<host> given in a port specification overrides
+a default binding address (a C<host> setting, see below).
+The I<host> part may be enclosed in square brackets, but when it is
+a numerical IPv6 address it B<must> be enclosed in square brackets
+to avoid ambiguity in parsing a port number, e.g.: "[::1]:80".
+
+If you are working with unix sockets, you may also specify
+C<socket_file|unix> or C<socket_file|type|unix> where type is SOCK_DGRAM
+or SOCK_STREAM.  If the protocol is not specified, I<proto> will
 default to the C<proto> specified in the arguments.  If C<proto> is not
 specified there it will default to "tcp".  If I<host> is not
 specified, I<host> will default to C<host> specified in the
-arguments.  If C<host> is not specified there it will
-default to "*".  Default port is 20203.  Configuration passed
-to new or run may be either a scalar containing a single port
-number or an arrayref of ports.
+arguments.  If C<host> is not specified there it will default to "*".
+Default port is 20203.  Configuration passed to new or run may be either
+a scalar containing a single port number or an arrayref of ports.
+
+On an IPv6-enabled host where a module IO::Socket::INET6 is installed
+the "*" implies two listening sockets, one for each of the protocols
+(PF_INET and PF_INET6) and is equivalent to specifying two ports, bound
+to an 'unspecified' address of each address family ("0.0.0.0" and "::").
+If listening on an INET6 socket is not desired despite IO::Socket::INET6
+module being available, please supply the 'unspecifed' INET (IPv4) address
+'0.0.0.0' as a I<host>, either in the C<port> or in the C<host> argument.
+
+An INET socket can only accept IPv4 connections. An INET6 socket accepts
+IPv6 connections, but may also accept IPv4 connections depending on
+OS and its settings. For example, on FreeBSD systems setting a sysctl
+net.inet6.ip6.v6only to 0 will allow IPv4 connections to an INET6 socket.
+If this is the case, specifying "::" as a binding address instead of a "*"
+might be desired to reduce the number of sockets needed. Note that a
+textual representation of a peer's IPv4 address as connected to an INET6
+socket will typically be in a form of an IPv4-mapped IPv6 addresses,
+e.g. "::FFFF:127.0.0.1" .
+
+Restricting binding to a loopback interface on systems where an INET6
+socket does not accept IPv4 connections requires creating two sockets,
+one bound to address "127.0.0.1" and the other bound to address "::1".
 
 On systems that support it, a port value of 0 may be used to ask
 the OS to auto-assign a port.  The value of the auto-assigned port
@@ -582,7 +609,9 @@ contains the port that was connected through.
 
 Local host or addr upon which to bind port.  If a value of '*' is
 given, the server will bind that port on all available addresses
-on the box.  See L<Net::Server::Proto>. See L<IO::Socket>.  Configuration
+on the box.  The C<host> argument provides a default local host
+address if the C<port> argument omits a host specification.
+See L<Net::Server::Proto>. See L<IO::Socket>.  Configuration
 passed to new or run may be either a scalar containing a single
 host or an arrayref of hosts - if the hosts array is shorter than
 the ports array, the last host entry will be used to augment the
