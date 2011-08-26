@@ -11,20 +11,13 @@ package FooServer;
 use strict;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok is use_ok);
+use NetServerTest qw(prepare_test ok is use_ok diag);
 prepare_test({n_tests => 78, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
 
 @FooServer::ISA = qw(Net::Server);
-
-#sub proto_object {
-#    my ($self, $host, $port, $proto) = @_;
-#    #debug $host, $port, $proto;
-#    #return $self->SUPER::proto_object($host, $port, $proto);
-#    return "Blah";
-#}
 
 ### override these to make run not run
 ### this will allow all configuration cycles to be run
@@ -37,136 +30,130 @@ sub server_close {
     return $self;
 }
 
-###----------------------------------------------------------------###
+my $dump; # poormans dumper - concise but not full bore
+$dump = sub {
+    my $ref = shift;
+    my $ind = shift || '';
+    return (!defined $ref) ? 'undef' : ($ref eq '0') ? 0 : ($ref=~/^[1-9]\d{0,12}$/) ? $ref : "'$ref'" if ! ref $ref;
+    return "[".join(', ',map {$dump->($_)} @$ref).']' if ref $ref eq 'ARRAY';
+    return "{".join(',',map {"\n$ind  $_ => ".$dump->($ref->{$_},"$ind  ")} sort keys %$ref)."\n$ind}";
+};
 
-my $obj = eval { FooServer->new };
-ok($obj, "Got an object ($@)");
+sub p_c { # port check
+    my ($pkg, $file, $line) = caller;
+    my ($args, $hash, $args_to_new) = @_;
+    my $prop = eval { ($args_to_new ? FooServer->new(@$args)->run : FooServer->run(@$args))->{'server'} }
+        || do { diag "$@ at line $line"; {} };
+    my $got = {_bind => $prop->{'_bind'}};
+    if ($hash->{'sock'}) {
+        push @{ $got->{'sock'} }, NS_props($_) for @{ $prop->{'sock'} || [] };
+    }
+    my $result = $dump->($got);
+    my $test   = $dump->($hash);
+    (my $str = $dump->({ref($args->[0]) eq 'HASH' ? %{$args->[0]} : @$args})) =~ s/\s*\n\s*/ /g;
+    $str =~ s/^\{/(/ && $str =~ s/\}$/)/ if ref($args->[0]) ne 'HASH';
+    $str .= "  ==>  [ '".join("', '", map {$_->hup_string} @{ $prop->{'sock'} || [] })."' ]";
+    $str = ($args_to_new ? 'new' : 'run')." $str";
+    if ($result eq $test) {
+        ok(1, "$str");
+    } else {
+        is($result, $test, "$str");
+        diag "at line $line";
+    }
+}
 
-my $server = eval { FooServer->run };
-ok($server, "Got a server ($@)");
-my $prop = eval { $server->{'server'} } || {};
-ok($prop->{'log_level'} == 2,  "Correct default log_level");
-ok($prop->{'log_file'}  eq "", "Correct default log_file");
-ok(! $prop->{'user'},          "Correct default user");
-ok(! $prop->{'group'},         "Correct default group");
-ok(@{ $prop->{'port'} } == 1,         "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,         "Had 1 configured socket");
-my $sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq '*' },   "Right host");
-ok(eval { $sock->NS_port  == 20203 }, "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' }, "Right proto");
-
-###----------------------------------------------------------------###
-
-$prop = eval { FooServer->run(port => 2201)->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq '*' },     "Right host");
-ok(eval { $sock->NS_port  == 2201 },    "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' },   "Right proto");
-
-
-###----------------------------------------------------------------###
-
-$prop = eval { FooServer->run(port => "localhost:2202")->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'localhost' }, "Right host");
-ok(eval { $sock->NS_port  == 2202 },    "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' },   "Right proto");
+my %class_m;
+sub NS_props {
+    no strict 'refs';
+    my $sock = shift || return {};
+    my $pkg  = ref($sock);
+    my $m = $class_m{$pkg} ||= {map {$_ => 1} qw(NS_port NS_host NS_proto), grep {/^NS_\w+$/ && defined(&{"${pkg}::$_"})} keys %{"${pkg}::"}};
+    return {map {$_ => $sock->$_()} keys %$m};
+}
 
 ###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run(port => "localhost:2202/udp")->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'localhost' }, "Right host");
-ok(eval { $sock->NS_port  == 2202 },    "Right port");
-ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
+p_c([], {
+    _bind => [{
+        host => '*',
+        port => Net::Server::default_port(),
+        proto => 'tcp',
+    }],
+    sock => [{
+        NS_host => '*',
+        NS_port => Net::Server::default_port(),
+        NS_proto => 'TCP',
+        NS_family => 0,
+    }],
+});
 
-###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run(port => ["localhost:2202/tcp"])->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'localhost' }, "Right host");
-ok(eval { $sock->NS_port  == 2202 },    "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' },   "Right proto");
+p_c([port => 2201], {
+    _bind => [{host => '*', port => 2201, proto => 'tcp'}],
+});
 
-###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run(port => ["bar.com:2201/udp", "foo.com:2202/tcp"])->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 2,          "Had 2 configured ports");
-ok(@{ $prop->{'sock'} } == 2,          "Had 2 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2201 },    "Right port");
-ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
-$sock = eval {$prop->{'sock'}->[1]};
-ok(eval { $sock->NS_host  eq 'foo.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2202 },    "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' },   "Right proto");
+p_c([port => "localhost:2202"], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'tcp'}],
+});
 
-###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run(port => [2201, "foo.com:2202/tcp"], host => 'bar.com', proto => 'UDP')->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 2,          "Had 2 configured ports");
-ok(@{ $prop->{'sock'} } == 2,          "Had 2 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2201 },    "Right port");
-ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
-$sock = eval {$prop->{'sock'}->[1]};
-ok(eval { $sock->NS_host  eq 'foo.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2202 },    "Right port");
-ok(eval { $sock->NS_proto eq 'TCP' },   "Right proto");
+p_c([port => "localhost:2202/udp"], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'udp'}],
+    sock  => [{
+        NS_broadcast => undef,
+        NS_host => 'localhost',
+        NS_port => 2202,
+        NS_proto => 'UDP',
+        NS_recv_flags => 0,
+        NS_recv_len => 4096,
+    }],
+});
 
-###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run(port => 2201, host => 'bar.com', proto => 'UDP')->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2201 },    "Right port");
-ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
+p_c([port => ["localhost:2202/tcp"]], {
+    _bind => [{host => 'localhost', port => 2202, proto => 'tcp'}],
+});
 
-###----------------------------------------------------------------###
 
-$prop = eval { FooServer->run({port => 2201, host => 'bar.com', proto => 'UDP'})->{'server'} };
-ok($prop, "Loaded server");
-$prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
-ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
-$sock = eval {$prop->{'sock'}->[0]};
-ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
-ok(eval { $sock->NS_port  == 2201 },    "Right port");
-ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
+p_c([port => ["bar.com:2201/udp", "foo.com:2202/tcp"]], {_bind => [
+   {host => 'bar.com', port => 2201, proto => 'udp'},
+   {host => 'foo.com', port => 2202, proto => 'tcp'},
+]});
 
-###----------------------------------------------------------------###
+
+p_c([port => 2201, host => 'bar.com', proto => 'UDP'], {
+    _bind => [{host => 'bar.com', port => 2201, proto => 'UDP'}],
+});
+
+
+p_c([{port => 2201, host => 'bar.com', proto => 'UDP'}], {
+    _bind => [{host => 'bar.com', port => 2201, proto => 'UDP'}],
+});
+
+
+p_c([port => 2201, host => 'bar.com', proto => 'UDP'], {
+    _bind => [{host => 'bar.com', port => 2201, proto => 'UDP'}],
+}, 'new');
+
+
+p_c([{port => 2201, host => 'bar.com', proto => 'UDP'}], {
+    _bind => [{host => 'bar.com', port => 2201, proto => 'UDP'}],
+}, 'new');
+
+
+p_c([port => [2201, "foo.com:2202/tcp"], host => 'bar.com', proto => 'UDP'], {_bind => [
+   {host => 'bar.com', port => 2201, proto => 'UDP'},
+   {host => 'foo.com', port => 2202, proto => 'tcp'},
+]});
+
+
+__END__
 
 $prop = eval { FooServer->new({port => 2201, host => 'bar.com', proto => 'UDP'})->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
+ok(@{ $prop->{'_bind'} } == 1,         "Had 1 configured ports");
 ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
 $sock = eval {$prop->{'sock'}->[0]};
 ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
@@ -178,7 +165,7 @@ ok(eval { $sock->NS_proto eq 'UDP' },   "Right proto");
 $prop = eval { FooServer->new(port => 2201, host => 'bar.com', proto => 'UDP')->run->{'server'} };
 ok($prop, "Loaded server");
 $prop ||= {};
-ok(@{ $prop->{'port'} } == 1,          "Had 1 configured ports");
+ok(@{ $prop->{'_bind'} } == 1,         "Had 1 configured ports");
 ok(@{ $prop->{'sock'} } == 1,          "Had 1 configured socket");
 $sock = eval {$prop->{'sock'}->[0]};
 ok(eval { $sock->NS_host  eq 'bar.com' }, "Right host");
