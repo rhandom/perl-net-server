@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok);
-prepare_test({n_tests => 67, plan_only => 1});
+prepare_test({n_tests => 66, plan_only => 1});
 
 use_ok('Net::Server');
 @FooServer::ISA = qw(Net::Server);
@@ -69,7 +69,7 @@ my $prop = eval { $server->{'server'} } || {};
 is($prop->{'log_level'}, 2,  "Correct default log_level");
 is($prop->{'log_file'}, "", "Correct default log_file");
 ok(! $prop->{'user'},          "Correct default user");
-is(scalar(@{ $prop->{'port'} }), 1,         "Had 1 configured ports");
+is(scalar(@{ $prop->{'_bind'} }), 1,        "Had 1 configured ports");
 is(scalar(@{ $prop->{'sock'} }), 1,         "Had 1 configured socket");
 my $sock = eval {$prop->{'sock'}->[0]};
 is(eval { $sock->NS_host  }, '*',   "Right host");
@@ -92,11 +92,6 @@ $prop ||= {};
 is(scalar(@{ $prop->{'port'} }), 2,    "Had 1 configured ports");
 is($prop->{'port'}->[0], 2201, "Right port");
 is($prop->{'port'}->[1], 2202, "Right port");
-
-###----------------------------------------------------------------###
-
-$prop = eval { FooServer->run(port => qr{bam})->{'server'} };
-ok(!$prop, "Correctly didn't load server");
 
 ###----------------------------------------------------------------###
 
