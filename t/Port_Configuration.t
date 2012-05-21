@@ -64,8 +64,8 @@ sub p_c { # port check
     if ($result eq $test && $str !~ /\|\|/) {
         ok(1, "$str");
     } else {
+        diag "Failed at line $line";
         is($result, $test, "$str");
-        diag "at line $line";
         exit;
     }
 }
@@ -92,7 +92,7 @@ p_c([], {
         NS_host => '*',
         NS_port => Net::Server::default_port(),
         NS_proto => 'TCP',
-        NS_family => 0,
+        NS_ipv6 => 0,
         NS_listen => eval { Socket::SOMAXCONN() },
     }],
 });
@@ -126,7 +126,7 @@ p_c([port => 2202, listen => 5], {
         NS_port => 2202,
         NS_proto => 'TCP',
         NS_listen => 5,
-        NS_family => 0,
+        NS_ipv6 => 0,
     }],
 });
 
@@ -204,7 +204,7 @@ p_c([port => [{port => 2202, listen => 6}]], {
         NS_port => 2202,
         NS_proto => 'TCP',
         NS_listen => 6,
-        NS_family => 0,
+        NS_ipv6 => 0,
     }],
 });
 
@@ -223,7 +223,7 @@ if (!eval { require IO::Socket::UNIX }) {
 
     p_c([port => '/foo/bar|unix', udp_recv_len => 500], {
         _bind => [{host => '*', port => '/foo/bar', proto => 'unix'}],
-        sock  => [{NS_family => 0, NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM'}],
+        sock  => [{NS_ipv6 => 0, NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM'}],
     });
 
     p_c([port => '/foo/bar|unixdgram', udp_recv_len => 500], {
@@ -237,7 +237,7 @@ if (!eval { require IO::Socket::UNIX }) {
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7}], {
         _bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7}],
-        sock  => [{NS_family => 0, NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_unix_type => 'SOCK_STREAM', NS_listen => 7}],
+        sock  => [{NS_ipv6 => 0, NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_unix_type => 'SOCK_STREAM', NS_listen => 7}],
     });
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_dgram'}], {
@@ -262,19 +262,19 @@ if (!eval { require Net::SSLeay; 1 }) {
 
     p_c([proto => 'ssleay'], {
         _bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssleay'}],
-        sock  => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSLEAY', NS_family => 0, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
+        sock  => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSLEAY', NS_ipv6 => 0, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
     });
 
     %class_m = (); # setting SSL_key_file may dynamically change the package methods
     p_c([port => '2203/ssleay', listen => 4, SSL_key_file => "foo/bar"], {
         _bind => [{host => '*', port => 2203, proto => 'ssleay'}],
-        sock  => [{NS_host => '*', NS_port => 2203, NS_proto => 'SSLEAY', NS_family => 0, NS_listen => 4, SSL_key_file => "foo/bar", SSL_cert_file => FooServer::SSL_cert_file()}],
+        sock  => [{NS_host => '*', NS_port => 2203, NS_proto => 'SSLEAY', NS_ipv6 => 0, NS_listen => 4, SSL_key_file => "foo/bar", SSL_cert_file => FooServer::SSL_cert_file()}],
     });
 
     %class_m = (); # setting SSL_key_file may dynamically change the package methods
     p_c([port => {port => '2203', proto => 'ssleay', listen => 6, SSL_key_file => "foo/bar"}], {
         _bind => [{host => '*', port => 2203, proto => 'ssleay', listen => 6, SSL_key_file => "foo/bar"}],
-        sock  => [{NS_host => '*', NS_port => 2203, NS_proto => 'SSLEAY', NS_family => 0, NS_listen => 6, SSL_key_file => "foo/bar", SSL_cert_file => FooServer::SSL_cert_file()}],
+        sock  => [{NS_host => '*', NS_port => 2203, NS_proto => 'SSLEAY', NS_ipv6 => 0, NS_listen => 6, SSL_key_file => "foo/bar", SSL_cert_file => FooServer::SSL_cert_file()}],
     });
 
 }
