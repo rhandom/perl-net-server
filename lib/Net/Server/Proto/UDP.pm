@@ -63,7 +63,7 @@ sub connect {
     my $ipv6 = $sock->NS_ipv6;
     my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
-    $sock->SUPER::configure(
+    $sock->SUPER::configure({
         LocalPort => $port,
         Proto     => 'udp',
         ReuseAddr => 1,
@@ -71,7 +71,7 @@ sub connect {
         ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
         ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
         ($sock->NS_broadcast ? (Broadcast => 1) : ()),
-    ) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
+    }) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
 
     if ($port == 0 && ($port = $sock->sockport)) {
         $sock->NS_port($port);
