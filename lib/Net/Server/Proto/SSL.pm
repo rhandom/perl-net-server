@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,73 +22,98 @@
 package Net::Server::Proto::SSL;
 
 use strict;
-eval { require IO::Socket::SSL; };
-$@ && warn "Module IO::Socket::SSL is required for SSL.";
+use warnings;
+
+BEGIN {
+    if (! eval { require IO::Socket::SSL }) {
+        die "Module IO::Socket::SSL is required for SSL - you may alternately try SSLEAY. $@";
+    }
+}
+
 our @ISA = qw(IO::Socket::SSL);
 
-our $VERSION = $Net::Server::VERSION; # done until separated
-
 sub NS_proto { 'SSL' }
+sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
+sub NS_host   { my $sock = shift; ${*$sock}{'NS_host'}   = shift if @_; return ${*$sock}{'NS_host'}   }
+sub NS_ipv6   { my $sock = shift; ${*$sock}{'NS_ipv6'}   = shift if @_; return ${*$sock}{'NS_ipv6'}   }
+sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 
-sub NS_family { 0 }
+our @ssl_args = qw(
+    SSL_server
+    SSL_use_cert
+    SSL_verify_mode
+    SSL_key_file
+    SSL_cert_file
+    SSL_ca_path
+    SSL_ca_file
+    SSL_cipher_list
+    SSL_passwd_cb
+    SSL_max_getline_length
+);
 
 sub object {
-    my ($class, $host, $port, $server) = @_;
+    my ($class, $info, $server) = @_;
+    my ($host, $port) = @$info{qw(host port)};
     my $prop = $server->{'server'};
+    my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
-  # read any additional protocol specific arguments
-  my @ssl_args = qw(
-      SSL_server
-      SSL_use_cert
-      SSL_verify_mode
-      SSL_key_file
-      SSL_cert_file
-      SSL_ca_path
-      SSL_ca_file
-      SSL_cipher_list
-      SSL_passwd_cb
-      SSL_max_getline_length
-  );
-    my %args = map {$_ => \$prop->{$_}} @ssl_args;
-    $server->configure(\%args);
+    my %temp = map {$_ => undef} @ssl_args;
+    $server->configure({map {$_ => \$temp{$_}} @ssl_args});
 
-    my $sock = $class->new;
-    $sock->NS_host($host);
-    $sock->NS_port($port);
+    my @sock = $class->SUPER::new();
+    foreach my $sock (@sock) {
+        $sock->NS_host($host);
+        $sock->NS_port($port);
+        $sock->NS_ipv6($info->{'ipv6'} || 0);
+        $sock->NS_listen($listen);
 
-    for my $key (@ssl_args) {
-        my $val = defined($prop->{$key}) ? $prop->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSL') : undef;
-        $sock->$key($val);
+        for my $key (@ssl_args) {
+            my $val = defined($info->{$key}) ? $info->{$key} : defined($temp{$key}) ? $temp{$key} : $server->can($key) ? $server->$key($host, $port, 'SSL') : undef;
+            next if ! defined $val;
+            $sock->$key($val) if defined $val;
+        }
     }
-
-    return $sock;
+    return wantarray ? @sock : $sock[0];
 }
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host);
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
 }
 
 sub connect {
     my ($sock, $server) = @_;
-    my $prop = $server->{'server'};
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
+    my $ipv6 = $sock->NS_ipv6;
+    my $lstn = $sock->NS_listen;
+    my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
-    my %args = (
+    my %ssl_args;
+    for my $key (@ssl_args) {
+        $ssl_args{$_} = $sock->$key();
+    }
+
+    $sock->SUPER::configure({
         LocalPort => $port,
         Proto     => 'tcp',
-        Listen    => $prop->{'listen'},
-        ReuseAddr => 1, Reuse => 1,
-    );
-    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
-    $args{$_} = $prop->{$_} for grep {/^SSL_/} keys %$prop;
+        Listen    => $lstn,
+        ReuseAddr => 1,
+        Reuse     => 1,
+        ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
+        ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        %ssl_args,
+    }) or $server->fatal("Cannot connect to SSL port $port on $host [$!]");
 
-    $sock->SUPER::configure(\%args) or $server->fatal("Can't connect to SSL port $port on $host [$!]");
+    if ($port == 0 && ($port = $sock->sockport)) {
+        $sock->NS_port($port);
+        $server->log(2, "Bound to auto-assigned port $port");
+    }
 }
 
 sub reconnect { # after a sig HUP
     my ($sock, $fd, $server) = @_;
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
@@ -107,24 +132,16 @@ sub accept {
 
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv6;
 }
 
 sub show {
     my $sock = shift;
-    return "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
-}
-
-sub NS_port {
-    my $sock = shift;
-    ${*$sock}{'NS_port'} = shift if @_;
-    return ${*$sock}{'NS_port'};
-}
-
-sub NS_host {
-    my $sock = shift;
-    ${*$sock}{'NS_host'} = shift if @_;
-    return ${*$sock}{'NS_host'};
+    my $t = "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
+    foreach my $prop (qw(SSLeay_context SSLeay_is_client)) {
+        $t .= "  $prop = \"" .$sock->$prop()."\"\n";
+    }
+    return $t;
 }
 
 1;

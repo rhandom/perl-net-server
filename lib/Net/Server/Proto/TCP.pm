@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -22,53 +22,59 @@
 package Net::Server::Proto::TCP;
 
 use strict;
-use base qw(IO::Socket::INET);
+use warnings;
+use IO::Socket::INET;
+use Net::Server::Proto;
 
+our @ISA = qw(IO::Socket::INET); # we may dynamically change this to INET6 based upon our server configuration
 our $VERSION = $Net::Server::VERSION;
-our $have_inet6;
-our $NS_bam = 1;
+
 sub NS_proto { 'TCP' }
+sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
+sub NS_host   { my $sock = shift; ${*$sock}{'NS_host'}   = shift if @_; return ${*$sock}{'NS_host'}   }
+sub NS_ipv6   { my $sock = shift; ${*$sock}{'NS_ipv6'}   = shift if @_; return ${*$sock}{'NS_ipv6'}   }
+sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 
 sub object {
-    my ($class, $default_host, $port, $server) = @_;
+    my ($class, $info, $server) = @_;
+    my ($host, $port) = @$info{qw(host port)};
+    my $prop = $server->{'server'};
+    my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
-    my $host;
-    if ($port =~ /^([\w\.\-\*\/]+):(\w+)$/) { # allow for things like "domain.com:80"
-        ($host, $port) = ($1, $2);
-    } elsif ($port =~ /^(\w+)$/) { # allow for things like "80"
-        ($host, $port) = ($default_host, $1);
-    } else {
-        $server->fatal("Unknown port type \"$port\" under ".__PACKAGE__);
+    @ISA = qw(IO::Socket::INET6) if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
+
+    my @sock = $class->SUPER::new();
+    foreach my $sock (@sock) {
+        $sock->NS_host($host);
+        $sock->NS_port($port);
+        $sock->NS_ipv6($info->{'ipv6'} || 0);
+        $sock->NS_listen($listen);
     }
-
-    my $sock = $class->SUPER::new();
-    $sock->NS_host($host);
-    $sock->NS_port($port);
-    return $sock;
+    return wantarray ? @sock : $sock[0];
 }
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with PF ".($sock->NS_family || 0));
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
 }
 
 sub connect {
     my ($sock, $server) = @_;
-    my $prop = $server->{'server'};
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
-    my $pfamily = $sock->NS_family;
+    my $ipv6 = $sock->NS_ipv6;
+    my $lstn = $sock->NS_listen;
+    my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
-    my %args = (
+    $sock->SUPER::configure({
         LocalPort => $port,
         Proto     => 'tcp',
-        Listen    => $prop->{'listen'},
-        ReuseAddr => 1, Reuse => 1,  # allow us to rebind the port on a restart
-    );
-    $args{'LocalAddr'} = $host if $host !~ /\*/; # what local address (* is all)
-    $args{'Domain'}    = $pfamily if $have_inet6 && $pfamily;
-
-    $sock->SUPER::configure(\%args) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
+        Listen    => $lstn,
+        ReuseAddr => 1,
+        Reuse     => 1,
+        ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
+        ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+    }) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
     if ($port == 0 && ($port = $sock->sockport)) {
         $sock->NS_port($port);
@@ -78,7 +84,7 @@ sub connect {
 
 sub reconnect { # after a sig HUP
     my ($sock, $fd, $server) = @_;
-    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", PF ".$sock->NS_family);
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
@@ -115,27 +121,15 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
 ### the hup_string must be a unique identifier based on configuration info
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_family;
+    print "$_ undefined\n"
+        for grep {!defined $sock->$_()} qw(NS_host NS_port NS_proto NS_ipv6);
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv6;
 }
 
 sub show {
     my $sock = shift;
     return "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
 }
-
-sub NS_port {
-    my $sock = shift;
-    ${*$sock}{'NS_port'} = shift if @_;
-    return ${*$sock}{'NS_port'};
-}
-
-sub NS_host {
-    my $sock = shift;
-    ${*$sock}{'NS_host'} = shift if @_;
-    return ${*$sock}{'NS_host'};
-}
-
-sub NS_family { 0 }
 
 1;
 
