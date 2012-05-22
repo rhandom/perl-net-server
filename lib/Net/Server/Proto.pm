@@ -22,6 +22,9 @@
 package Net::Server::Proto;
 
 use strict;
+use warnings;
+
+my $requires_ipv6 = 0;
 
 sub parse_info {
     my ($class, $port, $host, $proto, $server) = @_;
@@ -37,7 +40,7 @@ sub parse_info {
         $info = {};
         ($port, $info->{'unix_type'}) = ($1, $2) if $port =~ m{ (.+) [,|/] (sock_(?:stream|dgram)) $ }x; # legacy /some/path|sock_dgram
         if (     $port =~ m{^ \[ ([\w/.\-:]+ | \*) \] [,|:](\w+) $ }x) { # allow for things like "[::1]:80" or "[host.example.com]:80"
-            @$info{qw(host port)} = ($1, $2);
+            @$info{qw(host port ipv6)} = ($1, $2, 1);
         } elsif ($port =~ m{^    ([\w/.\-:]+ | \*)    [,|:](\w+) $ }x) { # allow for things like "127.0.0.1:80" or "host.example.com:80"
             @$info{qw(host port)} = ($1, $2);
         } else {
@@ -45,16 +48,25 @@ sub parse_info {
         }
     }
 
-    $info->{'host'} ||= (!defined($host) || $host eq '') ? '*'
-        : ($host =~ m{^ \[ ([\w/.\-:]+ | :?\*) \] $ }x) ? $1
-        : ($host =~ m{^    ([\w/.\-:]+ | :?\*)    $ }x) ? $1
-        : $server->fatal("Could not determine host from \"$host\"");
+    $info->{'host'} ||= (defined($host) && $host ne '') ? $host : ($INC{'Socket6.pm'}) ? '[*]' : '*';
+    if (     $info->{'host'} =~ m{^ \[ ([\w/.\-:]+ | :?\*) \] $ }x) {
+        @$info{qw(host ipv6)} = ($1, 1);
+    } elsif ($info->{'host'} =~ m{^    ([\w/.\-:]+ | :?\*)    $ }x) {
+        $info->{'host'} = $1;
+        $info->{'ipv6'} = 1 if $info->{'host'} =~ /:/;
+    } else {
+        $server->fatal("Could not determine host from \"$info->{'host'}\"");
+    }
 
-    $info->{'proto'} ||= !$proto ? 'tcp'
-        : ($proto =~ /^(\w+ (?:::\w+)*)$/x) ? $1
-        : $server->fatal("Could not determine proto from \"$proto\"");
+    $info->{'proto'} ||= $proto || 'tcp';
+    if ($info->{'proto'} =~ /^(\w+ (?:::\w+)*)$/x) {
+        $info->{'proto'} = $1;
+    } else {
+        $server->fatal("Could not determine proto from \"$proto\"");
+    }
 
-    $info->{'ipv6'} = 1 if $info->{'host'} =~ /:/;
+    $info->{'ipv6'} = 1 if $server && $server->{'server'} && $server->{'server'}->{'ipv6'};
+    $requires_ipv6++ if $info->{'ipv6'};
 
     return $info;
 }
@@ -69,6 +81,19 @@ sub object {
     (my $file = "${proto_class}.pm") =~ s|::|/|g;
     $server->fatal("Unable to load module for proto \"$proto_class\": $@") if ! eval { require $file };
     return $proto_class->object($info, $server);
+}
+
+sub requires_ipv6 {
+    my ($class, $server) = @_;
+    return if ! $requires_ipv6;
+
+    if (! $ENV{'IO/Socket/INET6.pm'}) {
+        eval {
+            require Socket6;
+            require IO::Socket::INET6;
+        } or $server->fatal("Port configuration using IPv6 could not be started becauses of Socket6 library issues: $@");
+    }
+    return 1;
 }
 
 1;
