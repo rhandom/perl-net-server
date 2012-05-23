@@ -108,9 +108,12 @@ sub connect { # connect the first time
         ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
     }) || $server->fatal("Can't connect to SSLEAY port $port on $host [$!]");
 
-    if ($port == 0 && ($port = $sock->sockport)) {
+    if ($port eq '0' and $port = $sock->sockport) {
         $sock->NS_port($port);
         $server->log(2, "Bound to auto-assigned port $port");
+    } elsif ($port =~ /\D/ and $port = $sock->sockport) {
+        $server->log(2, "Bound to service port ".$sock->NS_port()."($port)");
+        $sock->NS_port($port);
     }
 
     $sock->bind_SSL($server);
@@ -157,6 +160,10 @@ sub accept {
     my $sock = shift;
     my $client = $sock->SUPER::accept;
     if (defined $client) {
+        $client->NS_proto($sock->NS_proto);
+        $client->NS_ipv6( $sock->NS_ipv6);
+        $client->NS_host( $sock->NS_host);
+        $client->NS_port( $sock->NS_port);
         $client->SSLeay_context($sock->SSLeay_context);
         $client->SSLeay_is_client(1);
     }
@@ -270,6 +277,17 @@ sub read {
     return length $read;
 }
 
+sub sysread {
+    my ($client, $buf, $size, $offset) = @_;
+    warn "sysread is not supported by Net::Server::Proto::SSLEAY";
+    # not quite right, usable only for testing:
+    my ($ok, $read) = $client->read_until($size, $/, 1);
+    substr($_[1], $offset || 0, defined($buf) ? length($buf) : 0, $read);
+    # should return the number of bytes actually read, 0 at end of file, or
+    # undef if there was an error (in the latter case $! should also be set)
+    return length $read;
+}
+
 sub getline {
     my $client = shift;
     my ($ok, $line) = $client->read_until($client->SSL_max_getline_length, $/);
@@ -320,7 +338,6 @@ sub write {
     $client->print($buf);
 }
 
-sub sysread  { die "sysread is not supported by Net::Server::Proto::SSLEAY" }
 sub syswrite { die "syswrite is not supported by Net::Server::Proto::SSLEAY" }
 
 sub seek {

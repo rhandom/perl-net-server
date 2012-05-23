@@ -105,9 +105,12 @@ sub connect {
         %ssl_args,
     }) or $server->fatal("Cannot connect to SSL port $port on $host [$!]");
 
-    if ($port == 0 && ($port = $sock->sockport)) {
+    if ($port eq '0' and $port = $sock->sockport) {
         $sock->NS_port($port);
         $server->log(2, "Bound to auto-assigned port $port");
+    } elsif ($port =~ /\D/ and $port = $sock->sockport) {
+        $server->log(2, "Bound to service port ".$sock->NS_port()."($port)");
+        $sock->NS_port($port);
     }
 }
 

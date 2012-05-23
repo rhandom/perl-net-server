@@ -76,9 +76,12 @@ sub connect {
         ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
     }) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
-    if ($port == 0 && ($port = $sock->sockport)) {
+    if ($port eq '0' and $port = $sock->sockport) {
         $sock->NS_port($port);
         $server->log(2, "Bound to auto-assigned port $port");
+    } elsif ($port =~ /\D/ and $port = $sock->sockport) {
+        $server->log(2, "Bound to service port ".$sock->NS_port()."($port)");
+        $sock->NS_port($port);
     }
 }
 
