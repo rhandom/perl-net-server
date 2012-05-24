@@ -65,6 +65,7 @@ sub parse_info {
 
     $ipv = $info->{'ipv'} || $ipv || '';
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
+    $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv !~ /[46*]/;
     my @_info;
     if ($info->{'host'} !~ /:/
         && (!$ipv
@@ -81,11 +82,11 @@ sub parse_info {
         my $proto = getprotobyname(lc($info->{'proto'}) eq 'udp' ? 'udp' : 'tcp');
         my $type  = lc($info->{'proto'}) eq 'udp' ? Socket::SOCK_DGRAM() : Socket::SOCK_STREAM();
         my @res = Socket6::getaddrinfo($host eq '*' ? '' : $host, $port, Socket::AF_UNSPEC(), $type, $proto, Socket6::AI_PASSIVE());
-        die "Unresolvable [$host]:$port: $res[0]" if @res < 5;
+        $server->fatal("Unresolvable [$host]:$port: $res[0]") if @res < 5;
         while (@res >= 5) {
             my ($afam, $socktype, $proto, $saddr, $canonname) = splice @res, 0, 5;
             my @res2 = Socket6::getnameinfo($saddr, Socket6::NI_NUMERICHOST() | Socket6::NI_NUMERICSERV());
-            die "getnameinfo failed on [$host]:$port: $res2[0]" if @res2 < 2;
+            $server->fatal("getnameinfo failed on [$host]:$port: $res2[0]") if @res2 < 2;
             my ($ip, $_port) = @res2;
             my $ipv = ($afam == Socket6::AF_INET6()) ? 6 : ($afam == Socket::AF_INET()) ? 4 : '*';
             $server->log(2, "Resolved [$host]:$port to [$ip]:$_port, IPv$ipv");
