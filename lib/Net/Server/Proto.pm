@@ -65,7 +65,7 @@ sub parse_info {
 
     $ipv = $info->{'ipv'} || $ipv || '';
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
-    $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv !~ /[46*]/;
+    $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
     my @_info;
     if ($info->{'host'} !~ /:/
         && (!$ipv
