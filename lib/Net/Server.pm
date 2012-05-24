@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -32,7 +32,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '1.01';
+our $VERSION = '2.000';
 
 sub new {
     my $class = shift || die "Missing class";
@@ -45,7 +45,8 @@ sub set_property { $_[0]->{'server'}->{$_[1]} = $_[2] }
 
 sub run {
     my $self = ref($_[0]) ? shift() : shift->new;  # pass package or object
-    $self->_initialize(@_ == 1 ? %{$_[0]} : @_);     # configure all parameters
+    $self->{'server'}->{'_run_args'} = [@_ == 1 ? %{$_[0]} : @_];
+    $self->_initialize;         # configure all parameters
 
     $self->post_configure;      # verification of passed parameters
     $self->post_configure_hook; # user customizable hook
@@ -88,7 +89,7 @@ sub _initialize {
 
     $self->commandline($self->_get_commandline) if ! eval { $self->commandline }; # save for a HUP
     $self->configure_hook;      # user customizable hook
-    $self->configure(@_);       # allow for reading of commandline, program, and configuration file parameters
+    $self->configure;           # allow for reading of commandline, program, and configuration file parameters
 
     my @defaults = %{ $self->default_values || {} }; # allow yet another way to pass defaults
     $self->process_args(\@defaults) if @defaults;
@@ -121,7 +122,7 @@ sub configure {
     my $template = ($_[0] && ref($_[0])) ? shift : undef;
 
     $self->process_args(\@ARGV, $template) if @ARGV; # command line
-    $self->process_args([@_],   $template);          # passed to run
+    $self->process_args($prop->{'_run_args'}, $template) if $prop->{'_run_args'}; # passed to run
 
     if ($prop->{'conf_file'}) {
         $self->process_args($self->_read_conf($prop->{'conf_file'}), $template);
@@ -219,21 +220,13 @@ sub pre_bind { # make sure we have good port parameters
 
     $prop->{'sock'} = [grep {$_} map { $self->proto_object($_) } @{ $self->prepared_ports }];
     $self->fatal("No valid socket parameters found") if ! @{ $prop->{'sock'} };
-
-    if (!$prop->{'listen'} || $prop->{'listen'} !~ /^\d+$/) {
-        my $max = Socket::SOMAXCONN();
-        $max = 128 if $max < 10; # some invalid Solaris constants ?
-        $prop->{'listen'} = $max;
-        $self->log(2, "Using default listen value of $max");
-    }
 }
 
 sub prepared_ports {
     my $self = shift;
     my $prop = $self->{'server'};
-    my $bind = $prop->{'_bind'} = [];
 
-    my ($ports, $hosts, $protos) = @$prop{qw(port host proto)};
+    my ($ports, $hosts, $protos, $ipvs) = @$prop{qw(port host proto ipv)};
     $ports ||= $prop->{'ports'};
     if (!defined($ports) || (ref($ports) && !@$ports)) {
         $ports = $self->default_port;
@@ -244,24 +237,27 @@ sub prepared_ports {
     }
 
     my %bound;
+    my $bind = $prop->{'_bind'} = [];
     for my $_port (ref($ports) ? @$ports : $ports) {
         my $_host  = ref($hosts)  ? $hosts->[ @$bind >= @$hosts  ? -1 : $#$bind + 1] : $hosts; # if ports are greater than hosts - augment with the last host
         my $_proto = ref($protos) ? $protos->[@$bind >= @$protos ? -1 : $#$bind + 1] : $protos;
-        my $info   = $self->proto_info($_port, $_host, $_proto);
-        my ($port, $host, $proto) = @$info{qw(port host proto)}; # use cleaned values
-        if ($port ne "0" && $bound{"$host/$port/$proto"}++) {
-            $self->log(2, "Duplicate configuration (".(uc $proto)." on [$host]:$port - skipping");
-            next;
+        my $_ipv   = ref($ipvs)  ? $ipvs->[ @$bind >= @$ipvs  ? -1 : $#$bind + 1] : $ipvs;
+        foreach my $info ($self->port_info($_port, $_host, $_proto, $_ipv)) {
+            my ($port, $host, $proto, $ipv) = @$info{qw(port host proto ipv)}; # use cleaned values
+            if ($port ne "0" && $bound{"$host\e$port\e$proto\e$ipv"}++) {
+                $self->log(2, "Duplicate configuration (\U$proto\E) on [$host]:$port with IPv$ipv) - skipping");
+                next;
+            }
+            push @$bind, $info;
         }
-        push @$bind, $info;
     }
 
     return $bind;
 }
 
-sub proto_info {
-    my ($self, $port, $host, $proto) = @_;
-    return Net::Server::Proto->parse_info($port, $host, $proto, $self);
+sub port_info {
+    my ($self, $port, $host, $proto, $ipv) = @_;
+    return Net::Server::Proto->parse_info($port, $host, $proto, $ipv, $self);
 }
 
 sub proto_object {
@@ -276,15 +272,18 @@ sub bind { # bind to the port (This should serve all but INET)
     if (exists $ENV{'BOUND_SOCKETS'}) {
         $self->restart_open_hook;
         $self->log(2, "Binding open file descriptors");
+        my %map;
         foreach my $info (split /\n/, $ENV{'BOUND_SOCKETS'}) {
             my ($fd, $hup_string) = split /\|/, $info, 2;
-            $fd = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
-            foreach my $sock (@{ $prop->{'sock'} }) {
-                if ($hup_string eq $sock->hup_string) {
-                    $sock->log_connect($self);
-                    $sock->reconnect($fd, $self);
-                    last;
-                }
+            $map{$hup_string} = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
+        }
+        foreach my $sock (@{ $prop->{'sock'} }) {
+            $sock->log_connect($self);
+            if (my $fd = $map{$sock->hup_string}) {
+                $sock->reconnect($fd, $self);
+            } else {
+                $self->log(2, "Added new port configuration");
+                $sock->connect($self);
             }
         }
         delete $ENV{'BOUND_SOCKETS'};
@@ -337,7 +336,7 @@ sub post_bind { # secure the process and background it
     # chown any files or sockets that we need to
     if ($prop->{'group'} ne $) || $prop->{'user'} ne $>) {
         my @chown_files;
-        push @chown_files, map {$_->NS_unix_path} grep {$_->NS_proto eq 'UNIX'} @{ $prop->{'sock'} };
+        push @chown_files, map {$_->NS_port} grep {$_->NS_proto =~ /^UNIX/} @{ $prop->{'sock'} };
         push @chown_files, $prop->{'pid_file'}  if $prop->{'pid_file_unlink'};
         push @chown_files, $prop->{'lock_file'} if $prop->{'lock_file_unlink'};
         push @chown_files, $prop->{'log_file'}  if delete $prop->{'chown_log_file'};
@@ -484,8 +483,8 @@ sub get_client_info {
     my $prop = $self->{'server'};
 
     my $sock = $prop->{'client'};
-    if ($sock->can('NS_proto') && $sock->NS_proto eq 'UNIX') {
-        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_unix_path."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
+    if ($sock->can('NS_proto') && $sock->NS_proto =~ /^UNIX/) {
+        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
         return;
     }
 
@@ -537,7 +536,7 @@ sub allow_deny {
     my $sock = $prop->{'client'};
 
     # unix sockets are immune to this check
-    return 1 if $sock && UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto eq 'UNIX';
+    return 1 if $sock && UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto =~ /^UNIX/;
 
     # if no allow or deny parameters are set, allow all
     return 1 if ! @{ $prop->{'allow'} }
@@ -672,7 +671,6 @@ sub server_close {
         $self->hup_children;
 
     } else {
-        use CGI::Ex::Dump qw(debug);
         $self->close_children() if $prop->{'children'};
         $self->post_child_cleanup_hook;
     }
@@ -710,7 +708,7 @@ sub shutdown_sockets {
 
     foreach my $sock (@{ $prop->{'sock'} }) { # unlink remaining socket files (if any)
         $sock->shutdown(2);
-        unlink $sock->NS_unix_path if $sock->NS_proto eq 'UNIX';
+        unlink $sock->NS_port if $sock->NS_proto =~ /^UNIX/;
     }
 
     $prop->{'sock'} = []; # delete the sock objects
@@ -781,7 +779,7 @@ sub sig_hup {
         require Fcntl;
         $prop->{'_HUP'}->[$i]->fcntl(Fcntl::F_SETFD(), my $flags = "");
 
-        push @fd, $fd .'|'. $sock->hup_string; # save host|port|proto|family, and file descriptor
+        push @fd, $fd .'|'. $sock->hup_string; # save file-descriptor and host|port|proto|family
 
         $sock->close();
         $i++;
@@ -916,7 +914,7 @@ sub options {
     my $ref  = shift || {};
     my $prop = $self->{'server'};
 
-    foreach (qw(port host proto allow deny cidr_allow cidr_deny)) {
+    foreach (qw(port host proto ipv allow deny cidr_allow cidr_deny)) {
         if (! defined $prop->{$_}) {
             $prop->{$_} = [];
         } elsif (! ref $prop->{$_}) {
