@@ -27,10 +27,7 @@ use warnings;
 my $requires_ipv6 = 0;
 
 sub parse_info {
-    my ($class, $port, $host, $proto, $server) = @_;
-    if ($port && ref($port) ne 'HASH' && $port =~ m{ (.+) [,|/] (\w+ (?:::\w+)*) $ }x) {
-        ($port, $proto) = ($1, $2);
-    }
+    my ($class, $port, $host, $proto, $ipv, $server) = @_;
 
     my $info;
     if (ref($port) eq 'HASH') {
@@ -38,25 +35,25 @@ sub parse_info {
         $info = $port;
     } else {
         $info = {};
-        ($port, $info->{'unix_type'}) = ($1, $2) if $port =~ m{ (.+) [,|/] (sock_(?:stream|dgram)) $ }x; # legacy /some/path|sock_dgram
-        if (     $port =~ m{^ \[ ([\w/.\-:]+ | \*) \] [,|:](\w+) $ }x) { # allow for things like "[::1]:80" or "[host.example.com]:80"
-            @$info{qw(host port ipv6)} = ($1, $2, 1);
-        } elsif ($port =~ m{^    ([\w/.\-:]+ | \*)    [,|:](\w+) $ }x) { # allow for things like "127.0.0.1:80" or "host.example.com:80"
-            @$info{qw(host port)} = ($1, $2);
-        } else {
-            $info->{'port'} = $port;
-        }
+        $info->{'unix_type'} = $1
+                    if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (sock_stream|sock_dgram) \b }{}x; # legacy /some/path|sock_dgram
+        $ipv   = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) \b }{}xi; # allow for 80|IPv*
+        $ipv  .= $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv(\d+) \b }{}xi; # allow for 80|IPv4|IPv6
+        $proto = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (tcp|udp|ssl|ssleay|unix|unixdgram|\w+(?: ::\w+)+) $ }{}xi # allow for 80/tcp or 200/udb or 90/Net::Server::Proto::TCP
+                    || $port =~ s{ / (\w+) $ }{}x; # legacy 80/MyTcp support
+        $host  = $1 if $port =~ s{ ^ (.*?)      [,|\s:]+  (?= \w+ $) }{}x; # allow localhost:80
+        $info->{'port'} = $port;
     }
+    $info->{'port'} ||= 0;
 
-    $info->{'host'} ||= (defined($host) && $host ne '') ? $host : ($INC{'Socket6.pm'}) ? '[*]' : '*';
-    if (     $info->{'host'} =~ m{^ \[ ([\w/.\-:]+ | :?\*) \] $ }x) {
-        @$info{qw(host ipv6)} = ($1, 1);
-    } elsif ($info->{'host'} =~ m{^    ([\w/.\-:]+ | :?\*)    $ }x) {
-        $info->{'host'} = $1;
-        $info->{'ipv6'} = 1 if $info->{'host'} =~ /:/;
-    } else {
+
+    $info->{'host'} ||= (defined($host) && length($host)) ? $host : '*';
+    if (     $info->{'host'} =~ m{^ \[ ([\w/.\-:]+ | \*?) \] $ }x) { # allow for [::1] or [host.example.com]
+        $info->{'host'} = length($1) ? $1 : '*';
+    } elsif ($info->{'host'} !~ m{^    ([\w/.\-:]+ | \*?)    $ }x) {
         $server->fatal("Could not determine host from \"$info->{'host'}\"");
     }
+
 
     $info->{'proto'} ||= $proto || 'tcp';
     if ($info->{'proto'} =~ /^(\w+ (?:::\w+)*)$/x) {
@@ -65,10 +62,47 @@ sub parse_info {
         $server->fatal("Could not determine proto from \"$proto\"");
     }
 
-    $info->{'ipv6'} = 1 if $server && $server->{'server'} && $server->{'server'}->{'ipv6'};
-    $requires_ipv6++ if $info->{'ipv6'};
 
-    return $info;
+    $ipv = $info->{'ipv'} || $ipv || '';
+    $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
+    my @_info;
+    if ($info->{'host'} !~ /:/
+        && (!$ipv
+            || $ipv =~ /4/
+            || ($ipv =~ /[*]/ && $info->{'host'} !~ /:/ && !eval{ require Socket6; require IO::Socket::INET6 }))) {
+        push @_info, {%$info, ipv => '4'};
+    }
+    if ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
+        push @_info, {%$info, ipv => '6'};
+        $requires_ipv6++;
+    } elsif ($ipv =~ /[*]/
+        && eval { require Socket6; require IO::Socket::INET6; require Socket }) {
+        my ($host, $port) = @$info{qw(host port)};
+        my $proto = getprotobyname(lc($info->{'proto'}) eq 'udp' ? 'udp' : 'tcp');
+        my $type  = lc($info->{'proto'}) eq 'udp' ? Socket::SOCK_DGRAM() : Socket::SOCK_STREAM();
+        my @res = Socket6::getaddrinfo($host eq '*' ? '' : $host, $port, Socket::AF_UNSPEC(), $type, $proto, Socket6::AI_PASSIVE());
+        die "Unresolvable [$host]:$port: $res[0]" if @res < 5;
+        while (@res >= 5) {
+            my ($afam, $socktype, $proto, $saddr, $canonname) = splice @res, 0, 5;
+            my @res2 = Socket6::getnameinfo($saddr, Socket6::NI_NUMERICHOST() | Socket6::NI_NUMERICSERV());
+            die "getnameinfo failed on [$host]:$port: $res2[0]" if @res2 < 2;
+            my ($ip, $_port) = @res2;
+            my $ipv = ($afam == Socket6::AF_INET6()) ? 6 : ($afam == Socket::AF_INET()) ? 4 : '*';
+            $server->log(2, "Resolved [$host]:$port to [$ip]:$_port, IPv$ipv");
+            push @_info, {port => $_port, host => $ip, ipv => $ipv, proto => $info->{'proto'}};
+            $requires_ipv6++ if $ipv ne '*';
+        }
+        if ((grep {$_->{'host'} eq '::'} @_info)) {
+            for (0 .. $#_info) {
+                next if $_info[$_]->{'host'} ne '0.0.0.0';
+                $server->log(2, "Removing doubly bound port [$_info[$_]->{'host'}] IPv4 because it should be handled by [::] IPv6");
+                splice @_info, $_, 1, ();
+                last;
+            }
+        }
+    }
+
+    return @_info;
 }
 
 sub object {
@@ -120,13 +154,15 @@ __END__
         $port,            # port to connect to
         $default_host,    # host to use if none found in port
         $default_proto,   # proto to use if none found in port
+        $default_ipv6,    # default to use for ipv6 if none found in port
         $server_obj,      # Net::Server object
     );
 
     my $sock = Net::Server::Proto->object({
-        port => $port,
-        host => $host,
+        port  => $port,
+        host  => $host,
         proto => $proto,
+        ipv6  => $ipv6, # ipv4 if false (default false)
     }, $server);
 
     # Net::Server::Proto will attempt to interface with
@@ -141,9 +177,10 @@ __END__
     # The method can gather any other information that it
     # needs from the server object.
     my $sock = Net::Server::Proto::TCP->object({
-        port => $port,
-        host => $host,
+        port  => $port,
+        host  => $host,
         proto => $proto,
+        ipv6  => $ipv6, # ipv4 if false (default false)
     }, $server);
 
 
