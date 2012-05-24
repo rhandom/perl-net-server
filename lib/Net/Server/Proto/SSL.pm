@@ -101,7 +101,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1,
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => ($ipv == 6) ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        ($require_ipv6 ? (Domain => ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC()) : ()),
         %ssl_args,
     }) or $server->fatal("Cannot connect to SSL port $port on $host [$!]");
 

@@ -73,7 +73,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1,
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => ($ipv == 6) ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        ($require_ipv6 ? (Domain => ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC()) : ()),
     }) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
