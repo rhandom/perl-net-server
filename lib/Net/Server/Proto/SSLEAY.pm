@@ -55,12 +55,12 @@ my @ssl_args = qw(
 sub NS_proto { 'SSLEAY' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
 sub NS_host   { my $sock = shift; ${*$sock}{'NS_host'}   = shift if @_; return ${*$sock}{'NS_host'}   }
-sub NS_ipv6   { my $sock = shift; ${*$sock}{'NS_ipv6'}   = shift if @_; return ${*$sock}{'NS_ipv6'}   }
+sub NS_ipv    { my $sock = shift; ${*$sock}{'NS_ipv'}    = shift if @_; return ${*$sock}{'NS_ipv'}    }
 sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 
 sub object {
     my ($class, $info, $server) = @_;
-    my ($host, $port) = @$info{qw(host port)};
+    my ($host, $port, $ipv) = @$info{qw(host port ipv)};
     my $prop = $server->{'server'};
     my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
@@ -73,7 +73,7 @@ sub object {
     foreach my $sock (@sock) {
         $sock->NS_host($host);
         $sock->NS_port($port);
-        $sock->NS_ipv6($info->{'ipv6'} || 0);
+        $sock->NS_ipv($ipv);
         $sock->NS_listen($listen);
 
         for my $key (@ssl_args) {
@@ -87,14 +87,14 @@ sub object {
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with IPv".$sock->NS_ipv);
 }
 
 sub connect { # connect the first time
     my ($sock, $server) = @_;
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
-    my $ipv6 = $sock->NS_ipv6;
+    my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
     my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
@@ -104,8 +104,8 @@ sub connect { # connect the first time
         Listen    => $lstn,
         ReuseAddr => 1,
         Reuse     => 1,
-        ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
+        ($require_ipv6 ? (Domain => ($ipv == 6) ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
     }) || $server->fatal("Can't connect to SSLEAY port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
@@ -121,7 +121,7 @@ sub connect { # connect the first time
 
 sub reconnect { # connect on a sig -HUP
     my ($sock, $fd, $server) = @_;
-    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     my $resp = $sock->fdopen( $fd, 'w' ) or $server->fatal("Error opening to file descriptor ($fd) [$!]");
     $sock->bind_SSL($server);
     return $resp;
@@ -161,7 +161,7 @@ sub accept {
     my $client = $sock->SUPER::accept;
     if (defined $client) {
         $client->NS_proto($sock->NS_proto);
-        $client->NS_ipv6( $sock->NS_ipv6);
+        $client->NS_ipv(  $sock->NS_ipv);
         $client->NS_host( $sock->NS_host);
         $client->NS_port( $sock->NS_port);
         $client->SSLeay_context($sock->SSLeay_context);
@@ -364,7 +364,7 @@ sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropri
 
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv6;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, "ipv".$sock->NS_ipv;
 }
 
 sub show {

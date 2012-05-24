@@ -32,7 +32,7 @@ our $VERSION = $Net::Server::VERSION;
 sub NS_proto { 'TCP' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
 sub NS_host   { my $sock = shift; ${*$sock}{'NS_host'}   = shift if @_; return ${*$sock}{'NS_host'}   }
-sub NS_ipv6   { my $sock = shift; ${*$sock}{'NS_ipv6'}   = shift if @_; return ${*$sock}{'NS_ipv6'}   }
+sub NS_ipv    { my $sock = shift; ${*$sock}{'NS_ipv'}    = shift if @_; return ${*$sock}{'NS_ipv'}    }
 sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 
 sub object {
@@ -47,7 +47,7 @@ sub object {
     foreach my $sock (@sock) {
         $sock->NS_host($host);
         $sock->NS_port($port);
-        $sock->NS_ipv6($info->{'ipv6'} || 0);
+        $sock->NS_ipv($info->{'ipv'});
         $sock->NS_listen($listen);
     }
     return wantarray ? @sock : $sock[0];
@@ -55,14 +55,14 @@ sub object {
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with IPv".$sock->NS_ipv);
 }
 
 sub connect {
     my ($sock, $server) = @_;
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
-    my $ipv6 = $sock->NS_ipv6;
+    my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
     my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
@@ -72,8 +72,8 @@ sub connect {
         Listen    => $lstn,
         ReuseAddr => 1,
         Reuse     => 1,
-        ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
+        ($require_ipv6 ? (Domain => ($ipv == 6) ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
     }) || $server->fatal("Can't connect to TCP port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
@@ -87,7 +87,7 @@ sub connect {
 
 sub reconnect { # after a sig HUP
     my ($sock, $fd, $server) = @_;
-    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
@@ -124,9 +124,7 @@ sub read_until { # only sips the data - but it allows for compatibility with SSL
 ### the hup_string must be a unique identifier based on configuration info
 sub hup_string {
     my $sock = shift;
-    print "$_ undefined\n"
-        for grep {!defined $sock->$_()} qw(NS_host NS_port NS_proto NS_ipv6);
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv6;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, 'ipv'.$sock->NS_ipv;
 }
 
 sub show {

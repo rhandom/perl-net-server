@@ -35,7 +35,7 @@ our @ISA = qw(IO::Socket::SSL);
 sub NS_proto { 'SSL' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
 sub NS_host   { my $sock = shift; ${*$sock}{'NS_host'}   = shift if @_; return ${*$sock}{'NS_host'}   }
-sub NS_ipv6   { my $sock = shift; ${*$sock}{'NS_ipv6'}   = shift if @_; return ${*$sock}{'NS_ipv6'}   }
+sub NS_ipv    { my $sock = shift; ${*$sock}{'NS_ipv'}    = shift if @_; return ${*$sock}{'NS_ipv'}    }
 sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 
 our @ssl_args = qw(
@@ -64,7 +64,7 @@ sub object {
     foreach my $sock (@sock) {
         $sock->NS_host($host);
         $sock->NS_port($port);
-        $sock->NS_ipv6($info->{'ipv6'} || 0);
+        $sock->NS_ipv($info->{'ipv'});
         $sock->NS_listen($listen);
 
         for my $key (@ssl_args) {
@@ -78,14 +78,14 @@ sub object {
 
 sub log_connect {
     my ($sock, $server) = @_;
-    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with IPv".($sock->NS_ipv);
 }
 
 sub connect {
     my ($sock, $server) = @_;
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
-    my $ipv6 = $sock->NS_ipv6;
+    my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
     my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
@@ -100,8 +100,8 @@ sub connect {
         Listen    => $lstn,
         ReuseAddr => 1,
         Reuse     => 1,
-        ($host !~ /\*/ ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => $ipv6 ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
+        (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
+        ($require_ipv6 ? (Domain => ($ipv == 6) ? Socket6::AF_INET6() : Socket::AF_INET()) : ()),
         %ssl_args,
     }) or $server->fatal("Cannot connect to SSL port $port on $host [$!]");
 
@@ -116,7 +116,7 @@ sub connect {
 
 sub reconnect { # after a sig HUP
     my ($sock, $fd, $server) = @_;
-    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using ".($sock->NS_ipv6 ? 'ipv6' : 'ipv4'));
+    $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
@@ -135,7 +135,7 @@ sub accept {
 
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv6;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, 'ipv'.$sock->NS_ipv;
 }
 
 sub show {
@@ -163,8 +163,8 @@ See L<Net::Server::Proto::SSLEAY>.
 =head1 DESCRIPTION
 
 This original SSL module was experimental.  It has been superceeded by
-Net::Server::Proto::SSLEAY If anybody has any successes or ideas for
-improvment under SSL, please email <paul@seamons.com>.
+Net::Server::Proto::SSLEAY. If anybody has any successes or ideas for
+improvement under SSL, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a
 secure socket layer over tcp (also known as SSL).
