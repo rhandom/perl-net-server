@@ -583,23 +583,24 @@ sub process_request { # sample echo server - override for full functionality
         return $prop->{'client'}->send("You said \"$prop->{'udp_data'}\"", 0);
     }
 
-    print "Welcome to \"".ref($self)."\" ($$)\r\n";
-    my $previous_alarm = alarm(30);
+    print "Welcome to \"".ref($self)."\" ($$)\015\012";
+    my $previous_alarm = alarm 30;
     eval {
         local $SIG{'ALRM'} = sub { die "Timed Out!\n" };
         while (<STDIN>) {
-            s/\r?\n$//;
-            print ref($self),":$$: You said \"$_\"\r\n";
+            s/[\r\n]+$//;
+            print ref($self),":$$: You said \"$_\"\015\012";
             $self->log(5, $_); # very verbose log
-            if (/get\s+(\w+)/) { print "$1: $self->{'server'}->{$1}\r\n" }
+            if (/get\s+(\w+)/) { print "$1: $self->{'server'}->{$1}\015\012" }
             elsif (/dump/) { require Data::Dumper; print Data::Dumper::Dumper($self) }
             elsif (/quit/) { last }
             elsif (/exit/) { $self->server_close }
-            alarm(30); # another 30
+            alarm 30; # another 30
         }
         alarm($previous_alarm);
     };
-    print "Timed Out.\r\n" if $@ eq "Timed Out!\n";
+    alarm 0;
+    print "Timed Out.\015\012" if $@ eq "Timed Out!\n";
 }
 
 sub post_process_request_hook {}
