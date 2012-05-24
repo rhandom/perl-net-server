@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok diag skip);
-prepare_test({n_tests => 46, plan_only => 1});
+prepare_test({n_tests => 47, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -204,6 +204,10 @@ p_c([port => ["localhost,20202,Net::Server::Proto::TCP"]], {
     bind => [{host => 'localhost', port => 20202, proto => 'Net::Server::Proto::TCP', ipv => 4}],
 });
 
+
+p_c([port => {port => 20201}], {
+    bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
+});
 
 p_c([port => [{port => 20201}]], {
     bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
