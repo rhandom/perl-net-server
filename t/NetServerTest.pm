@@ -6,6 +6,7 @@ use Exporter;
 @NetServerTest::ISA = qw(Exporter);
 @NetServerTest::EXPORT_OK = qw(prepare_test ok is use_ok skip diag);
 my %env;
+use constant debug => $ENV{'NS_DEBUG'} ? 1 : 0;
 
 END {
     warn "# number of tests ran ".($env{'_ok_n'} || 0)." did not match number of specified tests ".($env{'_ok_N'} || 0)."\n"
@@ -26,19 +27,25 @@ sub prepare_test {
     $env{'hostname'} ||= 'localhost';
     $env{'timeout'}  ||= 5;
 
+    warn "# Checking can_fork\n" if debug;
     ok(can_fork(), "Can fork on this platform") || do { SKIP: { skip("Fork doesn't work on this platform", $N - 1) }; exit; };
+    warn "# Checked can_fork\n"  if debug;
 
+    warn "# Getting ports\n"  if debug;
     my $ports = $env{'ports'} = get_ports($args);
     ok(scalar(@$ports), "Got needed ports (@$ports)") || do { SKIP: { skip("Couldn't get the needed ports for testing", $N - 2) }; exit };
+    warn "# Got ports\n"  if debug;
 
+
+    warn "# Checking pipe serialization\n" if debug;
     pipe(NST_READ, NST_WRITE);
     NST_READ->autoflush(1);
     NST_WRITE->autoflush(1);
-    print NST_WRITE "testing\n";
-    is(scalar(<NST_READ>), "testing\n", "Pipe works") || do { SKIP: { skip ("Couldn't use working pipe", $N - 3) }; exit };
-
-    $env{'block_until_ready_to_test'} = sub { scalar <NST_READ>; };
-    $env{'signal_ready_to_test'}      = sub { print NST_WRITE "ready\n"; };
+    print NST_WRITE "22";
+    is(read(NST_READ, my $buf, 2), 2, "Pipe works") || do { SKIP: { skip ("Couldn't use working pipe", $N - 3) }; exit };
+    warn "# Checked pipe serialization\n" if debug;
+    $env{'block_until_ready_to_test'} = sub { read(NST_READ, my $buf, 1) };
+    $env{'signal_ready_to_test'}      = sub { print NST_WRITE "1"; NST_WRITE->flush; };
 
     return \%env;
 }
