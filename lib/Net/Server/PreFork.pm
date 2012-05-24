@@ -93,9 +93,10 @@ sub loop {
     $prop->{'children'} = {};
     $prop->{'reaped_children'} = {};
     if ($ENV{'HUP_CHILDREN'}) {
-        my %children = map {/^(\w+)$/; $1} split(/\s+/, $ENV{'HUP_CHILDREN'});
-        $children{$_} = {status => $children{$_}, hup => 1} foreach keys %children;
-        $prop->{'children'} = \%children;
+        foreach my $line (split /\n/, $ENV{'HUP_CHILDREN'}) {
+            my ($pid, $status) = ($line =~ /^(\d+)\t(\w+)$/) ? ($1, $2) : next;
+            $prop->{'children'}->{$pid} = {status => $status, hup => 1};
+        }
     }
 
     $prop->{'tally'} = {
