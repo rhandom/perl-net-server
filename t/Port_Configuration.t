@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok diag skip);
-prepare_test({n_tests => 47, plan_only => 1});
+prepare_test({n_tests => 48, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -304,6 +304,18 @@ if (!eval { require Net::SSLeay; 1 }) {
     });
 
 }
+
+if (!eval { require IO::Socket::SSL }) {
+  SKIP: {
+      skip "Cannot load Net::SSLeay - skipping SSLEAY proto tests", 1;
+    };
+} else {
+    p_c([proto => 'ssl'], {
+        bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssl', ipv => 4}],
+        sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSL', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
+    });
+}
+
 
 ###----------------------------------------------------------------###
 # ipv6
