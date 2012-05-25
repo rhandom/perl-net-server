@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -25,23 +25,22 @@ use strict;
 use base qw(IO::Socket::UNIX);
 use Socket qw(SOCK_STREAM SOCK_DGRAM);
 
-our $VERSION = $Net::Server::VERSION;
-
 sub NS_proto { 'UNIX' }
-sub NS_port  { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
-sub NS_host  { '*' }
-sub NS_ipv   { '*' }
+sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
+sub NS_host   { '*' }
+sub NS_ipv    { '*' }
 sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return ${*$sock}{'NS_listen'} }
 sub NS_unix_type { 'SOCK_STREAM' }
 
 sub object {
     my ($class, $info, $server) = @_;
-    my $prop = $server->{'server'};
 
     if ($class eq __PACKAGE__) {
-        my $type;
-        $server->configure({unix_type => \$type});
-        my $u_type = uc(defined($info->{'unix_type'}) ? $info->{'unix_type'} : defined($type) ? $type : 'SOCK_STREAM');
+        $server->configure({unix_type => \$server->{'server'}->{'unix_type'}})
+            if ! exists $server->{'server'}->{'unix_type'};
+        my $u_type = uc( defined($info->{'unix_type'}) ? $info->{'unix_type'}
+                       : defined($server->{'server'}->{'unix_type'}) ? $server->{'server'}->{'unix_type'}
+                       : 'SOCK_STREAM');
         if ($u_type eq 'SOCK_DGRAM' || $u_type eq ''.SOCK_DGRAM()) { # allow for legacy invocations passing unix_type to UNIX - now just use proto UNIXDGRAM
             require Net::Server::Proto::UNIXDGRAM;
             return Net::Server::Proto::UNIXDGRAM->object($info, $server);
@@ -50,10 +49,11 @@ sub object {
         }
     }
 
-    my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
     my $sock = $class->SUPER::new();
     $sock->NS_port($info->{'port'});
-    $sock->NS_listen($listen) if defined $listen;
+    $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                    : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                    : Socket::SOMAXCONN());
     return $sock;
 }
 
@@ -79,10 +79,10 @@ sub reconnect { # connect on a sig -HUP
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 }
 
-### a string containing any information necessary for restarting the server
-### via a -HUP signal
-### a newline is not allowed
-### the hup_string must be a unique identifier based on configuration info
+# a string containing any information necessary for restarting the server
+# via a -HUP signal
+# a newline is not allowed
+# the hup_string must be a unique identifier based on configuration info
 sub hup_string {
     my $sock = shift;
     return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, $sock->NS_ipv;
@@ -99,7 +99,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto::UNIX - adp0 - Net::Server UNIX protocol.
+Net::Server::Proto::UNIX - Net::Server UNIX protocol.
 
 =head1 SYNOPSIS
 
@@ -107,18 +107,17 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
-Protocol module for Net::Server.  This module implements the
-UNIX SOCK_STREAM socket type.
-See L<Net::Server::Proto>.
+Protocol module for Net::Server.  This module implements the UNIX
+SOCK_STREAM socket type.  See L<Net::Server::Proto>.
 
-Any sockets created during startup will be chown'ed to the
-user and group specified in the starup arguments.
+Any sockets created during startup will be chown'ed to the user and
+group specified in the starup arguments.
 
 =head1 PARAMETERS
 
-The following paramaters may be specified in addition to
-normal command line parameters for a Net::Server.  See
-L<Net::Server> for more information on reading arguments.
+The following paramaters may be specified in addition to normal
+command line parameters for a Net::Server.  See L<Net::Server> for
+more information on reading arguments.
 
 =over 4
 
@@ -127,9 +126,9 @@ L<Net::Server> for more information on reading arguments.
 Can be either SOCK_STREAM or SOCK_DGRAM (default is SOCK_STREAM).
 This can also be passed on the port line (see L<Net::Server::Proto>).
 
-However, this method is deprecated.  If you want SOCK_STREAM - just use
-proto UNIX without any other arguments.  If you'd like SOCK_DGRAM, use the
-new proto UNIXDGRAM.
+However, this method is deprecated.  If you want SOCK_STREAM - just
+use proto UNIX without any other arguments.  If you'd like SOCK_DGRAM,
+use the new proto UNIXDGRAM.
 
 =back
 
@@ -137,7 +136,7 @@ new proto UNIXDGRAM.
 
   Key               Value                    Default
 
-  ## UNIX socket parameters
+  # UNIX socket parameters
   unix_type         (SOCK_STREAM|SOCK_DGRAM) SOCK_STREAM
   port              "filename"               undef
 
