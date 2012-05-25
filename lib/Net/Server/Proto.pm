@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -37,8 +37,8 @@ sub parse_info {
         $info = {};
         $info->{'unix_type'} = $1
                     if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (sock_stream|sock_dgram) \b }{}x; # legacy /some/path|sock_dgram
-        $ipv   = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) \b }{}xi; # allow for 80|IPv*
-        $ipv  .= $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv(\d+) \b }{}xi; # allow for 80|IPv4|IPv6 stacked
+        $ipv   = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv*
+        $ipv  .= $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv4|IPv6 stacked
         $proto = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (tcp|udp|ssl|ssleay|unix|unixdgram|\w+(?: ::\w+)+) $ }{}xi # allow for 80/tcp or 200/udb or 90/Net::Server::Proto::TCP
                     || $port =~ s{ / (\w+) $ }{}x; # legacy 80/MyTcp support
         $host  = $1 if $port =~ s{ ^ (.*?)      [,|\s:]+  (?= \w+ $) }{}x; # allow localhost:80
@@ -96,7 +96,7 @@ sub parse_info {
         if ((grep {$_->{'host'} eq '::'} @_info)) {
             for (0 .. $#_info) {
                 next if $_info[$_]->{'host'} ne '0.0.0.0';
-                $server->log(2, "Removing doubly bound port [$_info[$_]->{'host'}] IPv4 because it should be handled by [::] IPv6");
+                $server->log(2, "Removing doubly bound host [$_info[$_]->{'host'}] IPv4 because it should be handled by [::] IPv6");
                 splice @_info, $_, 1, ();
                 last;
             }
@@ -138,7 +138,7 @@ __END__
 
 =head1 NAME
 
-    Net::Server::Proto - Net::Server Protocol compatibility layer
+Net::Server::Proto - Net::Server Protocol compatibility layer
 
 =head1 SYNOPSIS
 
