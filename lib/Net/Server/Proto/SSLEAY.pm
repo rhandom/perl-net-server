@@ -64,8 +64,11 @@ sub object {
     my $prop = $server->{'server'};
     my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
-    my %temp = map {$_ => undef} @ssl_args;
-    $server->configure({map {$_ => \$temp{$_}} @ssl_args});
+    my $ssl = $prop->{'ssl_args'} ||= do {
+        my %temp = map {$_ => undef} @ssl_args;
+        $server->configure({map {$_ => \$temp{$_}} @ssl_args});
+        \%temp;
+    };
 
     @ISA = qw(IO::Socket::INET6) if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
@@ -77,7 +80,7 @@ sub object {
         $sock->NS_listen($listen);
 
         for my $key (@ssl_args) {
-            my $val = defined($info->{$key}) ? $info->{$key} : defined($temp{$key}) ? $temp{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLEAY') : undef;
+            my $val = defined($info->{$key}) ? $info->{$key} : defined($ssl->{$key}) ? $ssl->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLEAY') : undef;
             next if ! defined $val;
             $sock->$key($val) if defined $val;
         }
@@ -138,8 +141,8 @@ sub bind_SSL {
     Net::SSLeay::CTX_set_mode($ctx, 0x11);  $sock->SSLeay_check_fatal("SSLeay bind_SSL CTX_set_mode");
 
     # Load certificate. This will prompt for a password if necessary.
-    my $file_key  = $sock->SSL_key_file  || die "SSLeay missing SSL_key_file.\n";
-    my $file_cert = $sock->SSL_cert_file || die "SSLeay missing SSL_cert_file.\n";
+    my $file_key  = $sock->SSL_key_file  || die "SSLeay missing SSL_key_file on ".$sock->hup_string.".\n";
+    my $file_cert = $sock->SSL_cert_file || die "SSLeay missing SSL_cert_file on ".$sock->hup_string>".\n";
     Net::SSLeay::CTX_use_RSAPrivateKey_file($ctx, $file_key,  Net::SSLeay::FILETYPE_PEM());  $sock->SSLeay_check_fatal("SSLeay bind_SSL CTX_use_RSAPrivateKey_file");
     Net::SSLeay::CTX_use_certificate_file(  $ctx, $file_cert, Net::SSLeay::FILETYPE_PEM());  $sock->SSLeay_check_fatal("SSLeay bind_SSL CTX_use_certificate_file");
     $sock->SSLeay_context($ctx);
