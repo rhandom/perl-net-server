@@ -22,6 +22,7 @@ lib/Net/Server/Proto/TCP.pm	Proto interface to IO::Socket::INET
 lib/Net/Server/Proto/UDP.pm	Proto interface to IO::Socket::INET
 lib/Net/Server/Proto/UNIX.pm	Proto interface to IO::Socket::UNIX under SOCK_STREAM
 lib/Net/Server/Proto/UNIXDGRAM.pm Proto interface to IO::Socket::UNIX under SOCK_DGRAM
+lib/Net/Server/PSGI.pm		Sub class allowing for easy HTTP PSGI daemon creation
 lib/Net/Server/SIG.pm		Module to make signals safer
 lib/Net/Server/Single.pm	Sub class allowing for parallelism of base class
 Makefile.PL			Makefile script
