@@ -411,6 +411,8 @@ sub tie_stdout { 1 }
 
 1;
 
+__END__
+
 =head1 NAME
 
 Net::Server::Proto::SSLEAY - Custom Net::Server SSL protocol handler based on Net::SSLeay.
@@ -470,6 +472,10 @@ for improvment under SSLEAY, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a secure
 socket layer over tcp (also known as SSL).  See L<Net::Server::Proto>.
+
+If you need more customization of the SSL layer, you may want to
+investigate using SSL rather than SSLEAY as it uses the venerable(ish)
+IO::Socket::SSL.
 
 =head1 PARAMETERS
 
