@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -25,26 +25,40 @@ use strict;
 use base qw(Net::Server::Proto::UNIX);
 use Socket qw(SOCK_DGRAM);
 
+my @udp_args = qw(
+    udp_recv_len
+    udp_recv_flags
+    udp_broadcast
+); # we do broadcast just for cacheing parallelism with UDP.pm
+
 sub NS_proto { 'UNIXDGRAM' }
 sub NS_recv_len   { my $sock = shift; ${*$sock}{'NS_recv_len'}   = shift if @_; return ${*$sock}{'NS_recv_len'}   }
 sub NS_recv_flags { my $sock = shift; ${*$sock}{'NS_recv_flags'} = shift if @_; return ${*$sock}{'NS_recv_flags'} }
-sub NS_unix_type { 'SOCK_DGRAM' }
+sub NS_unix_type  { 'SOCK_DGRAM' }
 
 sub object {
     my ($class, $info, $server) = @_;
 
-    my ($len, $flags);
-    $server->configure({
-        udp_recv_len   => \$len,
-        udp_recv_flags => \$flags,
-    });
-    $len   = defined($info->{'udp_recv_len'})   ? $info->{'udp_recv_len'}   : (defined($len)   && $len   =~ /^(\d+)$/) ? $1 : 4096;
-    $flags = defined($info->{'udp_recv_flags'}) ? $info->{'udp_recv_flags'} : (defined($flags) && $flags =~ /^(\d+)$/) ? $1 : 0;
+    my $udp = $server->{'server'}->{'udp_args'} ||= do {
+        my %temp = map {$_ => undef} @udp_args;
+        $server->configure({map {$_ => \$temp{$_}} @udp_args});
+        \%temp;
+    };
+
+    my $len = defined($info->{'udp_recv_len'}) ? $info->{'udp_recv_len'}
+            : defined($udp->{'udp_recv_len'})  ? $udp->{'udp_recv_len'}
+            : 4096;
+    $len = ($len =~ /^(\d+)$/) ? $1 : 4096;
+
+    my $flg = defined($info->{'udp_recv_flags'}) ? $info->{'udp_recv_flags'}
+            : defined($udp->{'udp_recv_flags'})  ? $udp->{'udp_recv_flags'}
+            : 0;
+    $flg = ($flg =~ /^(\d+)$/) ? $1 : 0;
 
     my $sock = $class->SUPER::new();
     $sock->NS_port($info->{'port'});
     $sock->NS_recv_len($len);
-    $sock->NS_recv_flags($flags);
+    $sock->NS_recv_flags($flg);
     return $sock;
 }
 
@@ -65,7 +79,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto::UNIXDGRAM - adp0 - Net::Server UNIXDGRAM protocol.
+Net::Server::Proto::UNIXDGRAM - Net::Server UNIXDGRAM protocol.
 
 =head1 SYNOPSIS
 
@@ -73,18 +87,17 @@ See L<Net::Server::Proto>.
 
 =head1 DESCRIPTION
 
-Protocol module for Net::Server.  This module implements the
-UNIX SOCK_DGRAM socket type.
-See L<Net::Server::Proto>.
+Protocol module for Net::Server.  This module implements the UNIX
+SOCK_DGRAM socket type.  See L<Net::Server::Proto>.
 
-Any sockets created during startup will be chown'ed to the
-user and group specified in the starup arguments.
+Any sockets created during startup will be chown'ed to the user and
+group specified in the starup arguments.
 
 =head1 PARAMETERS
 
-The following paramaters may be specified in addition to
-normal command line parameters for a Net::Server.  See
-L<Net::Server> for more information on reading arguments.
+The following paramaters may be specified in addition to normal
+command line parameters for a Net::Server.  See L<Net::Server> for
+more information on reading arguments.
 
 =over 4
 
