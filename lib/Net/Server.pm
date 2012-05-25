@@ -484,7 +484,7 @@ sub get_client_info {
 
     my $sock = $prop->{'client'};
     if ($sock->can('NS_proto') && $sock->NS_proto =~ /^UNIX/) {
-        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
+        $self->log(3, $self->log_time." CONNECT ".$sock->NS_proto." Socket: \"".$sock->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
         return;
     }
 
@@ -524,7 +524,8 @@ sub get_client_info {
     }
 
     $self->log(3, $self->log_time
-               ." CONNECT ".($prop->{'udp_true'}?'UDP':'TCP')." Peer: \"$prop->{'peeraddr'}:$prop->{'peerport'}\""
+               ." CONNECT ".($sock->can('NS_proto')?$sock->NS_proto:$prop->{'udp_true'}?'UDP':'TCP')
+               ." Peer: \"[$prop->{'peeraddr'}]:$prop->{'peerport'}\""
                ." Local: \"[$prop->{'sockaddr'}]:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
 }
 
