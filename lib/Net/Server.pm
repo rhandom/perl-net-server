@@ -454,6 +454,7 @@ sub post_accept {
     return if $prop->{'udp_true'}; # no need to do STDIN/STDOUT in UDP
 
     if (my $client = $prop->{'client'}) {
+        $client->post_accept() if $client->can("post_accept");
         if (! $prop->{'no_client_stdout'}) {
             close STDIN; # duplicate some handles and flush them
             close STDOUT;
