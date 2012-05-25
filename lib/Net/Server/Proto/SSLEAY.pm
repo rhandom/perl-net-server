@@ -28,9 +28,6 @@ use Fcntl ();
 use Errno ();
 use Socket ();
 
-our @ISA = qw(IO::Socket::INET);
-our $AUTOLOAD;
-
 BEGIN {
     eval { require Net::SSLeay; 1 }
         or warn "Module Net::SSLeay is required for SSLeay.";
@@ -38,6 +35,9 @@ BEGIN {
         Net::SSLeay->can($sub)->();
     }
 }
+
+our @ISA = qw(IO::Socket::INET);
+our $AUTOLOAD;
 
 my @ssl_args = qw(
     SSL_server
@@ -50,7 +50,8 @@ my @ssl_args = qw(
     SSL_cipher_list
     SSL_passwd_cb
     SSL_max_getline_length
-    SSL_error_callback);
+    SSL_error_callback
+);
 
 sub NS_proto { 'SSLEAY' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
@@ -60,27 +61,30 @@ sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return $
 
 sub object {
     my ($class, $info, $server) = @_;
-    my ($host, $port, $ipv) = @$info{qw(host port ipv)};
-    my $prop = $server->{'server'};
-    my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
-    my $ssl = $prop->{'ssl_args'} ||= do {
+    my $ssl = $server->{'server'}->{'ssl_args'} ||= do {
         my %temp = map {$_ => undef} @ssl_args;
         $server->configure({map {$_ => \$temp{$_}} @ssl_args});
         \%temp;
     };
 
+    # we cannot do this at compile time because we have not yet read the configuration then
     @ISA = qw(IO::Socket::INET6) if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
     my @sock = $class->SUPER::new();
     foreach my $sock (@sock) {
-        $sock->NS_host($host);
-        $sock->NS_port($port);
-        $sock->NS_ipv($ipv);
-        $sock->NS_listen($listen);
+        $sock->NS_host($info->{'host'});
+        $sock->NS_port($info->{'port'});
+        $sock->NS_ipv( $info->{'ipv'} );
+        $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                        : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                        : Socket::SOMAXCONN());
 
         for my $key (@ssl_args) {
-            my $val = defined($info->{$key}) ? $info->{$key} : defined($ssl->{$key}) ? $ssl->{$key} : $server->can($key) ? $server->$key($host, $port, 'SSLEAY') : undef;
+            my $val = defined($info->{$key}) ? $info->{$key}
+                    : defined($ssl->{$key})  ? $ssl->{$key}
+                    : $server->can($key) ? $server->$key($info->{'host'}, $info->{'port'}, 'SSLEAY')
+                    : undef;
             next if ! defined $val;
             $sock->$key($val) if defined $val;
         }
@@ -404,20 +408,63 @@ sub tie_stdout { 1 }
 
 =head1 NAME
 
-Net::Server::Proto::SSLEAY - Custom Net::Server SSL protocol handler based on Net::SSLeay directly.
+Net::Server::Proto::SSLEAY - Custom Net::Server SSL protocol handler based on Net::SSLeay.
 
 =head1 SYNOPSIS
 
 See L<Net::Server::Proto>.
 
+    use base qw(Net::Server::HTTP);
+    main->run(
+        proto => 'ssleay',
+        SSL_key_file  => "/path/to/my/file.key",
+        SSL_cert_file => "/path/to/my/file.crt",
+    );
+
+
+    # OR
+
+    sub SSL_key_file  { "/path/to/my/file.key" }
+    sub SSL_cert_file { "/path/to/my/file.crt" }
+    main->run(proto => 'ssleay');
+
+
+    # OR
+
+    main->run(
+        port => [443, 8443, "80/tcp"],  # bind to two ssleay ports and one tcp
+        proto => "ssleay",    # use ssleay as the default
+        ipv  => "*",          # bind both IPv4 and IPv6 interfaces
+        SSL_key_file  => "/path/to/my/file.key",
+        SSL_cert_file => "/path/to/my/file.crt",
+    );
+
+
+    # OR
+
+    main->run(port => [{
+        port  => "443",
+        proto => "ssleay",
+        # ipv => 4, # default - only do IPv4
+        SSL_key_file  => "/path/to/my/file.key",
+        SSL_cert_file => "/path/to/my/file.crt",
+    }, {
+        port  => "8443",
+        proto => "ssleay",
+        ipv   => "*", # IPv4 and IPv6
+        SSL_key_file  => "/path/to/my/file2.key", # separate key
+        SSL_cert_file => "/path/to/my/file2.crt", # separate cert
+    }]);
+
+
 =head1 DESCRIPTION
 
-This module is relatively new and has only served a couple of months in production environments.
-If anybody has any successes or ideas for improvment under SSLEAY, please email <paul@seamons.com>.
+This module has reliably been used in situations receiving millions of
+hits on a single box per day.  If anybody has any successes or ideas
+for improvment under SSLEAY, please email <paul@seamons.com>.
 
-Protocol module for Net::Server.  This module implements a
-secure socket layer over tcp (also known as SSL).
-See L<Net::Server::Proto>.
+Protocol module for Net::Server.  This module implements a secure
+socket layer over tcp (also known as SSL).  See L<Net::Server::Proto>.
 
 =head1 PARAMETERS
 
@@ -427,29 +474,31 @@ Currently there is support for the following:
 
 =item C<SSL_cert_file>
 
-Full path to the certificate file to be used for this server.  Should be in PEM format.
+Full path to the certificate file to be used for this server.  Should
+be in PEM format.
 
 =item C<SSL_key_file>
 
-Full path to the key file to be used for this server.  Should be in PEM format.
+Full path to the key file to be used for this server.  Should be in
+PEM format.
 
 =item C<SSL_max_getline_length>
 
-Used during getline to only read until this many bytes are found.  Default is undef which
-means unlimited.
+Used during getline to only read until this many bytes are found.
+Default is undef which means unlimited.
 
 =item C<SSL_error_callback>
 
-Should be a code ref that will be called whenever error conditions are encountered.  It passes a source message
-and an arrayref of the errors.
+Should be a code ref that will be called whenever error conditions are
+encountered.  It passes a source message and an arrayref of the
+errors.
 
 =back
 
-I'll add support for more as patches come in.
-
 =head1 METHODS
 
-This module implements most of the common file handle operations.  There are some additions though:
+This module implements most of the common file handle operations.
+There are some additions though:
 
 =over 4
 
@@ -474,6 +523,7 @@ Distributed under the same terms as Net::Server
 
 Thanks to Bilbo at
 http://devpit.org/wiki/OpenSSL_with_nonblocking_sockets_%28in_Perl%29
-for documenting a more reliable way of accepting and reading SSL connections.
+for documenting a more reliable way of accepting and reading SSL
+connections.
 
 =cut
