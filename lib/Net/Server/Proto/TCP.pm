@@ -27,7 +27,6 @@ use IO::Socket::INET;
 use Net::Server::Proto;
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to INET6 based upon our server configuration
-our $VERSION = $Net::Server::VERSION;
 
 sub NS_proto { 'TCP' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
@@ -37,18 +36,18 @@ sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return $
 
 sub object {
     my ($class, $info, $server) = @_;
-    my ($host, $port) = @$info{qw(host port)};
-    my $prop = $server->{'server'};
-    my $listen = defined($info->{'listen'}) ? $info->{'listen'} : defined($prop->{'listen'}) ? $prop->{'listen'} : Socket::SOMAXCONN();
 
+    # we cannot do this at compile time because we have not net read the configuration then
     @ISA = qw(IO::Socket::INET6) if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
     my @sock = $class->SUPER::new();
     foreach my $sock (@sock) {
-        $sock->NS_host($host);
-        $sock->NS_port($port);
+        $sock->NS_host($info->{'host'});
+        $sock->NS_port($info->{'port'});
         $sock->NS_ipv($info->{'ipv'});
-        $sock->NS_listen($listen);
+        $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                        : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                        : Socket::SOMAXCONN());
     }
     return wantarray ? @sock : $sock[0];
 }
