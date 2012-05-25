@@ -146,39 +146,6 @@ sub accept {
     return wantarray ? ($client, $peername) : $client;
 }
 
-sub post_accept {
-    my $client = shift;
-    $client->_accept_ssl if !${*$client}{'_accept_ssl'};
-}
-
-sub _accept_ssl {
-    my $client = shift;
-    ${*$client}{'_accept_ssl'} = 1;
-    my $sock = delete(${*$client}{'_parent_sock'}) || die "Could not get handshake from accept\n";
-    $sock->accept_SSL($client) || die "Could not finalize SSL connection with client handle\n";
-}
-
-sub read_until { # allow for an interface that can be tied to STDOUT
-    my ($client, $bytes, $end_qr) = @_;
-    die "One of bytes or end_qr should be defined for TCP read_until\n" if !defined($bytes) && !defined($end_qr);
-
-    $client->_accept_ssl if !${*$client}{'_accept_ssl'};
-
-    my $content = '';
-    my $ok = 0;
-    while (1) {
-        $client->read($content, 1, length($content));
-        if (defined($bytes) && length($content) >= $bytes) {
-            $ok = 2;
-            last;
-        } elsif (defined($end_qr) && $content =~ $end_qr) {
-            $ok = 1;
-            last;
-        }
-    }
-    return wantarray ? ($ok, $content) : $content;
-}
-
 sub hup_string {
     my $sock = shift;
     return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, 'ipv'.$sock->NS_ipv;
@@ -213,16 +180,49 @@ sub AUTOLOAD {
 
 sub tie_stdout { 1 }
 
+sub post_accept {
+    my $client = shift;
+    $client->_accept_ssl if !${*$client}{'_accept_ssl'};
+}
+
+sub _accept_ssl {
+    my $client = shift;
+    ${*$client}{'_accept_ssl'} = 1;
+    my $sock = delete(${*$client}{'_parent_sock'}) || die "Could not get handshake from accept\n";
+    $sock->accept_SSL($client) || die "Could not finalize SSL connection with client handle\n";
+}
+
+sub read_until { # allow for an interface that can be tied to STDOUT
+    my ($client, $bytes, $end_qr) = @_;
+    die "One of bytes or end_qr should be defined for TCP read_until\n" if !defined($bytes) && !defined($end_qr);
+
+    $client->_accept_ssl if !${*$client}{'_accept_ssl'};
+
+    my $content = '';
+    my $ok = 0;
+    while (1) {
+        $client->read($content, 1, length($content));
+        if (defined($bytes) && length($content) >= $bytes) {
+            $ok = 2;
+            last;
+        } elsif (defined($end_qr) && $content =~ $end_qr) {
+            $ok = 1;
+            last;
+        }
+    }
+    return wantarray ? ($ok, $content) : $content;
+}
+
 1;
 
 =head1 NAME
 
-Net::Server::Proto::SSL - Net::Server SSL protocol (deprecated - use Net::Server::Proto::SSLEAY instead).
+Net::Server::Proto::SSL - Net::Server SSL protocol.
 
 =head1 SYNOPSIS
 
-This module is mostly deprecated - you will want to look at
-Net::Server::Proto::SSLEAY instead.
+Until this release, it was preferrable to use the Net::Server::Proto::SSLEAY
+module.  Recent versions include code that overcomes original limitations.
 
 See L<Net::Server::Proto>.
 See L<Net::Server::Proto::SSLEAY>.
@@ -275,38 +275,42 @@ See L<Net::Server::Proto::SSLEAY>.
 
 =head1 DESCRIPTION
 
-You probably want to use SSLEAY rather than SSL.
+Protocol module for Net::Server based on IO::Socket::SSL.  This module
+implements a secure socket layer over tcp (also known as SSL) via the
+IO::Socket::SSL module.  If this module does not work in your
+situation, please also consider using the SSLEAY protocol
+(Net::Server::Proto::SSLEAY) which interfaces directly with
+Net::SSLeay.  See L<Net::Server::Proto>.
 
-Protocol module for Net::Server.  This module implements a secure
-socket layer over tcp (also known as SSL) via the IO::Socket::SSL
-module.  If this module does not work, please also consider using
-the SSLEAY protocol (Net::Server::Proto::SSLEAY) which interfaces
-directly with Net::SSLeay.  See L<Net::Server::Proto>.
+This module has another major difference from
+Net::Server::Proto::SSLEAY: the NS_ipv value defaults to "*" rather
+than to "4".  Infact, if you have Socket6 installed on your system,
+IO::Socket::SSL will always try to use it.  The only way to not have
+this behavior is to load IO::Socket::SSL with the inet4 option prior
+to calling Net::Server->run as in:
 
-Additionally, getline support is very limited and writing directly to
-STDOUT will not work.  This is entirely dependent upon the
-implementation of IO::Socket::SSL.  getline may work but the client is
-not copied to STDOUT under SSL.  It is suggested that clients sysread
-and syswrite to the client handle (located in
-$self->{'server'}->{'client'} or passed to the process_request
-subroutine as the first argument).
+    use IO::Socket::SSL qw(inet4);
+    use base qw(Net::Server::Fork);
+
+    __PACKAGE__->run(proto => "ssl");
 
 =head1 PARAMETERS
 
 In addition to the normal Net::Server parameters, any of the SSL
 parameters from IO::Socket::SSL may also be specified.  See
-L<IO::Socket::SSL> for information on setting this up.
+L<IO::Socket::SSL> for information on setting this up.  All arguments
+prefixed with SSL_ will be passed to the IO::Socket::SSL->configure
+method.
 
 =head1 BUGS
 
-Christopher A Bongaarts pointed out that if the SSL negotiation is
-slow then the server won't be accepting for that period of time
-(because the locking of accept is around both the socket accept and
-the SSL negotiation).  This means that as it stands now the SSL
-implementation is susceptible to DOS attacks.  To fix this will
-require deviding up the accept call a little bit more finely which may
-not yet be possible with IO::Socket::SSL.  Any ideas or patches on
-this bug are welcome.
+Until version Net::Server version 2, Net::Server::Proto::SSL used the
+default IO::Socket::SSL::accept method.  This old approach introduces a
+DDOS vulnerability into the server, where the socket is accepted, but
+the parent server then has to block until the client negotiates the
+SSL connection.  This has now been overcome by overriding the accept
+method and accepting the SSL negotiation after the parent socket has
+had the chance to go back to listening.
 
 =head1 LICENCE
 
