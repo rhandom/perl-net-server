@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -36,7 +36,8 @@ sub options {
 
 sub run {
     my $self = ref($_[0]) ? shift() : shift->new;
-    $self->_initialize(@_ == 1 ? %{$_[0]} : @_);
+    $self->{'server'}->{'_run_args'} = [@_ == 1 ? %{$_[0]} : @_];
+    $self->_initialize;
     my $prop = $self->{'server'};
 
     if (!defined $prop->{'server_type'} || ! @{ $prop->{'server_type'} }) {
