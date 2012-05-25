@@ -37,14 +37,14 @@ sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return $
 sub object {
     my ($class, $info, $server) = @_;
 
-    # we cannot do this at compile time because we have not net read the configuration then
+    # we cannot do this at compile time because we have not yet read the configuration then
     @ISA = qw(IO::Socket::INET6) if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
     my @sock = $class->SUPER::new();
     foreach my $sock (@sock) {
         $sock->NS_host($info->{'host'});
         $sock->NS_port($info->{'port'});
-        $sock->NS_ipv($info->{'ipv'});
+        $sock->NS_ipv( $info->{'ipv'} );
         $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                         : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
                         : Socket::SOMAXCONN());
