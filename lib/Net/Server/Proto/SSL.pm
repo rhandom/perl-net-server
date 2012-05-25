@@ -96,7 +96,7 @@ sub connect {
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
+    my $require_ipv6 = $sock->isa('IO::Socket::INET6'); # IO::Socket::SSL loads Socket6 on its own
 
     $sock->SUPER::configure({
         LocalPort => $port,
