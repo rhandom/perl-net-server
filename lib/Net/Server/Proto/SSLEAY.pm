@@ -40,7 +40,6 @@ our @ISA = qw(IO::Socket::INET);
 our $AUTOLOAD;
 
 my @ssl_args = qw(
-    SSL_server
     SSL_use_cert
     SSL_verify_mode
     SSL_key_file
@@ -178,6 +177,11 @@ sub accept {
     return $client;
 }
 
+sub post_accept {
+    my $client = shift;
+    $client->SSLeay;
+}
+
 sub SSLeay {
     my $client = shift;
 
@@ -195,6 +199,7 @@ sub SSLeay {
         ${*$client}{'SSLeay'} = $ssl;
     }
 
+    return if ! defined wantarray;
     return ${*$client}{'SSLeay'};
 }
 
