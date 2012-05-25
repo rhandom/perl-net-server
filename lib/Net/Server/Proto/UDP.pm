@@ -27,6 +27,12 @@ package Net::Server::Proto::UDP;
 use strict;
 use base qw(Net::Server::Proto::TCP);
 
+my @udp_args = qw(
+    udp_recv_len
+    udp_recv_flags
+    udp_broadcast
+);
+
 sub NS_proto { 'UDP' }
 sub NS_recv_len   { my $sock = shift; ${*$sock}{'NS_recv_len'}   = shift if @_; return ${*$sock}{'NS_recv_len'}   }
 sub NS_recv_flags { my $sock = shift; ${*$sock}{'NS_recv_flags'} = shift if @_; return ${*$sock}{'NS_recv_flags'} }
@@ -35,23 +41,30 @@ sub NS_broadcast  { my $sock = shift; ${*$sock}{'NS_broadcast'}  = shift if @_; 
 sub object {
     my ($class, $info, $server) = @_;
 
-    my ($len, $flags, $broadcast);
-    $server->configure({
-        udp_recv_len   => \$len,
-        udp_recv_flags => \$flags,
-        udp_broadcast  => \$broadcast,
-    });
-    $len   = defined($info->{'udp_recv_len'})   ? $info->{'udp_recv_len'}   : (defined($len)   && $len   =~ /^(\d+)$/) ? $1 : 4096;
-    $flags = defined($info->{'udp_recv_flags'}) ? $info->{'udp_recv_flags'} : (defined($flags) && $flags =~ /^(\d+)$/) ? $1 : 0;
+    my $udp = $server->{'server'}->{'udp_args'} ||= do {
+        my %temp = map {$_ => undef} @udp_args;
+        $server->configure({map {$_ => \$temp{$_}} @udp_args});
+        \%temp;
+    };
+
+    my $len = defined($info->{'udp_recv_len'}) ? $info->{'udp_recv_len'}
+            : defined($udp->{'udp_recv_len'})  ? $udp->{'udp_recv_len'}
+            : 4096;
+    $len = ($len =~ /^(\d+)$/) ? $1 : 4096;
+
+    my $flg = defined($info->{'udp_recv_flags'}) ? $info->{'udp_recv_flags'}
+            : defined($udp->{'udp_recv_flags'})  ? $udp->{'udp_recv_flags'}
+            : 0;
+    $flg = ($flg =~ /^(\d+)$/) ? $1 : 0;
 
     my @sock = $class->SUPER::new(); # it is possible that multiple connections will be returned if INET6 is in effect
     foreach my $sock (@sock) {
         $sock->NS_host($info->{'host'});
         $sock->NS_port($info->{'port'});
-        $sock->NS_ipv($info->{'ipv'});
+        $sock->NS_ipv( $info->{'ipv'} );
         $sock->NS_recv_len($len);
-        $sock->NS_recv_flags($flags);
-        $sock->NS_broadcast($broadcast);
+        $sock->NS_recv_flags($flg);
+        $sock->NS_broadcast(exists($info->{'udp_broadcast'}) ? $info->{'udp_broadcast'} : $udp->{'upd_broadcast'});
     }
     return wantarray ? @sock : $sock[0];
 }
@@ -88,7 +101,7 @@ __END__
 
 =head1 NAME
 
-  Net::Server::Proto::UDP - Net::Server UDP protocol.
+Net::Server::Proto::UDP - Net::Server UDP protocol.
 
 =head1 SYNOPSIS
 
