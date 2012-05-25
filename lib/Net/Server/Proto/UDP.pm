@@ -41,6 +41,10 @@ sub NS_broadcast  { my $sock = shift; ${*$sock}{'NS_broadcast'}  = shift if @_; 
 sub object {
     my ($class, $info, $server) = @_;
 
+    # we cannot do this at compile time because we have not yet read the configuration then
+    # (this is the height of rudeness changing another's class on their behalf)
+    @Net::Server::Proto::TCP::ISA = qw(IO::Socket::INET6) if $Net::Server::Proto::TCP::ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
+
     my $udp = $server->{'server'}->{'udp_args'} ||= do {
         my %temp = map {$_ => undef} @udp_args;
         $server->configure({map {$_ => \$temp{$_}} @udp_args});
