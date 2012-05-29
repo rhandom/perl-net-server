@@ -47,6 +47,7 @@ my $ok = eval {
             close STDERR;
             Net::Server::Test->run(port => $env->{'ports'}->[0], host => $env->{'hostname'}, server_type => 'Single', background => 0, setsid => 0);
         } || diag("Trouble running server: $@");
+        alarm(0);
         exit;
     }
     alarm(0);
