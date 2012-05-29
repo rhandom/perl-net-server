@@ -28,7 +28,7 @@ use POSIX qw(WNOHANG);
 use IO::Select ();
 use Time::HiRes qw(time);
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub options {
     my $self = shift;
@@ -254,8 +254,6 @@ sub run_parent {
 
     @{ $prop }{qw(last_checked_for_dead last_checked_for_waiting last_checked_for_dequeue last_process last_kill)} = (time) x 5;
 
-    $self->register_sig_pass;
-
     register_sig(
         PIPE => 'IGNORE',
         INT  => sub { $self->server_close() },
@@ -269,6 +267,8 @@ sub run_parent {
             }
         },
     );
+
+    $self->register_sig_pass;
 
     if ($ENV{'HUP_CHILDREN'}) {
         while (defined(my $chld = waitpid(-1, WNOHANG))) {
@@ -329,6 +329,11 @@ sub run_parent {
     }
 }
 
+sub run_dequeue {
+    my $self = shift;
+    $self->SUPER::run_dequeue;
+    $self->{'server'}->{'tally'}->{'dequeue'}++;
+}
 
 sub coordinate_children {
     my $self = shift;
