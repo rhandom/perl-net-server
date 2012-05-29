@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2010-2011
+#  Copyright (C) 2010-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -28,7 +28,7 @@ use Socket qw(SO_TYPE SOL_SOCKET SOCK_DGRAM);
 eval { require threads };
 $@ && die "threads are required to run a server of type Net::Server::Thread";
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub options {
     my $self = shift;
@@ -154,28 +154,26 @@ Net::Server::Thread - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use base qw(Net::Server::Thread);
+    use base qw(Net::Server::Thread);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        #...code...
+    }
 
-  __PACKAGE__->run();
+    __PACKAGE__->run();
 
 =head1 DESCRIPTION
 
-Please read the pod on Net::Server first.  This module
-is a personality, or extension, or sub class, of the
-Net::Server module.
+Please read the pod on Net::Server first.  This module is a
+personality, or extension, or sub class, of the Net::Server module.
 
-This personality binds to one or more ports and then waits
-for a client connection.  When a connection is received,
-the server spawns a new thread.  The thread handles the request
-and then closes.
+This personality binds to one or more ports and then waits for a
+client connection.  When a connection is received, the server spawns a
+new thread.  The thread handles the request and then closes.
 
-Because this Net::Server flavor spawns and destroys a thread
-for each request, it really should only be used where the processing
-of each request may be lengthy or involved.  If short and light request are
+Because this Net::Server flavor spawns and destroys a thread for each
+request, it really should only be used where the processing of each
+request may be lengthy or involved.  If short and light request are
 used, perl may not voluntarily give back the used memory.  This is
 highly system dependent.
 
@@ -185,15 +183,14 @@ highly system dependent.
 
 =item check_for_dead
 
-Number of seconds to wait before looking for dead children.
-This only takes place if the maximum number of child processes
-(max_servers) has been reached.  Default is 60 seconds.
+Number of seconds to wait before looking for dead children.  This only
+takes place if the maximum number of child processes (max_servers) has
+been reached.  Default is 60 seconds.
 
 =item max_servers
 
-The maximum number of children to fork.  The server will
-not accept connections until there are free children. Default
-is 256 children.
+The maximum number of children to fork.  The server will not accept
+connections until there are free children. Default is 256 children.
 
 =back
 
@@ -203,16 +200,14 @@ See L<Net::Server>.
 
 =head1 PROCESS FLOW
 
-Process flow follows Net::Server until the post_accept phase.
-At this point a child is forked.  The parent is immediately
-able to wait for another request.  The child handles the
-request and then exits.
+Process flow follows Net::Server until the post_accept phase.  At this
+point a child is forked.  The parent is immediately able to wait for
+another request.  The child handles the request and then exits.
 
 =head1 HOOKS
 
-The Fork server has the following hooks in addition to
-the hooks provided by the Net::Server base class.
-See L<Net::Server>
+The Fork server has the following hooks in addition to the hooks
+provided by the Net::Server base class.  See L<Net::Server>
 
 =over 4
 
