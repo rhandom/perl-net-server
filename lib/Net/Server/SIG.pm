@@ -26,7 +26,7 @@ use vars qw($VERSION @ISA @EXPORT_OK
             %_SIG %_SIG_SUB);
 use Exporter ();
 
-$VERSION   = '0.02';
+$VERSION   = '0.03';
 @ISA       = qw(Exporter);
 @EXPORT_OK = qw(register_sig unregister_sig check_sigs);
 
@@ -72,6 +72,11 @@ sub check_sigs {
         $_SIG_SUB{$sig}->($sig);
     }
     return @found;
+}
+
+sub sig_is_registered {
+    my $sig = shift;
+    return $_SIG_SUB{$sig};
 }
 
 1;
@@ -159,6 +164,10 @@ register_sig(SIG,'DEFAULT')
 Checks to see if any registered signals have occured.  If so, it will
 play the registered code ref for that signal.  Return value is array
 containing any SIGNAL names that had occured.
+
+=item C<sig_is_registered($SIG)>
+
+Takes a signal name and returns any registered code_ref for that signal.
 
 =back
 
