@@ -160,6 +160,7 @@ sub run_n_children {
             ($parentsock, $childsock) = IO::Socket::UNIX->socketpair(IO::Socket::AF_UNIX, IO::Socket::SOCK_STREAM, IO::Socket::PF_UNSPEC);
         }
 
+        local $!;
         my $pid = fork;
         if (! defined $pid) {
             if ($prop->{'child_communication'}) {
@@ -208,8 +209,10 @@ sub run_child {
     };
 
     # Open in child at start
-    open $prop->{'lock_fh'}, ">", $prop->{'lock_file'}
+    if ($prop->{'serialize'} eq 'flock') {
+        open $prop->{'lock_fh'}, ">", $prop->{'lock_file'}
         or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+    }
 
     $self->log(4, "Child Preforked ($$)");
 
@@ -452,33 +455,33 @@ Net::Server::PreFork - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use base qw(Net::Server::PreFork);
+    use base qw(Net::Server::PreFork);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        #...code...
+    }
 
-  __PACKAGE__->run();
+    __PACKAGE__->run();
 
 =head1 DESCRIPTION
 
 Please read the pod on Net::Server and Net::Server::PreForkSimple
-first.  This module is a personality, or extension, or sub class,
-of the Net::Server::PreForkSimple class which is a sub class of
+first.  This module is a personality, or extension, or sub class, of
+the Net::Server::PreForkSimple class which is a sub class of
 Net::Server.  See L<Net::Server::PreForkSimple>.
 
 This personality binds to one or more ports and then forks
-C<min_servers> child process.  The server will make sure
-that at any given time there are C<min_spare_servers> available
-to receive a client request, up to C<max_servers>.  Each of
-these children will process up to C<max_requests> client
-connections.  This type is good for a heavily hit site, and
-should scale well for most applications.  (Multi port accept
-is accomplished using flock to serialize the children).
+C<min_servers> child process.  The server will make sure that at any
+given time there are C<min_spare_servers> available to receive a
+client request, up to C<max_servers>.  Each of these children will
+process up to C<max_requests> client connections.  This type is good
+for a heavily hit site, and should scale well for most applications.
+(Multi port accept is accomplished using flock to serialize the
+children).
 
 At this time, it does not appear that this module will pass tests on
-Win32 systems.  Any ideas or patches for making the tests pass would be
-welcome.
+Win32 systems.  Any ideas or patches for making the tests pass would
+be welcome.
 
 =head1 SAMPLE CODE
 
@@ -486,30 +489,29 @@ Please see the sample listed in Net::Server.
 
 =head1 COMMAND LINE ARGUMENTS
 
-In addition to the command line arguments of the Net::Server
-base class and the Net::Server::PreForkSimple parent class,
-Net::Server::PreFork contains several other configurable
-parameters.  You really should also see
-L<Net::Server::PreForkSimple>.
+In addition to the command line arguments of the Net::Server base
+class and the Net::Server::PreForkSimple parent class,
+Net::Server::PreFork contains several other configurable parameters.
+You really should also see L<Net::Server::PreForkSimple>.
 
-  Key                 Value                   Default
-  min_servers         \d+                     5
-  min_spare_servers   \d+                     2
-  max_spare_servers   \d+                     10
-  max_servers         \d+                     50
-  max_requests        \d+                     1000
+    Key                 Value                   Default
+    min_servers         \d+                     5
+    min_spare_servers   \d+                     2
+    max_spare_servers   \d+                     10
+    max_servers         \d+                     50
+    max_requests        \d+                     1000
 
-  serialize           (flock|semaphore|pipe)  undef
-  # serialize defaults to flock on multi_port or on Solaris
-  lock_file           "filename"              POSIX::tmpnam
+    serialize           (flock|semaphore|pipe)  undef
+    # serialize defaults to flock on multi_port or on Solaris
+    lock_file           "filename"              POSIX::tmpnam
 
-  check_for_dead      \d+                     30
-  check_for_waiting   \d+                     10
+    check_for_dead      \d+                     30
+    check_for_waiting   \d+                     10
 
-  max_dequeue         \d+                     undef
-  check_for_dequeue   \d+                     undef
+    max_dequeue         \d+                     undef
+    check_for_dequeue   \d+                     undef
 
-  child_communication 1                       undef
+    child_communication 1                       undef
 
 =over 4
 
@@ -519,25 +521,24 @@ The minimum number of servers to keep running.
 
 =item min_spare_servers
 
-The minimum number of servers to have waiting for requests.
-Minimum and maximum numbers should not be set to close to
-each other or the server will fork and kill children too
-often.
+The minimum number of servers to have waiting for requests.  Minimum
+and maximum numbers should not be set to close to each other or the
+server will fork and kill children too often.
 
 =item max_spare_servers
 
-The maximum number of servers to have waiting for requests.
-See I<min_spare_servers>.
+The maximum number of servers to have waiting for requests.  See
+I<min_spare_servers>.
 
 =item max_servers
 
-The maximum number of child servers to start.  This does not
-apply to dequeue processes.
+The maximum number of child servers to start.  This does not apply to
+dequeue processes.
 
 =item check_for_waiting
 
-Seconds to wait before checking to see if we can kill
-off some waiting servers.
+Seconds to wait before checking to see if we can kill off some waiting
+servers.
 
 =item check_for_spawn
 
@@ -545,15 +546,15 @@ Seconds between checking to see if we need to spawn more children
 
 =item min_child_ttl
 
-Minimum number of seconds between starting children and killing
-a child process
+Minimum number of seconds between starting children and killing a
+child process
 
 =item child_communication
 
-Enable child communication to parent via unix sockets.  If set
-to true, will let children write to the socket contained in
-$self->{'server'}->{'parent_sock'}.  The parent will be notified through
-child_is_talking_hook where the first argument is the socket
+Enable child communication to parent via unix sockets.  If set to
+true, will let children write to the socket contained in
+$self->{'server'}->{'parent_sock'}.  The parent will be notified
+through child_is_talking_hook where the first argument is the socket
 to the child.  The child's socket is stored in
 $self->{'server'}->{'children'}->{$child_pid}->{'sock'}.
 
@@ -561,99 +562,96 @@ $self->{'server'}->{'children'}->{$child_pid}->{'sock'}.
 
 =head1 CONFIGURATION FILE
 
-C<Net::Server::PreFork> allows for the use of a
-configuration file to read in server parameters.  The format
-of this conf file is simple key value pairs.  Comments and
-white space are ignored.
+C<Net::Server::PreFork> allows for the use of a configuration file to
+read in server parameters.  The format of this conf file is simple key
+value pairs.  Comments and white space are ignored.
 
-  #-------------- file test.conf --------------
+    #-------------- file test.conf --------------
 
-  ### server information
-  min_servers   20
-  max_servers   80
-  min_spare_servers 10
-  min_spare_servers 15
+    ### server information
+    min_servers   20
+    max_servers   80
+    min_spare_servers 10
+    min_spare_servers 15
 
-  max_requests  1000
+    max_requests  1000
 
-  ### user and group to become
-  user        somebody
-  group       everybody
+    ### user and group to become
+    user        somebody
+    group       everybody
 
-  ### logging ?
-  log_file    /var/log/server.log
-  log_level   3
-  pid_file    /tmp/server.pid
+    ### logging ?
+    log_file    /var/log/server.log
+    log_level   3
+    pid_file    /tmp/server.pid
 
-  ### access control
-  allow       .+\.(net|com)
-  allow       domain\.com
-  deny        a.+
+    ### access control
+    allow       .+\.(net|com)
+    allow       domain\.com
+    deny        a.+
 
-  ### background the process?
-  background  1
+    ### background the process?
+    background  1
 
-  ### ports to bind
-  host        127.0.0.1
-  port        localhost:20204
-  port        20205
+    ### ports to bind
+    host        127.0.0.1
+    port        localhost:20204
+    port        20205
 
-  ### reverse lookups ?
-  # reverse_lookups on
+    ### reverse lookups ?
+    # reverse_lookups on
 
-  ### enable child communication ?
-  # child_communication
+    ### enable child communication ?
+    # child_communication
 
-  #-------------- file test.conf --------------
+    #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
 
-Process flow follows Net::Server until the loop phase.  At
-this point C<min_servers> are forked and wait for
-connections.  When a child accepts a connection, finishs
-processing a client, or exits, it relays that information to
-the parent, which keeps track and makes sure there are
-enough children to fulfill C<min_servers>, C<min_spare_servers>,
+Process flow follows Net::Server until the loop phase.  At this point
+C<min_servers> are forked and wait for connections.  When a child
+accepts a connection, finishs processing a client, or exits, it relays
+that information to the parent, which keeps track and makes sure there
+are enough children to fulfill C<min_servers>, C<min_spare_servers>,
 C<max_spare_servers>, and C<max_servers>.
 
 =head1 HOOKS
 
-The PreFork server has the following hooks in addition
-to the hooks provided by PreForkSimple.
-See L<Net::Server::PreForkSimple>.
+The PreFork server has the following hooks in addition to the hooks
+provided by PreForkSimple.  See L<Net::Server::PreForkSimple>.
 
 =over 4
 
 =item C<$self-E<gt>run_n_children_hook()>
 
-This hook occurs at the top of run_n_children which is called
-each time the server goes to start more child processes.  This
-gives the parent to do a little of its own accountting (as desired).
-Idea for this hook came from James FitzGibbon.
+This hook occurs at the top of run_n_children which is called each
+time the server goes to start more child processes.  This gives the
+parent to do a little of its own accountting (as desired).  Idea for
+this hook came from James FitzGibbon.
 
 =item C<$self-E<gt>parent_read_hook()>
 
-This hook occurs any time that the parent reads information
-from the child.  The line from the child is sent as an
-argument.
+This hook occurs any time that the parent reads information from the
+child.  The line from the child is sent as an argument.
 
 =item C<$self-E<gt>child_is_talking_hook()>
 
-This hook occurs if child_communication is true and the child
-has written to $self->{'server'}->{'parent_sock'}.  The first argument
+This hook occurs if child_communication is true and the child has
+written to $self->{'server'}->{'parent_sock'}.  The first argument
 will be the open socket to the child.
 
 =item C<$self-E<gt>idle_loop_hook()>
 
-This hook is called in every pass through the main process wait loop, every
-C<check_for_waiting> seconds.  The first argument is a reference to an
-array of file descriptors that can be read at the moment.
+This hook is called in every pass through the main process wait loop,
+every C<check_for_waiting> seconds.  The first argument is a reference
+to an array of file descriptors that can be read at the moment.
 
 =back
 
 =head1 BUGS
 
-Tests don't seem to work on Win32.  Any ideas or patches would be welcome.
+Tests don't seem to work on Win32.  Any ideas or patches would be
+welcome.
 
 =head1 TO DO
 

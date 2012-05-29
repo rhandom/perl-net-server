@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -133,6 +133,7 @@ sub run_n_children {
     $self->log(3, "Starting \"$n\" children");
 
     for (1 .. $n) {
+        local $!;
         my $pid = fork;
         $self->fatal("Bad fork [$!]") if ! defined $pid;
 
@@ -164,8 +165,11 @@ sub run_child {
         $prop->{'SigHUPed'} = 1;
     };
 
-    open($prop->{'lock_fh'}, ">", $prop->{'lock_file'})
-        or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+    my $needs_lock = ($prop->{'serialize'} eq 'flock') ? 1 : 0;
+    if ($needs_lock) {
+        open($prop->{'lock_fh'}, ">", $prop->{'lock_file'})
+            or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+    }
 
     $self->log(4, "Child Preforked ($$)");
     delete $prop->{'children'};
@@ -181,7 +185,7 @@ sub run_child {
 
     $self->child_finish_hook;
 
-    close($prop->{'lock_fh'}) if $prop->{'lock_fh'};
+    close($prop->{'lock_fh'}) if $needs_lock && $prop->{'lock_fh'};
 
     $self->log(4, "Child leaving ($prop->{'max_requests'})");
     exit;
@@ -218,7 +222,7 @@ sub accept {
         my $waiting = $prop->{'_WAITING'};
         scalar <$waiting>; # read one line - kernel says who gets it
         my $v = $self->SUPER::accept();
-        print { $prop->{'ready'} } "Next!\n";
+        print { $prop->{'_READY'} } "Next!\n";
         return $v;
     }
 }
@@ -342,34 +346,31 @@ Net::Server::PreForkSimple - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use Net::Server::PreForkSimple;
-  @ISA = qw(Net::Server::PreForkSimple);
+    use base qw(Net::Server::PreForkSimple);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        #...code...
+    }
 
-  __PACKAGE__->run();
+    __PACKAGE__->run();
 
 =head1 DESCRIPTION
 
-Please read the pod on Net::Server first.  This module
-is a personality, or extension, or sub class, of the
-Net::Server module.
+Please read the pod on Net::Server first.  This module is a
+personality, or extension, or sub class, of the Net::Server module.
 
 This personality binds to one or more ports and then forks
-C<max_servers> child processes.  The server will make sure
-that at any given time there are always C<max_servers>
-available to receive a client request.  Each of
-these children will process up to C<max_requests> client
-connections.  This type is good for a heavily hit site that can
-keep C<max_servers> processes dedicated to the serving.
-(Multi port accept defaults to using flock to serialize the
+C<max_servers> child processes.  The server will make sure that at any
+given time there are always C<max_servers> available to receive a
+client request.  Each of these children will process up to
+C<max_requests> client connections.  This type is good for a heavily
+hit site that can keep C<max_servers> processes dedicated to the
+serving.  (Multi port accept defaults to using flock to serialize the
 children).
 
 At this time, it does not appear that this module will pass tests on
-Win32 systems.  Any ideas or patches for making the tests pass would be
-welcome.
+Win32 systems.  Any ideas or patches for making the tests pass would
+be welcome.
 
 =head1 SAMPLE CODE
 
@@ -377,165 +378,157 @@ Please see the sample listed in Net::Server.
 
 =head1 COMMAND LINE ARGUMENTS
 
-In addition to the command line arguments of the Net::Server
-base class, Net::Server::PreFork contains several other
-configurable parameters.
+In addition to the command line arguments of the Net::Server base
+class, Net::Server::PreFork contains several other configurable
+parameters.
 
-  Key               Value                   Default
-  max_servers       \d+                     50
-  max_requests      \d+                     1000
+    Key               Value                   Default
+    max_servers       \d+                     50
+    max_requests      \d+                     1000
 
-  serialize         (flock|semaphore|pipe)  undef
-  # serialize defaults to flock on multi_port or on Solaris
-  lock_file         "filename"              POSIX::tmpnam
+    serialize         (flock|semaphore|pipe)  undef
+    # serialize defaults to flock on multi_port or on Solaris
+    lock_file         "filename"              POSIX::tmpnam
 
-  check_for_dead    \d+                     30
+    check_for_dead    \d+                     30
 
-  max_dequeue       \d+                     undef
-  check_for_dequeue \d+                     undef
+    max_dequeue       \d+                     undef
+    check_for_dequeue \d+                     undef
 
 =over 4
 
 =item max_servers
 
-The maximum number of child servers to start and maintain.
-This does not apply to dequeue processes.
+The maximum number of child servers to start and maintain.  This does
+not apply to dequeue processes.
 
 =item max_requests
 
-The number of client connections to receive before a
-child terminates.
+The number of client connections to receive before a child terminates.
 
 =item serialize
 
-Determines whether the server serializes child connections.
-Options are undef, flock, semaphore, or pipe.  Default is undef.
-On multi_port servers or on servers running on Solaris, the
-default is flock.  The flock option uses blocking exclusive
-flock on the file specified in I<lock_file> (see below).
-The semaphore option uses IPC::Semaphore (thanks to Bennett
-Todd) for giving some sample code.  The pipe option reads on a
-pipe to choose the next.  the flock option should be the
-most bulletproof while the pipe option should be the most
-portable.  (Flock is able to reliquish the block if the
-process dies between accept on the socket and reading
-of the client connection - semaphore and pipe do not)
+Determines whether the server serializes child connections.  Options
+are undef, flock, semaphore, or pipe.  Default is undef.  On
+multi_port servers or on servers running on Solaris, the default is
+flock.  The flock option uses blocking exclusive flock on the file
+specified in I<lock_file> (see below).  The semaphore option uses
+IPC::Semaphore (thanks to Bennett Todd) for giving some sample code.
+The pipe option reads on a pipe to choose the next.  the flock option
+should be the most bulletproof while the pipe option should be the
+most portable.  (Flock is able to reliquish the block if the process
+dies between accept on the socket and reading of the client connection
+- semaphore and pipe do not)
 
 =item lock_file
 
-Filename to use in flock serialized accept in order to
-serialize the accept sequece between the children.  This
-will default to a generated temporary filename.  If default
-value is used the lock_file will be removed when the server
-closes.
+Filename to use in flock serialized accept in order to serialize the
+accept sequece between the children.  This will default to a generated
+temporary filename.  If default value is used the lock_file will be
+removed when the server closes.
 
 =item check_for_dead
 
-Seconds to wait before checking to see if a child died
-without letting the parent know.
+Seconds to wait before checking to see if a child died without letting
+the parent know.
 
 =item max_dequeue
 
-The maximum number of dequeue processes to start.  If a
-value of zero or undef is given, no dequeue processes will
-be started.  The number of running dequeue processes will
-be checked by the check_for_dead variable.
+The maximum number of dequeue processes to start.  If a value of zero
+or undef is given, no dequeue processes will be started.  The number
+of running dequeue processes will be checked by the check_for_dead
+variable.
 
 =item check_for_dequeue
 
-Seconds to wait before forking off a dequeue process.  The
-run_dequeue hook must be defined when using this setting.
-It is intended to use the dequeue process to take care of
-items such as mail queues.  If a value of undef is given,
-no dequeue processes will be started.
+Seconds to wait before forking off a dequeue process.  The run_dequeue
+hook must be defined when using this setting.  It is intended to use
+the dequeue process to take care of items such as mail queues.  If a
+value of undef is given, no dequeue processes will be started.
 
 
 =back
 
 =head1 CONFIGURATION FILE
 
-C<Net::Server::PreFork> allows for the use of a
-configuration file to read in server parameters.  The format
-of this conf file is simple key value pairs.  Comments and
-white space are ignored.
+C<Net::Server::PreFork> allows for the use of a configuration file to
+read in server parameters.  The format of this conf file is simple key
+value pairs.  Comments and white space are ignored.
 
-  #-------------- file test.conf --------------
+    #-------------- file test.conf --------------
 
-  ### server information
-  max_servers   80
+    ### server information
+    max_servers   80
 
-  max_requests  1000
+    max_requests  1000
 
-  ### user and group to become
-  user        somebody
-  group       everybody
+    ### user and group to become
+    user        somebody
+    group       everybody
 
-  ### logging ?
-  log_file    /var/log/server.log
-  log_level   3
-  pid_file    /tmp/server.pid
+    ### logging ?
+    log_file    /var/log/server.log
+    log_level   3
+    pid_file    /tmp/server.pid
 
-  ### access control
-  allow       .+\.(net|com)
-  allow       domain\.com
-  deny        a.+
+    ### access control
+    allow       .+\.(net|com)
+    allow       domain\.com
+    deny        a.+
 
-  ### background the process?
-  background  1
+    ### background the process?
+    background  1
 
-  ### ports to bind
-  host        127.0.0.1
-  port        localhost:20204
-  port        20205
+    ### ports to bind
+    host        127.0.0.1
+    port        localhost:20204
+    port        20205
 
-  ### reverse lookups ?
-  # reverse_lookups on
+    ### reverse lookups ?
+    # reverse_lookups on
 
-  #-------------- file test.conf --------------
+    #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
 
-Process flow follows Net::Server until the loop phase.  At
-this point C<max_servers> are forked and wait for
-connections.  When a child accepts a connection, finishs
-processing a client, or exits, it relays that information to
-the parent, which keeps track and makes sure there are
-always C<max_servers> running.
+Process flow follows Net::Server until the loop phase.  At this point
+C<max_servers> are forked and wait for connections.  When a child
+accepts a connection, finishs processing a client, or exits, it relays
+that information to the parent, which keeps track and makes sure there
+are always C<max_servers> running.
 
 =head1 HOOKS
 
-The PreForkSimple server has the following hooks in addition
-to the hooks provided by the Net::Server base class.
-See L<Net::Server>
+The PreForkSimple server has the following hooks in addition to the
+hooks provided by the Net::Server base class.  See L<Net::Server>
 
 =over 4
 
 =item C<$self-E<gt>run_n_children_hook()>
 
-This hook occurs at the top of run_n_children which is called
-each time the server goes to start more child processes.  This
-gives the parent to do a little of its own accountting (as desired).
-Idea for this hook came from James FitzGibbon.
+This hook occurs at the top of run_n_children which is called each
+time the server goes to start more child processes.  This gives the
+parent to do a little of its own accountting (as desired).  Idea for
+this hook came from James FitzGibbon.
 
 =item C<$self-E<gt>child_init_hook()>
 
-This hook takes place immeditately after the child process
-forks from the parent and before the child begins
-accepting connections.  It is intended for any addiotional
-chrooting or other security measures.  It is suggested
-that all perl modules be used by this point, so that
-the most shared memory possible is used.
+This hook takes place immeditately after the child process forks from
+the parent and before the child begins accepting connections.  It is
+intended for any addiotional chrooting or other security measures.  It
+is suggested that all perl modules be used by this point, so that the
+most shared memory possible is used.
 
 =item C<$self-E<gt>child_finish_hook()>
 
-This hook takes place immediately before the child tells
-the parent that it is exiting.  It is intended for
-saving out logged information or other general cleanup.
+This hook takes place immediately before the child tells the parent
+that it is exiting.  It is intended for saving out logged information
+or other general cleanup.
 
 =item C<$self-E<gt>run_dequeue()>
 
-This hook only gets called in conjuction with the
-check_for_dequeue setting.
+This hook only gets called in conjuction with the check_for_dequeue
+setting.
 
 =item C<$self-E<gt>idle_loop_hook()>
 
@@ -545,7 +538,8 @@ This hook is called in every pass through the main process wait loop.
 
 =head1 BUGS
 
-Tests don't seem to work on Win32.  Any ideas or patches would be welcome.
+Tests don't seem to work on Win32.  Any ideas or patches would be
+welcome.
 
 =head1 TO DO
 
