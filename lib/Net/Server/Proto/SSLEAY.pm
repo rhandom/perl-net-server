@@ -163,8 +163,13 @@ sub close {
 }
 
 sub accept {
-    my $sock = shift;
-    my $client = $sock->SUPER::accept;
+    my ($sock, $class) = (@_);
+    my ($client, $peername);
+    if (wantarray) {
+        ($client, $peername) = $sock->SUPER::accept($class);
+    } else {
+        $client = $sock->SUPER::accept($class);
+    }
     if (defined $client) {
         $client->NS_proto($sock->NS_proto);
         $client->NS_ipv(  $sock->NS_ipv);
@@ -174,7 +179,7 @@ sub accept {
         $client->SSLeay_is_client(1);
     }
 
-    return $client;
+    return wantarray ? ($client, $peername) : $client;
 }
 
 sub post_accept {
