@@ -554,7 +554,7 @@ sub allow_deny {
     my $sock = $prop->{'client'};
 
     # unix sockets are immune to this check
-    return 1 if $sock && UNIVERSAL::can($sock,'NS_proto') && $sock->NS_proto =~ /^UNIX/;
+    return 1 if $sock && $sock->NS_proto =~ /^UNIX/;
 
     # if no allow or deny parameters are set, allow all
     return 1 if ! @{ $prop->{'allow'} }
@@ -562,24 +562,28 @@ sub allow_deny {
              && ! @{ $prop->{'cidr_allow'} }
              && ! @{ $prop->{'cidr_deny'} };
 
+    # work around Net::CIDR::cidrlookup() croaking,
+    # if first parameter is an IPv4 address in IPv6 notation.
+    my $peeraddr = ($prop->{'peeraddr'} =~ /^\s*::ffff:([0-9.]+\s*)$/) ? $1 : $prop->{'peeraddr'};
+
     # if the addr or host matches a deny, reject it immediately
     foreach (@{ $prop->{'deny'} }) {
         return 0 if $prop->{'peerhost'} =~ /^$_$/ && defined $prop->{'reverse_lookups'};
-        return 0 if $prop->{'peeraddr'} =~ /^$_$/;
+        return 0 if $peeraddr =~ /^$_$/;
     }
     if (@{ $prop->{'cidr_deny'} }) {
         require Net::CIDR;
-        return 0 if Net::CIDR::cidrlookup($prop->{'peeraddr'}, @{ $prop->{'cidr_deny'} });
+        return 0 if Net::CIDR::cidrlookup($peeraddr, @{ $prop->{'cidr_deny'} });
     }
 
     # if the addr or host isn't blocked yet, allow it if it is allowed
     foreach (@{ $prop->{'allow'} }) {
         return 1 if $prop->{'peerhost'} =~ /^$_$/ && defined $prop->{'reverse_lookups'};
-        return 1 if $prop->{'peeraddr'} =~ /^$_$/;
+        return 1 if $peeraddr =~ /^$_$/;
     }
     if (@{ $prop->{'cidr_allow'} }) {
         require Net::CIDR;
-        return 1 if Net::CIDR::cidrlookup($prop->{'peeraddr'}, @{ $prop->{'cidr_allow'} });
+        return 1 if Net::CIDR::cidrlookup($peeraddr, @{ $prop->{'cidr_allow'} });
     }
 
     return 0;
