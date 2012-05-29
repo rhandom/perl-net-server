@@ -1620,7 +1620,9 @@ Thanks to CATONE for sending the idea for arbitrary signal passing to children. 
 
 Thanks to intrigeri@boum for pointing out and giving code ideas for NS_port not functioning after a HUP.
 
-Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY.
+Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY as well as the base test.
+
+Thanks to mbarbon@users. for adding tally dequeue to prefork server.
 
 =head1 SEE ALSO
 
