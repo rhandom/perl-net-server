@@ -1624,6 +1624,8 @@ Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY as well a
 
 Thanks to mbarbon@users. for adding tally dequeue to prefork server.
 
+Thanks to stefanos@cpan for fixes to PreFork under Win32
+
 =head1 SEE ALSO
 
 Please see also
