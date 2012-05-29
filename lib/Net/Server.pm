@@ -949,6 +949,9 @@ sub options {
 sub process_args {
     my ($self, $args, $template) = @_;
     $self->options($template = {}) if ! $template || ! ref $template;
+    if (!$_[2] && !scalar(keys %$template) && !$self->{'server'}->{'_no_options'}++) {
+        warn "Configuration options were empty - skipping any commandline, config file, or run argument parsing.\n";
+    }
 
     # we want subsequent calls to not overwrite or add to previously set values so that command line arguments win
     my %previously_set;
@@ -1012,7 +1015,7 @@ sub delete_child {
 
     return $self->other_child_died_hook($pid) if ! exists $prop->{'children'}->{$pid};
 
-    ### prefork server check to clear child communication
+    # prefork server check to clear child communication
     if ($prop->{'child_communication'}) {
         if ($prop->{'children'}->{$pid}->{'sock'}) {
             $prop->{'child_select'}->remove($prop->{'children'}->{$pid}->{'sock'});
@@ -1040,10 +1043,16 @@ sub register_sig_pass {
     $self->fatal('invalid sig_passthrough') if ref $ref ne 'ARRAY';
     return if ! @$ref;
     $self->log(4, "sig_passthrough option found");
-    foreach my $sig (@$ref) {
-        my $code = ref($SIG{$sig}) eq 'CODE' ? $SIG{$sig} : undef;
-        Net::Server::SIG::register_sig($sig => sub { $self->sig_pass($sig); $code->($sig) if $code; }); # should already be loaded
-        $self->log(4, "Installed passthrough for $sig");
+    require Net::Server::SIG;
+    foreach my $sig (map {split /\s*,\s*/, $_} @$ref) {
+        my $code = Net::Server::SIG::sig_is_registered($sig);
+        if ($code) {
+            $self->log(2, "Installing passthrough for $sig even though it is already registered.");
+        } else {
+            $code = ref($SIG{$sig}) eq 'CODE' ? $SIG{$sig} : undef;
+        }
+        Net::Server::SIG::register_sig($sig => sub { $self->sig_pass($sig); $code->($sig) if $code; });
+        $self->log(2, "Installed passthrough for $sig");
     }
 }
 
