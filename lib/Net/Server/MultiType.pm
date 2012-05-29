@@ -24,7 +24,7 @@ package Net::Server::MultiType;
 use strict;
 use base qw(Net::Server);
 
-our $VERSION = $Net::Server::VERSION;
+#sub net_server_type { shift->SUPER::net_server_type }; # not-needed
 
 sub options {
     my $self = shift;

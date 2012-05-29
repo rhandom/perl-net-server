@@ -25,7 +25,7 @@ use strict;
 use base qw(Net::Server);
 use Scalar::Util qw(blessed);
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub post_configure {
     my $self = shift;
