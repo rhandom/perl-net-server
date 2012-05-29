@@ -1,7 +1,19 @@
 Revision history for Perl extension Net::Server.
 
-1.01   Apr 26 2011
-        - 
+2.000  May 29 2012
+        - Bring Net::Server::Proto::SSL back.  It is now fully functional under all scenarios, including IPv4 and IPv6
+        - Change Proto interface to allow passing more information.  This represents an internal API change.
+        - Updates to the HUP mechanisms to make sure we rebind all types of ports correctly.
+        - Internal code retidying
+        - Add IPv6 integration via ::1 style addresses as well as the ipv configuration parameter
+        - Finish out support for connecting to ports by service name
+        - Don't loose track of fork and prefork children on a hup - make sure to actively wait them off
+        - Correct accept to take a classname, and optionally be called in array context
+        - Cleanup numerous configuration issues.
+        - Added sig_passthrough option to Fork, PreFork, and PreForkSimple servers allowing for arbitrary signals to propagate to children
+        - Add syswrite/sysread support to SSLEAY (Sergey Zasenko).
+        - Add PSGI module.
+        - Many small accumulated bugfixes.
 
 0.99   Jul 13 2010
         - Add customizable  check_for_spawn and min_child_ttl settings in PreFork (Graham Barr)
