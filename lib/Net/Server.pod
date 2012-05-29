@@ -35,7 +35,7 @@ Net::Server - Extensible, general Perl server engine
     * Multi port accepts on Single, Preforking, and Forking modes
     * Basic HTTP Daemon handler
     * IPv6 support
-    * Working SSL sockets
+    * Working SSL sockets (both with and without IO::Socket::SSL)
     * Simultaneous accept/recv on tcp/udp/unix, ssl/tcp, and IPv4/IPv6 sockets
     * Safe signal handling in Fork/PreFork avoids perl signal trouble
     * User customizable hooks
@@ -171,8 +171,8 @@ only as parallelism for Net::Server::MultiType.
 =item HTTP
 
 Not a distinct personality.  Provides a basic HTTP daemon.  This can
-be combined with the SSLEAY proto to provide an HTTPS Daemon.  See
-L<Net::Server::HTTP>.
+be combined with the SSL or SSLEAY proto to provide an HTTPS Daemon.
+See L<Net::Server::HTTP>.
 
 =back
 
@@ -436,7 +436,7 @@ base class.)
 
     no_close_by_child (1|undef)                undef
 
-    ## See Net::Server::Proto::(TCP|UDP|UNIX|SSLeay|etc)
+    ## See Net::Server::Proto::(TCP|UDP|UNIX|SSL|SSLeay|etc)
     ## for more sample parameters.
 
 =over 4
@@ -576,7 +576,7 @@ the port may be passed as a hashref or array hashrefs of information:
         host  => 'localhost',
         port  => '20204',
         ipv   => '*',      # all IPv4 and IPv6 interfaces tied to localhost
-        proto => 'ssleay', # Using SSL
+        proto => 'ssleay', # or ssl - Using SSL
     }],
 
 An explicit I<host> given in a port specification overrides a default
@@ -623,13 +623,13 @@ hosts arrary to the size of the ports array.
 
 See L<Net::Server::Proto>.
 Protocol to use when binding ports.  See L<IO::Socket>.  As of release
-2.0, Net::Server supports tcp, udp, and unix, unixdgram, and ssleay.
-Other types will need to be added later (or custom modules extending
-the Net::Server::Proto class may be used).  Configuration passed to
-new or run may be either a scalar containing a single proto or an
-arrayref of protos - if the protos array is shorter than the ports
-array, the last proto entry will be used to augment the protos arrary
-to the size of the ports array.
+2.0, Net::Server supports tcp, udp, and unix, unixdgram, ssl, and
+ssleay.  Other types will need to be added later (or custom modules
+extending the Net::Server::Proto class may be used).  Configuration
+passed to new or run may be either a scalar containing a single proto
+or an arrayref of protos - if the protos array is shorter than the
+ports array, the last proto entry will be used to augment the protos
+arrary to the size of the ports array.
 
 =item ipv (IPv4 and IPv6)
 
@@ -815,12 +815,20 @@ children from the former parent but custom communication channels
 available to the old child processes.  New child processes will still
 connect properly to the new parent.
 
+=item sig_passthrough
+
+Default none.  Allow for passing requested signals through to
+children.  Takes a single signal name, a comma separated list of
+names, or an arrayref of signal names.  It first sends the signals to
+the children before calling any currently registered signal by that
+name.
+
 =item tie_client_stdout
 
 Default undef.  If set will use Net::Server::TiedHandle tied interface
-for STDIN and STDOUT.  This interface allows SSLEAY to work.  It also
-allows for intercepting read and write via the tied_stdin_callback and
-tied_stdout_callback.
+for STDIN and STDOUT.  This interface allows SSL and SSLEAY to work.
+It also allows for intercepting read and write via the
+tied_stdin_callback and tied_stdout_callback.
 
 =item tied_stdin_callback
 
@@ -1599,6 +1607,20 @@ Thanks to Daniel Kahn Gillmor for adding the other_child_died_hook.
 Thanks to Dominic Humphries for helping not kill pid files on HUP.
 
 Thanks to Kristoffer Møllerhøj for fixing UDP on Multiplex.
+
+Thanks to mishikal for patches for helping identify un-cleaned up children.
+
+Thanks to rpkelly and tim@retout for pointing out error in header regex of HTTP.
+
+Thanks to dmcbride for some basic HTTP parsing fixes, as well as for some broken tied handle fixes.
+
+Thanks to Gareth for pointing out glaring bug issues with broken pipe and semaphore serialization.
+
+Thanks to CATONE for sending the idea for arbitrary signal passing to children.  (See the sig_passthrough option)
+
+Thanks to intrigeri@boum for pointing out and giving code ideas for NS_port not functioning after a HUP.
+
+Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY.
 
 =head1 SEE ALSO
 
