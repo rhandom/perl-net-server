@@ -50,7 +50,9 @@ sub parse_info {
     $info->{'host'} ||= (defined($host) && length($host)) ? $host : '*';
     if (     $info->{'host'} =~ m{^ \[ ([\w/.\-:]+ | \*?) \] $ }x) { # allow for [::1] or [host.example.com]
         $info->{'host'} = length($1) ? $1 : '*';
-    } elsif ($info->{'host'} !~ m{^    ([\w/.\-:]+ | \*?)    $ }x) {
+    } elsif ($info->{'host'} =~ m{^    ([\w/.\-:]+ | \*?)    $ }x) {
+        $info->{'host'} = $1; # untaint
+    } else {
         $server->fatal("Could not determine host from \"$info->{'host'}\"");
     }
 
