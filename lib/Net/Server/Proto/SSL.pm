@@ -111,10 +111,12 @@ sub connect {
     }) or $server->fatal("Cannot connect to SSL port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
-        $sock->NS_port($port);
         $server->log(2, "Bound to auto-assigned port $port");
+        ${*$sock}{'NS_orig_port'} = $sock->NS_port;
+        $sock->NS_port($port);
     } elsif ($port =~ /\D/ and $port = $sock->sockport) {
         $server->log(2, "Bound to service port ".$sock->NS_port()."($port)");
+        ${*$sock}{'NS_orig_port'} = $sock->NS_port;
         $sock->NS_port($port);
     }
 }
@@ -128,7 +130,7 @@ sub reconnect { # after a sig HUP
 sub accept {
     my ($sock, $class) = @_;
     my ($client, $peername);
-    my $code = $sock->isa('IO::Socket::INET6') ? 'IO::Socket::INET6'->can('accept') : 'IO::Socket::INET'->can('accept');
+    my $code = $sock->isa('IO::Socket::INET6') ? 'IO::Socket::INET6'->can('accept') : 'IO::Socket::INET'->can('accept'); # TODO - cache this lookup
     if (wantarray) {
         ($client, $peername) = $code->($sock, $class || ref($sock));
     } else {
@@ -148,7 +150,7 @@ sub accept {
 
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, 'ipv'.$sock->NS_ipv;
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, 'ipv'.$sock->NS_ipv, (${*$sock}{'NS_orig_port'} || ());
 }
 
 sub show {
@@ -189,7 +191,7 @@ sub _accept_ssl {
     my $client = shift;
     ${*$client}{'_accept_ssl'} = 1;
     my $sock = delete(${*$client}{'_parent_sock'}) || die "Could not get handshake from accept\n";
-    $sock->accept_SSL($client) || die "Could not finalize SSL connection with client handle\n";
+    $sock->accept_SSL($client) || die "Could not finalize SSL connection with client handle ($@)\n";
 }
 
 sub read_until { # allow for an interface that can be tied to STDOUT
@@ -282,12 +284,10 @@ situation, please also consider using the SSLEAY protocol
 (Net::Server::Proto::SSLEAY) which interfaces directly with
 Net::SSLeay.  See L<Net::Server::Proto>.
 
-This module has another major difference from
-Net::Server::Proto::SSLEAY: the NS_ipv value defaults to "*" rather
-than to "4".  Infact, if you have Socket6 installed on your system,
-IO::Socket::SSL will always try to use it.  The only way to not have
-this behavior is to load IO::Socket::SSL with the inet4 option prior
-to calling Net::Server->run as in:
+If you know that your server will only need IPv4 (which is the default
+for Net::Server), you can load IO::Socket::SSL in inet4 mode which
+will prevent it from using Socket6 and IO::Socket::INET6 since they
+would represent additional and unsued overhead.
 
     use IO::Socket::SSL qw(inet4);
     use base qw(Net::Server::Fork);
