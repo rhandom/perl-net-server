@@ -27,7 +27,7 @@ use Net::Server::SIG qw(register_sig check_sigs);
 use POSIX qw(WNOHANG EINTR);
 use Fcntl ();
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub options {
     my $self = shift;
@@ -36,7 +36,8 @@ sub options {
 
     $ref->{$_} = \$prop->{$_} for qw(max_servers     max_requests      max_dequeue
                                      check_for_dead  check_for_dequeue
-                                     lock_file       serialize         sig_passthrough);
+                                     lock_file       serialize);
+    $ref->{'sig_passthrough'} = $prop->{'sig_passthrough'} = [];
     return $ref;
 }
 
@@ -248,8 +249,6 @@ sub run_parent {
 
     $prop->{'last_checked_for_dead'} = $prop->{'last_checked_for_dequeue'} = time();
 
-    $self->register_sig_pass;
-
     register_sig(PIPE => 'IGNORE',
                  INT  => sub { $self->server_close() },
                  TERM => sub { $self->server_close() },
@@ -261,6 +260,8 @@ sub run_parent {
                          $self->delete_child($chld);
                      }
                  });
+
+    $self->register_sig_pass;
 
     if ($ENV{'HUP_CHILDREN'}) {
         while (defined(my $chld = waitpid(-1, WNOHANG))) {
@@ -445,7 +446,6 @@ Seconds to wait before forking off a dequeue process.  The run_dequeue
 hook must be defined when using this setting.  It is intended to use
 the dequeue process to take care of items such as mail queues.  If a
 value of undef is given, no dequeue processes will be started.
-
 
 =back
 

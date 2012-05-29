@@ -27,13 +27,14 @@ use Net::Server::SIG qw(register_sig check_sigs);
 use Socket qw(SO_TYPE SOL_SOCKET SOCK_DGRAM);
 use POSIX qw(WNOHANG);
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub options {
     my $self = shift;
     my $ref  = $self->SUPER::options(@_);
     my $prop = $self->{'server'};
     $ref->{$_} = \$prop->{$_} for qw(max_servers max_dequeue check_for_dead check_for_dequeue);
+    $ref->{'sig_passthrough'} = $prop->{'sig_passthrough'} = [];
     return $ref;
 }
 
@@ -60,8 +61,6 @@ sub loop {
         $prop->{'children'} = \%children;
     }
 
-    $self->register_sig_pass;
-
     # register some of the signals for safe handling
     register_sig(PIPE => 'IGNORE',
                  INT  => sub { $self->server_close() },
@@ -74,6 +73,8 @@ sub loop {
                          $self->delete_child($chld);
                      }
                  });
+
+    $self->register_sig_pass;
 
     if ($ENV{'HUP_CHILDREN'}) {
         while (defined(my $chld = waitpid(-1, WNOHANG))) {
@@ -126,6 +127,7 @@ sub loop {
         $self->pre_fork_hook;
 
         ### fork a child so the parent can go back to listening
+        local $!;
         my $pid = fork;
         if (! defined $pid) {
             $self->log(1, "Bad fork [$!]");
@@ -148,7 +150,7 @@ sub loop {
 sub pre_accept_hook {};
 
 sub accept {
-    my $self = shift;
+    my ($self, $class) = @_;
     my $prop = $self->{'server'};
 
     # block on trying to get a handle (select created because we specified multi_port)
@@ -170,7 +172,7 @@ sub accept {
     # Receive a SOCK_STREAM (TCP or UNIX) packet
     } else {
         delete $prop->{'udp_true'};
-        $prop->{'client'} = $sock->accept() || return;
+        $prop->{'client'} = $sock->accept($class) || return;
     }
 }
 
