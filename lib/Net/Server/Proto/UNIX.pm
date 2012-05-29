@@ -50,7 +50,8 @@ sub object {
     }
 
     my $sock = $class->SUPER::new();
-    $sock->NS_port($info->{'port'});
+    my $port = $info->{'port'} =~ m{^ ([\w\.\-\*\/]+) $ }x ? $1 : $server->fatal("Insecure filename");
+    $sock->NS_port($port);
     $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                     : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
                     : Socket::SOMAXCONN());
