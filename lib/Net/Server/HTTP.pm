@@ -77,7 +77,7 @@ sub pre_bind {
             alarm($copy->timeout_idle); # reset timeout
             return $client->$method(@_) if ${*$client}{'headers_sent'};
             if ($method ne 'print') {
-                $client->print("HTTP/1.0 501 Print\r\nContent-type:text/html\r\n\r\nHeaders may only be sent via print method ($method)");
+                $client->print("HTTP/1.0 501 Print\015\012Content-type:text/html\015\012\015\012Headers may only be sent via print method ($method)");
                 die "All headers must be done via print";
             }
             my $headers = ${*$client}{'headers'} || '';
@@ -115,10 +115,10 @@ sub send_status {
     my ($self, $status, $msg) = @_;
     $msg ||= ($status == 200) ? 'OK' : '-';
     $self->{'server'}->{'client'}->print(
-        "HTTP/1.0 $status $msg\r\n",
-        "Date: ".gmtime()." GMT\r\n",
-        "Connection: close\r\n",
-        "Server: ".$self->server_revision."\r\n",
+        "HTTP/1.0 $status $msg\015\012",
+        "Date: ".gmtime()." GMT\015\012",
+        "Connection: close\015\012",
+        "Server: ".$self->server_revision."\015\012",
     );
 }
 
@@ -126,7 +126,7 @@ sub send_501 {
     my ($self, $err) = @_;
     $self->send_status(500, 'Died');
     $self->{'server'}->{'client'}->print(
-        "Content-type: text/html\r\n\r\n",
+        "Content-type: text/html\015\012\015\012",
         "<h1>Internal Server</h1>",
         "<p>$err</p>",
     );
@@ -157,7 +157,7 @@ sub process_request {
         if ($self->psgi_enabled) {
             my $env = \%ENV;
             $env->{'psgi.version'}      = [1, 0];
-            $env->{'psgi.url_scheme'}   = ($self->{'server'}->{'client'}->NS_proto eq 'SSLEAY') ? 'https' : 'http';
+            $env->{'psgi.url_scheme'}   = ($ENV{'HTTPS'} && $ENV{'HTTPS'} eq 'on') ? 'https' : 'http';
             $env->{'psgi.input'}        = $self->{'server'}->{'client'};
             $env->{'psgi.errors'}       = $self->{'server'}->{'log_handle'};
             $env->{'psgi.multithread'}  = 1;
@@ -190,10 +190,11 @@ sub process_headers {
     $ENV{'REMOTE_ADDR'} = $self->{'server'}->{'peeraddr'};
     $ENV{'SERVER_PORT'} = $self->{'server'}->{'sockport'};
     $ENV{'SERVER_ADDR'} = $self->{'server'}->{'sockaddr'};
-    $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto eq 'SSLEAY';
+    $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto =~ /SSL/;
 
     my ($ok, $headers) = $self->{'server'}->{'client'}->read_until($self->max_header_size, qr{\n\r?\n});
-    die "Couldn't parse headers successfully" if $ok != 1;
+    my $c = $self->{'server'}->{'client'};
+    die "Could not parse headers successfully (${*$c}{'SSLeay_buffer'})" if $ok != 1;
 
     my ($req, @lines) = split /\r?\n/, $headers;
     if ($req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+HTTP/1\.[01]\s*$ }x) {
@@ -214,9 +215,13 @@ sub process_headers {
         $key = uc($key);
         $key =~ y/-/_/;
         $key =~ s/^\s+//;
-        $key = "HTTP_$key" if $key ne 'CONTENT_LENGTH';
+        $key = "HTTP_$key" if $key !~ /^CONTENT_(?:LENGTH|TYPE)$/;
         $val =~ s/\s+$//;
-        $ENV{$key} = $val;
+        if (exists $ENV{$key}) {
+            $ENV{$key} .= $val;
+        } else {
+            $ENV{$key} = $val;
+        }
     }
 }
 
@@ -254,8 +259,8 @@ sub print_psgi_headers {
     my ($self, $status, $headers) = @_;
     my $client = $self->{'server'}->{'client'};
     $self->send_status($status);
-    $client->print($headers->[$_*2],': ', $headers->[$_*2 + 1], "\r\n") for 0 .. @{ $headers || [] } / 2 - 1;
-    $client->print("\r\n");
+    $client->print($headers->[$_*2],': ', $headers->[$_*2 + 1], "\015\012") for 0 .. @{ $headers || [] } / 2 - 1;
+    $client->print("\015\012");
 }
 
 sub print_psgi_body {
@@ -292,7 +297,7 @@ Net::Server::HTTP - very basic Net::Server based HTTP server class
 
 =head1 TEST ONE LINER
 
-    perl -e 'use Net::Server::HTTP; Net::Server::HTTP->run(port=>8080)'
+    perl -e 'use base qw(Net::Server::HTTP); main->run(port => 8080)'
 
 =head1 SYNOPSIS
 
@@ -315,13 +320,16 @@ Net::Server::HTTP - very basic Net::Server based HTTP server class
 
 =head1 DESCRIPTION
 
-Even though Net::Server::HTTP doesn't fall into the normal parallel of the other Net::Server flavors,
-handling HTTP requests is an often requested feature and is a standard and simple protocol.
+Even though Net::Server::HTTP doesn't fall into the normal parallel of
+the other Net::Server flavors, handling HTTP requests is an often
+requested feature and is a standard and simple protocol.
 
-Net::Server::HTTP begins with base type MultiType defaulting to Net::Server::Fork.  It is easy
-to change it to any of the other Net::Server flavors by passing server_type => $other_flavor in the
-server configurtation.  The port has also been defaulted to port 80 - but could easily be changed to
-another through the server configuration.
+Net::Server::HTTP begins with base type MultiType defaulting to
+Net::Server::Fork.  It is easy to change it to any of the other
+Net::Server flavors by passing server_type => $other_flavor in the
+server configurtation.  The port has also been defaulted to port 80 -
+but could easily be changed to another through the server
+configuration.
 
 =head1 METHODS
 
@@ -329,31 +337,37 @@ another through the server configuration.
 
 =item C<process_http_request>
 
-Used if psgi_enabled is false (default).  During this method, the %ENV will
-have been set to a standard CGI style environment.  You will need to
-be sure to print the Content-type header.  This is one change from the
-other standard Net::Server base classes.
+Used if psgi_enabled is false (default).  During this method, the %ENV
+will have been set to a standard CGI style environment.  You will need
+to be sure to print the Content-type header.  This is one change from
+the other standard Net::Server base classes.
 
-During this method you can read from ENV and STDIN just like a normal HTTP request in other web servers.
-You can print to STDOUT and Net::Server will handle the header negotiation for you.
+During this method you can read from ENV and STDIN just like a normal
+HTTP request in other web servers.  You can print to STDOUT and
+Net::Server will handle the header negotiation for you.
 
-Note: Net::Server::HTTP has no concept of document root or script aliases or default handling of
-static content.  That is up to the consumer of Net::Server::HTTP to work out.
+Note: Net::Server::HTTP has no concept of document root or script
+aliases or default handling of static content.  That is up to the
+consumer of Net::Server::HTTP to work out.
 
 
-Net::Server::HTTP comes with a basic ENV display installed as the default process_request method.
+Net::Server::HTTP comes with a basic ENV display installed as the
+default process_request method.
 
 =item C<process_psgi_request>
 
-Used when psgi_enabled is true.  During this method, find_psgi_handler will be called to return
-the appropriate psgi response handler.  Once finished, print_psgi_headers and print_psgi_body are used to print
-out the response.  See L<PSGI>.
+Used when psgi_enabled is true.  During this method, find_psgi_handler
+will be called to return the appropriate psgi response handler.  Once
+finished, print_psgi_headers and print_psgi_body are used to print out
+the response.  See L<PSGI>.
 
 =item C<process_request>
 
-This method has been overridden in Net::Server::HTTP - you should not use it while using Net::Server::HTTP.
-This method parses the environment and sets up request alarms and handles dying failures.  It calls
-process_http_request or process_psgi_request once the request is ready and headers have been parsed.
+This method has been overridden in Net::Server::HTTP - you should not
+use it while using Net::Server::HTTP.  This method parses the
+environment and sets up request alarms and handles dying failures.  It
+calls process_http_request or process_psgi_request once the request is
+ready and headers have been parsed.
 
 =item C<send_status>
 
@@ -370,13 +384,14 @@ already parsed $env hashref is passed.  PATH_INFO will be initialized
 to the full path portion of the URI.  SCRIPT_NAME will be initialized
 to the empty string.  This handler should set the appropriate values
 for SCRIPT_NAME and PATH_INFO depending upon the path matched.  A code
-reference for the handler should be returned.  The default find_psgi_handler
-will return a reference to the psgi_echo_handler as the default application.
+reference for the handler should be returned.  The default
+find_psgi_handler will return a reference to the psgi_echo_handler as
+the default application.
 
 =head1 OPTIONS
 
-In addition to the command line arguments of the Net::Server
-base classes you can also set the following options.
+In addition to the command line arguments of the Net::Server base
+classes you can also set the following options.
 
 =over 4
 
@@ -387,7 +402,8 @@ handle the request.  When true, process_psgi_request will be used.
 
 =item max_header_size
 
-Defaults to 100_000.  Maximum number of bytes to read while parsing headers.
+Defaults to 100_000.  Maximum number of bytes to read while parsing
+headers.
 
 =item server_revision
 
@@ -399,8 +415,8 @@ Defaults to 15 - number of seconds to wait for parsing headers.
 
 =item timeout_idle
 
-Defaults to 60 - number of seconds a request can be idle before
-the request is closed.
+Defaults to 60 - number of seconds a request can be idle before the
+request is closed.
 
 =back
 
