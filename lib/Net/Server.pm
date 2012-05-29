@@ -656,7 +656,6 @@ sub run_dequeue { # fork off a child process to handle dequeuing
     }
 
     $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue';
-    $self->{'server'}->{'tally'}->{'dequeue'}++;
 }
 
 sub default_port { 20203 }
