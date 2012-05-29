@@ -102,7 +102,6 @@ sub connect { # connect the first time
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $require_ipv6 = Net::Server::Proto->requires_ipv6($server);
 
     $sock->SUPER::configure({
         LocalPort => $port,
@@ -111,15 +110,15 @@ sub connect { # connect the first time
         ReuseAddr => 1,
         Reuse     => 1,
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        ($require_ipv6 ? (Domain => ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC()) : ()),
+        ($sock->isa("IO::Socket::INET6") ? (Domain => ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC()) : ()),
     }) || $server->fatal("Can't connect to SSLEAY port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
-        $server->log(2, "Bound to auto-assigned port $port");
+        $server->log(2, "  Bound to auto-assigned port $port");
         ${*$sock}{'NS_orig_port'} = $sock->NS_port;
         $sock->NS_port($port);
     } elsif ($port =~ /\D/ and $port = $sock->sockport) {
-        $server->log(2, "Bound to service port ".$sock->NS_port()."($port)");
+        $server->log(2, "  Bound to service port ".$sock->NS_port()."($port)");
         ${*$sock}{'NS_orig_port'} = $sock->NS_port;
         $sock->NS_port($port);
     }
@@ -128,10 +127,23 @@ sub connect { # connect the first time
 }
 
 sub reconnect { # connect on a sig -HUP
-    my ($sock, $fd, $server) = @_;
+    my ($sock, $fd, $server, $port) = @_;
     $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     my $resp = $sock->fdopen( $fd, 'w' ) or $server->fatal("Error opening to file descriptor ($fd) [$!]");
+
+    if ($sock->isa("IO::Socket::INET6")) {
+        my $ipv = $sock->NS_ipv;
+        ${*$sock}{'io_socket_domain'} = ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC();
+    }
+
     $sock->bind_SSL($server);
+
+    if ($port ne $sock->NS_port) {
+        $server->log(2, "  Re-bound to previously assigned port $port");
+        ${*$sock}{'NS_orig_port'} = $sock->NS_port;
+        $sock->NS_port($port);
+    }
+
     return $resp;
 }
 
@@ -383,7 +395,7 @@ sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropri
 
 sub hup_string {
     my $sock = shift;
-    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, "ipv".$sock->NS_ipv, (${*$sock}{'NS_orig_port'} || ());
+    return join "|", $sock->NS_host, $sock->NS_port, $sock->NS_proto, "ipv".$sock->NS_ipv, (defined(${*$sock}{'NS_orig_port'}) ? ${*$sock}{'NS_orig_port'} : ());
 }
 
 sub show {

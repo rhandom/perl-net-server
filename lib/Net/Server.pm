@@ -278,16 +278,27 @@ sub bind { # bind to the port (This should serve all but INET)
         $self->log(2, "Binding open file descriptors");
         my %map;
         foreach my $info (split /\n/, $ENV{'BOUND_SOCKETS'}) {
-            my ($fd, $hup_string) = split /\|/, $info, 2;
-            $map{$hup_string} = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
+            my ($fd, $host, $port, $proto, $ipv, $orig) = split /\|/, $info;
+            $orig = $port if ! defined $orig; # allow for things like service ports or port 0
+            $fd = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
+            $map{"$host|$orig|$proto|$ipv"}->{$fd} = $port;
         }
         foreach my $sock (@{ $prop->{'sock'} }) {
             $sock->log_connect($self);
-            if (my $fd = $map{$sock->hup_string}) {
-                $sock->reconnect($fd, $self);
+            if (my $ref = $map{$sock->hup_string}) {
+                my ($fd, $port) = each %$ref;
+                $sock->reconnect($fd, $self, $port);
+                delete $ref->{$fd};
+                delete $map{$sock->hup_string} if ! keys %$ref;
             } else {
                 $self->log(2, "Added new port configuration");
                 $sock->connect($self);
+            }
+        }
+        foreach my $str (keys %map) {
+            foreach my $fd (keys %{ $map{$str} }) {
+                $self->log(2, "Closing un-mapped port ($str) on fd $fd");
+                POSIX::close($fd);
             }
         }
         delete $ENV{'BOUND_SOCKETS'};
@@ -506,6 +517,7 @@ sub get_client_info {
             ($prop->{'peerport'}, $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket::inet_ntoa($addr);
         } else {
+            warn "Right here\n";
             ($prop->{'peerport'}, $addr) = Socket6::sockaddr_in6($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket6->can('inet_ntop')
                                 ? Socket6::inet_ntop($sock->sockdomain, $addr)
@@ -786,7 +798,7 @@ sub sig_hup {
         require Fcntl;
         $prop->{'_HUP'}->[$i]->fcntl(Fcntl::F_SETFD(), my $flags = "");
 
-        push @fd, $fd .'|'. $sock->hup_string; # save file-descriptor and host|port|proto|family
+        push @fd, $fd .'|'. $sock->hup_string; # save file-descriptor and host|port|proto|ipv
 
         $sock->close();
         $i++;
