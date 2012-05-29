@@ -248,20 +248,20 @@ Net::Server::Daemonize - Safe fork and daemonization utilities
 
 =head1 SYNOPSIS
 
-  use Net::Server::Daemonize qw(daemonize);
+    use Net::Server::Daemonize qw(daemonize);
 
-  daemonize(
-    'nobody',                 # User
-    'nobody',                 # Group
-    '/var/state/mydaemon.pid' # Path to PID file - optional
-  );
+    daemonize(
+      'nobody',                 # User
+      'nobody',                 # Group
+      '/var/state/mydaemon.pid' # Path to PID file - optional
+    );
 
 =head1 DESCRIPTION
 
-This module is intended to let you simply and safely daemonize
-your server on systems supporting the POSIX module. This means
-that your Perl script runs in the background, and it's process ID
-is stored in a file so you can easily stop it later.
+This module is intended to let you simply and safely daemonize your
+server on systems supporting the POSIX module. This means that your
+Perl script runs in the background, and it's process ID is stored in a
+file so you can easily stop it later.
 
 =head1 EXPORTED FUNCTIONS
 
@@ -269,24 +269,24 @@ is stored in a file so you can easily stop it later.
 
 =item daemonize
 
-Main routine.  Arguments are user (or userid), group (or group id
-or space delimited list of groups), and pid_file (path to file).
-This routine will check on the pid file, safely fork, create the 
-pid file (storing the pid in the file), become another user and
-group, close STDIN, STDOUT and STDERR, separate from the process
-group (become session leader), and install $SIG{INT} to remove
-the pid file.  In otherwords - daemonize.  All errors result in
-a die.  As of version 0.89 the pid_file is optional.
+Main routine.  Arguments are user (or userid), group (or group id or
+space delimited list of groups), and pid_file (path to file).  This
+routine will check on the pid file, safely fork, create the pid file
+(storing the pid in the file), become another user and group, close
+STDIN, STDOUT and STDERR, separate from the process group (become
+session leader), and install $SIG{INT} to remove the pid file.  In
+otherwords - daemonize.  All errors result in a die.  As of version
+0.89 the pid_file is optional.
 
 =item safe_fork
 
-Block SIGINT during fork.  No arguments.  Returns pid of forked
-child.  All errors result in a die.
+Block SIGINT during fork.  No arguments.  Returns pid of forked child.
+All errors result in a die.
 
 =item set_user
 
-Become another user and group.  Arguments are user (or userid)
-and group (or group id or space delimited list of groups).
+Become another user and group.  Arguments are user (or userid) and
+group (or group id or space delimited list of groups).
 
 =item set_uid
 
@@ -304,8 +304,8 @@ userid.  All errors die.
 
 =item get_gid
 
-Find the gids.  Arguments are groups or space delimited list of groups.
-All errors die.
+Find the gids.  Arguments are groups or space delimited list of
+groups.  All errors die.
 
 =item is_root_user
 
@@ -313,8 +313,8 @@ Determine if the process is running as root.  Returns 1 or undef.
 
 =item check_pid_file
 
-Arguments are pid_file (full path to pid_file).  Checks for existance of
-pid_file.  If file exists, open it and determine if the process
+Arguments are pid_file (full path to pid_file).  Checks for existance
+of pid_file.  If file exists, open it and determine if the process
 that created it is still running.  This is done first by checking for
 a /proc file system and second using a "ps" command (BSD syntax).  (If
 neither of these options exist it assumed that the process has ended)
@@ -324,8 +324,8 @@ All errors die.
 =item create_pid_file.
 
 Arguments are pid_file (full path to pid_file).  Calls check_pid_file.
-If it is successful (no pid_file exists), creates a pid file and stores
-$$ in the file.
+If it is successful (no pid_file exists), creates a pid file and
+stores $$ in the file.
 
 =item unlink_pid_file
 
