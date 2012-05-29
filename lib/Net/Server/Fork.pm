@@ -193,8 +193,6 @@ sub run_client_connection {
     $self->SUPER::run_client_connection;
 }
 
-sub run_dequeue { die "run_dequeue: virtual method not defined" }
-
 sub close_children {
     my $self = shift;
     $self->SUPER::close_children(@_);
