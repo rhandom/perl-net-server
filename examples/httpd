@@ -23,7 +23,7 @@ exit;
 
 sub default_server_type { 'PreFork' }
 sub default_port { '8080' }
-#sub default_port { ['8443/SSLEAY', '8080'] } # if you want a secure server
+#sub default_port { ['8443/SSL', '8080'] } # if you want a secure server
 #sub SSL_key_file  { '/path/to/secure.key' }
 #sub SSL_cert_file { '/path/to/secure.crt' }
 
