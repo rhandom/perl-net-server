@@ -24,7 +24,7 @@ use base qw(Net::Server::MultiType);
 use Scalar::Util qw(weaken blessed);
 use IO::Handle ();
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 sub options {
     my $self = shift;
@@ -42,7 +42,7 @@ sub post_configure {
     my $d = {
         timeout_header  => 15,
         timeout_idle    => 60,
-        server_revision => __PACKAGE__."/$Net::Server::HTTP::VERSION",
+        server_revision => __PACKAGE__."/$Net::Server::VERSION",
         max_header_size => 100_000,
     };
     $prop->{$_} = $d->{$_} foreach grep {!defined($prop->{$_})} keys %$d;
