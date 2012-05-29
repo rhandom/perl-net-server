@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -24,7 +24,7 @@ package Net::Server::Single;
 use strict;
 use base qw(Net::Server);
 
-our $VERSION = $Net::Server::VERSION;
+sub net_server_type { __PACKAGE__ }
 
 ### this module is simple a place holder so that
 ### Net::Server::MultiType can ask for Single as one of
