@@ -40,6 +40,7 @@ sub new {
     return bless {server => {%$args}}, $class;
 }
 
+sub net_server_type { __PACKAGE__ }
 sub get_property { $_[0]->{'server'}->{$_[1]} }
 sub set_property { $_[0]->{'server'}->{$_[1]} = $_[2] }
 
@@ -209,14 +210,17 @@ sub post_configure {
 
 sub post_configure_hook {}
 
+sub _server_type { ref($_[0]) }
+
 sub pre_bind { # make sure we have good port parameters
     my $self = shift;
     my $prop = $self->{'server'};
 
-    my $super = do { no strict 'refs'; ${ref($self)."::ISA"}[0] };
-    $super = "$super -> MultiType -> $Net::Server::MultiType::ISA[0]" if $self->isa('Net::Server::MultiType');
-    $super = (! $super || ref($self) eq $super) ? '' : " (type $super)";
-    $self->log(2, $self->log_time ." ".ref($self)."$super starting! pid($$)");
+    my $super = $self->net_server_type;
+    my $type  = $self->_server_type;
+    $super = "$super -> MultiType -> ".Net::Server::MultiType->net_server_type if $self->isa('Net::Server::MultiType');
+    $type .= " (type $super)" if $type ne $super;
+    $self->log(2, $self->log_time ." $type starting! pid($$)");
 
     $prop->{'sock'} = [grep {$_} map { $self->proto_object($_) } @{ $self->prepared_ports }];
     $self->fatal("No valid socket parameters found") if ! @{ $prop->{'sock'} };
@@ -484,7 +488,7 @@ sub get_client_info {
     my $prop = $self->{'server'};
 
     my $sock = $prop->{'client'};
-    if ($sock->can('NS_proto') && $sock->NS_proto =~ /^UNIX/) {
+    if ($sock->NS_proto =~ /^UNIX/) {
         $self->log(3, $self->log_time." CONNECT ".$sock->NS_proto." Socket: \"".$sock->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
         return;
     }
@@ -525,7 +529,7 @@ sub get_client_info {
     }
 
     $self->log(3, $self->log_time
-               ." CONNECT ".($sock->can('NS_proto')?$sock->NS_proto:$prop->{'udp_true'}?'UDP':'TCP')
+               ." CONNECT ".$sock->NS_proto
                ." Peer: \"[$prop->{'peeraddr'}]:$prop->{'peerport'}\""
                ." Local: \"[$prop->{'sockaddr'}]:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
 }
@@ -615,8 +619,8 @@ sub post_process_request {
     return if $prop->{'udp_true'};
 
     if (! $prop->{'no_client_stdout'}) {
-        untie *STDOUT if tied *STDOUT;
-        untie *STDIN  if tied *STDIN;
+        my $t = tied *STDOUT; if ($t) { undef $t; untie *STDOUT };
+        $t    = tied *STDIN;  if ($t) { undef $t; untie *STDIN  };
         open(STDIN,  '<', '/dev/null') || die "Cannot read /dev/null  [$!]";
         open(STDOUT, '>', '/dev/null') || die "Cannot write /dev/null [$!]";
     }
@@ -1056,6 +1060,8 @@ sub WRITE    { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'write',    @_) : $s-
 sub SYSREAD  { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'sysread',  @_) : $s->[0]->sysread(@_) }
 sub SYSWRITE { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'syswrite', @_) : $s->[0]->syswrite(@_) }
 sub SEEK     { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'seek',     @_) : $s->[0]->seek(@_) }
+sub BINMODE  {}
+sub FILENO   {}
 
 1;
 
