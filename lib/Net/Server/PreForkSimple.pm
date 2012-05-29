@@ -77,7 +77,7 @@ sub post_bind {
         if (defined $prop->{'lock_file'}) {
             $prop->{'lock_file_unlink'} = undef;
         } else {
-            $prop->{'lock_file'} = POSIX::tmpnam();
+            $prop->{'lock_file'} = eval { require File::Temp } ? File::Temp::tempfile() : POSIX::tmpnam();
             $prop->{'lock_file_unlink'} = 1;
         }
 
@@ -387,7 +387,7 @@ parameters.
 
     serialize         (flock|semaphore|pipe)  undef
     # serialize defaults to flock on multi_port or on Solaris
-    lock_file         "filename"              POSIX::tmpnam
+    lock_file         "filename"              File::Temp::tempfile or POSIX::tmpnam
 
     check_for_dead    \d+                     30
 
