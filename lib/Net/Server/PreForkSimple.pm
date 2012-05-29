@@ -320,8 +320,6 @@ sub run_parent {
 
 sub idle_loop_hook {}
 
-sub run_dequeue { die "run_dequeue: virtual method not defined" }
-
 sub close_children {
     my $self = shift;
     $self->SUPER::close_children(@_);
