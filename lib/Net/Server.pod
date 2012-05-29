@@ -18,14 +18,16 @@ Net::Server - Extensible, general Perl server engine
         }
     }
 
-    MyPackage->run(port => 160);
+    MyPackage->run(port => 160, ipv => '*');
 
 
-    # onliner to get going quickly
+    # one liner to get going quickly
     perl -e 'use base qw(Net::Server); main->run(port => 20208)'
 
 =head1 FEATURES
 
+    * Full IPv6 support (via IPv6 style addr, or via ipv => "IPv6")
+    * Working SSL sockets and https (both with and without IO::Socket::SSL)
     * Single Server Mode
     * Inetd Server Mode
     * Preforking Simple Mode (PreForkSimple)
@@ -34,8 +36,6 @@ Net::Server - Extensible, general Perl server engine
     * Multiplexing Mode using a single process
     * Multi port accepts on Single, Preforking, and Forking modes
     * Basic HTTP Daemon handler
-    * IPv6 support
-    * Working SSL sockets (both with and without IO::Socket::SSL)
     * Simultaneous accept/recv on tcp/udp/unix, ssl/tcp, and IPv4/IPv6 sockets
     * Safe signal handling in Fork/PreFork avoids perl signal trouble
     * User customizable hooks
@@ -720,9 +720,14 @@ Restricting binding to a loopback interface on systems where an INET6
 socket does not accept IPv4 connections requires creating two sockets,
 one bound to address "127.0.0.1" and the other bound to address "::1".
 
+Essentially, the ipv parameter was chosen because it does not conflict
+with any other existing usage, it is very similar to ipv4 or ipv6, it
+allows for user code to not need to know about Socket::AF_INET or
+Socket6::AF_INET6 or Socket::AF_UNSPEC, and it is short.
+
 =item listen
 
-  See L<IO::Socket>.  Not used with udp protocol (or UNIX SOCK_DGRAM).
+See L<IO::Socket>.  Not used with udp protocol (or UNIX SOCK_DGRAM).
 
 =item reverse_lookups
 
@@ -1608,23 +1613,34 @@ Thanks to Dominic Humphries for helping not kill pid files on HUP.
 
 Thanks to Kristoffer Møllerhøj for fixing UDP on Multiplex.
 
-Thanks to mishikal for patches for helping identify un-cleaned up children.
+Thanks to mishikal for patches for helping identify un-cleaned up
+children.
 
-Thanks to rpkelly and tim@retout for pointing out error in header regex of HTTP.
+Thanks to rpkelly and tim@retout for pointing out error in header
+regex of HTTP.
 
-Thanks to dmcbride for some basic HTTP parsing fixes, as well as for some broken tied handle fixes.
+Thanks to dmcbride for some basic HTTP parsing fixes, as well as for
+some broken tied handle fixes.
 
-Thanks to Gareth for pointing out glaring bug issues with broken pipe and semaphore serialization.
+Thanks to Gareth for pointing out glaring bug issues with broken pipe
+and semaphore serialization.
 
-Thanks to CATONE for sending the idea for arbitrary signal passing to children.  (See the sig_passthrough option)
+Thanks to CATONE for sending the idea for arbitrary signal passing to
+children.  (See the sig_passthrough option)
 
-Thanks to intrigeri@boum for pointing out and giving code ideas for NS_port not functioning after a HUP.
+Thanks to intrigeri@boum for pointing out and giving code ideas for
+NS_port not functioning after a HUP.
 
-Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY as well as the base test.
+Thanks to Sergey Zasenko for adding sysread/syswrite support to SSLEAY
+as well as the base test.
 
 Thanks to mbarbon@users. for adding tally dequeue to prefork server.
 
 Thanks to stefanos@cpan for fixes to PreFork under Win32
+
+Thanks to the munin developers and Nicolai Langfeldt for hosting the
+development verion of Net::Server for so long and for fixes to the
+allow_deny checking for IPv6 addresses.
 
 =head1 SEE ALSO
 
