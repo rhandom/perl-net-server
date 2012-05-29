@@ -55,7 +55,7 @@ sub get_client_info {
     my $sock = $prop->{'client'};
 
     if (blessed($sock) && $sock->can('NS_proto') && $sock->NS_proto eq 'UNIX') {
-        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_unix_path."\"\n");
+        $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_unix_path."\"");
         return;
     }
 
@@ -204,26 +204,23 @@ Net::Server::INET - Net::Server personality
 
 =head1 SYNOPSIS
 
-  use Net::Server::INET;
-  @ISA = qw(Net::Server::INET);
+    use base qw(Net::Server::INET);
 
-  sub process_request {
-     #...code...
-  }
+    sub process_request {
+        #...code...
+    }
 
-  Net::Server::INET->run();
+    Net::Server::INET->run();
 
 =head1 DESCRIPTION
 
-Please read the pod on Net::Server first.  This module
-is a personality, or extension, or sub class, of the
-Net::Server module.
+Please read the pod on Net::Server first.  This module is a
+personality, or extension, or sub class, of the Net::Server module.
 
-This personality is intended for use with inetd.  It offers
-no methods beyond the Net::Server base class.  This module
-operates by overriding the pre_bind, bind, accept, and
-post_accept methods to let all socket processing to be done
-by inetd.
+This personality is intended for use with inetd.  It offers no methods
+beyond the Net::Server base class.  This module operates by overriding
+the pre_bind, bind, accept, and post_accept methods to let all socket
+processing to be done by inetd.
 
 =head1 CONFIGURATION FILE
 
