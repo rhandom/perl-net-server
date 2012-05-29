@@ -61,6 +61,7 @@ sub parse_info {
     } else {
         $server->fatal("Could not determine proto from \"$proto\"");
     }
+    $proto = lc $info->{'proto'};
 
 
     $ipv = $info->{'ipv'} || $ipv || '';
@@ -75,7 +76,7 @@ sub parse_info {
     }
     if ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
         push @_info, {%$info, ipv => '6'};
-        $requires_ipv6++;
+        $requires_ipv6++ if $proto ne 'ssl'; # IO::Socket::SSL does its own determination
     } elsif ($ipv =~ /[*]/
         && eval { require Socket6; require IO::Socket::INET6; require Socket }) {
         my ($host, $port) = @$info{qw(host port)};
@@ -91,7 +92,7 @@ sub parse_info {
             my $ipv = ($afam == Socket6::AF_INET6()) ? 6 : ($afam == Socket::AF_INET()) ? 4 : '*';
             $server->log(2, "Resolved [$host]:$port to [$ip]:$_port, IPv$ipv");
             push @_info, {port => $_port, host => $ip, ipv => $ipv, proto => $info->{'proto'}};
-            $requires_ipv6++ if $ipv ne '*';
+            $requires_ipv6++ if $ipv ne '4' && $proto ne 'ssl';
         }
         if ((grep {$_->{'host'} eq '::'} @_info)) {
             for (0 .. $#_info) {
