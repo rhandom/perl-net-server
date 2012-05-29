@@ -56,7 +56,8 @@ sub object {
     $flg = ($flg =~ /^(\d+)$/) ? $1 : 0;
 
     my $sock = $class->SUPER::new();
-    $sock->NS_port($info->{'port'});
+    my $port = $info->{'port'} =~ m{^ ([\w\.\-\*\/]+) $ }x ? $1 : $server->fatal("Insecure filename");
+    $sock->NS_port($port);
     $sock->NS_recv_len($len);
     $sock->NS_recv_flags($flg);
     return $sock;
@@ -67,10 +68,10 @@ sub connect {
     my $path = $sock->NS_port;
     $server->fatal("Can't connect to UNIXDGRAM socket at file $path [$!]") if -e $path && ! unlink $path;
 
-    $sock->SUPER::configure(
+    $sock->SUPER::configure({
         Local  => $path,
         Type   => SOCK_DGRAM,
-    ) or $server->fatal("Can't connect to UNIXDGRAM socket at file $path [$!]");
+    }) or $server->fatal("Can't connect to UNIXDGRAM socket at file $path [$!]");
 }
 
 1;
