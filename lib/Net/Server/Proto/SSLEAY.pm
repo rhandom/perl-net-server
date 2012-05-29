@@ -308,15 +308,41 @@ sub read {
     return length $read;
 }
 
-sub sysread {
-    my ($client, $buf, $size, $offset) = @_;
-    warn "sysread is not supported by Net::Server::Proto::SSLEAY";
-    # not quite right, usable only for testing:
-    my ($ok, $read) = $client->read_until($size, $/, 1);
-    substr($_[1], $offset || 0, defined($buf) ? length($buf) : 0, $read);
-    # should return the number of bytes actually read, 0 at end of file, or
-    # undef if there was an error (in the latter case $! should also be set)
-    return length $read;
+sub sysread  {
+    my ($client, $buf, $length, $offset) = @_;
+    $length = length $buf unless defined $length;
+    $offset = 0 unless defined $offset;
+    my $ssl = $client->SSLeay;
+    my $data = Net::SSLeay::read($ssl, $length);
+
+    return if $!{EAGAIN} || $!{EINTR};
+
+    die "SSLeay print: $!\n" unless defined $data;
+
+    $length = length($data);
+    $$buf = '' if !defined $buf;
+
+    if ($offset > length($$buf)) {
+        $$buf .= "\0" x ($offset - length($buf));
+    }
+
+    substr($$buf, $offset, length($$buf), $data);
+    return $length;
+}
+
+sub syswrite {
+    my ($client, $buf, $length, $offset) = @_;
+
+    $length = length $buf unless defined $length;
+    $offset = 0 unless defined $offset;
+    my $ssl    = $client->SSLeay;
+
+    my $write = Net::SSLeay::write_partial($ssl, $offset, $length, $buf);
+
+    return  if $!{EAGAIN} || $!{EINTR};
+    die "SSLeay print: $!\n" if $write < 0;
+
+    return $write;
 }
 
 sub getline {
@@ -368,8 +394,6 @@ sub write {
     $buf = substr($buf, $_[1] || 0, $_[0]) if @_;
     $client->print($buf);
 }
-
-sub syswrite { die "syswrite is not supported by Net::Server::Proto::SSLEAY" }
 
 sub seek {
     my $client = shift;
