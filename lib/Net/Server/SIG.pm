@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2011
+#  Copyright (C) 2001-2012
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -82,60 +82,59 @@ Net::Server::SIG - adpf - Safer signal handling
 
 =head1 SYNOPSIS
 
-  use Net::Server::SIG qw(register_sig check_sigs);
-  use IO::Select ();
-  use POSIX qw(WNOHANG);
+    use Net::Server::SIG qw(register_sig check_sigs);
+    use IO::Select ();
+    use POSIX qw(WNOHANG);
 
-  my $select = IO::Select->new();
+    my $select = IO::Select->new();
 
-  register_sig(PIPE => 'IGNORE',
-               HUP  => 'DEFAULT',
-               USR1 => sub { print "I got a SIG $_[0]\n"; },
-               USR2 => sub { print "I got a SIG $_[0]\n"; },
-               CHLD => sub { 1 while waitpid(-1, WNOHANG) > 0; },
-               );
+    register_sig(PIPE => 'IGNORE',
+                 HUP  => 'DEFAULT',
+                 USR1 => sub { print "I got a SIG $_[0]\n"; },
+                 USR2 => sub { print "I got a SIG $_[0]\n"; },
+                 CHLD => sub { 1 while waitpid(-1, WNOHANG) > 0; },
+                 );
 
-  ### add some handles to the select
-  $select->add(\*STDIN);
+    # add some handles to the select
+    $select->add(\*STDIN);
 
-  ### loop forever trying to stay alive
-  while (1) {
+    # loop forever trying to stay alive
+    while (1) {
 
-    ### do a timeout to see if any signals got passed us
-    ### while we were processing another signal
-    my @fh = $select->can_read(10);
+        # do a timeout to see if any signals got passed us
+        # while we were processing another signal
+        my @fh = $select->can_read(10);
 
-    my $key;
-    my $val;
+        my $key;
+        my $val;
 
-    ### this is the handler for safe (fine under unsafe also)
-    if (check_sigs()) {
-      # or my @sigs = check_sigs();
-      next unless @fh;
+        # this is the handler for safe (fine under unsafe also)
+        if (check_sigs()) {
+          # or my @sigs = check_sigs();
+          next unless @fh;
+        }
+
+        my $handle = $fh[@fh];
+
+        # do something with the handle
+
     }
-
-    my $handle = $fh[@fh];
-
-    ### do something with the handle
-
-  }
 
 =head1 DESCRIPTION
 
-Signals prior in Perl prior to 5.7 were unsafe.  Since then
-signals have been implemented in a more safe algorithm.
-Net::Server::SIG provides backwards compatibility, while still
-working reliably with newer releases.
+Signals prior in Perl prior to 5.7 were unsafe.  Since then signals
+have been implemented in a more safe algorithm.  Net::Server::SIG
+provides backwards compatibility, while still working reliably with
+newer releases.
 
-Using a property of the select() function, Net::Server::SIG
-attempts to fix the unsafe problem.  If a process is blocking on
-select() any signal will short circuit the select.  Using
-this concept, Net::Server::SIG does the least work possible (changing
-one bit from 0 to 1).  And depends upon the actual processing
-of the signals to take place immediately after the the select
-call via the "check_sigs" function.  See the example shown
-above and also see the sigtest.pl script located in the examples
-directory of this distribution.
+Using a property of the select() function, Net::Server::SIG attempts
+to fix the unsafe problem.  If a process is blocking on select() any
+signal will short circuit the select.  Using this concept,
+Net::Server::SIG does the least work possible (changing one bit from 0
+to 1).  And depends upon the actual processing of the signals to take
+place immediately after the the select call via the "check_sigs"
+function.  See the example shown above and also see the sigtest.pl
+script located in the examples directory of this distribution.
 
 =head1 FUNCTIONS
 
@@ -143,24 +142,23 @@ directory of this distribution.
 
 =item C<register_sig($SIG =E<gt> \&code_ref)>
 
-Takes key/value pairs where the key is the signal name, and the 
-argument is either a code ref, or the words 'DEFAULT' or
-'IGNORE'.  The function register_sig must be used in
-conjuction with check_sigs, and with a blocking select() function
-call -- otherwise, you will observe the registered signal
-mysteriously vanish.
+Takes key/value pairs where the key is the signal name, and the
+argument is either a code ref, or the words 'DEFAULT' or 'IGNORE'.
+The function register_sig must be used in conjuction with check_sigs,
+and with a blocking select() function call -- otherwise, you will
+observe the registered signal mysteriously vanish.
 
 =item C<unregister_sig($SIG)>
 
-Takes the name of a signal as an argument.  Calls register_sig
-with a this signal name and 'DEFAULT' as arguments (same as
+Takes the name of a signal as an argument.  Calls register_sig with a
+this signal name and 'DEFAULT' as arguments (same as
 register_sig(SIG,'DEFAULT')
 
 =item C<check_sigs()>
 
-Checks to see if any registered signals have occured.  If so, it
-will play the registered code ref for that signal.  Return value
-is array containing any SIGNAL names that had occured.
+Checks to see if any registered signals have occured.  If so, it will
+play the registered code ref for that signal.  Return value is array
+containing any SIGNAL names that had occured.
 
 =back
 
