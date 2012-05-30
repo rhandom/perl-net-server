@@ -131,6 +131,7 @@ sub use_ok {
 sub skip {
     my ($msg, $n) = @_;
     print "ok ".(++$env{'_ok_n'})." # skip $msg\n" for 1 .. $n;
+    no warnings 'exiting';
     last SKIP;
 }
 
