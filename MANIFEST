@@ -43,5 +43,7 @@ t/Server_MultiType.t		Test script for Net::Server::MultiType
 t/Server_PreFork.t		Test script for Net::Server::PreFork
 t/Server_PreForkSimple.t	Test script for Net::Server::PreForkSimple
 t/Server_Single.t		Test script for Net::Server::Single
+t/SSL_test.t                    Test script for Net::Server::Proto::SSL
+t/SSLEAY_test.t                 Test script for Net::Server::Proto::SSLEAY
 t/UDP_test.t			Test script for UDP connection
 t/UNIX_test.t			Test script for UNIX Socket connections
