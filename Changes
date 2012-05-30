@@ -3,6 +3,7 @@ Revision history for Perl extension Net::Server.
 2.001  May 30 2012
         - Bug fix wrong usage of File::Temp::tempfile.
         - Fix HTTP_COOKIES to be HTTP_COOKIE
+        - Handle multiple header values better in HTTP
         - Add Log::Log4perl logging courtesy of TONVOON@cpan
 
 2.000  May 30 2012
