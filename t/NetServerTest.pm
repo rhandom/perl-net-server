@@ -4,7 +4,7 @@ use strict;
 use IO::Socket;
 use Exporter;
 @NetServerTest::ISA = qw(Exporter);
-@NetServerTest::EXPORT_OK = qw(prepare_test ok is use_ok skip diag);
+@NetServerTest::EXPORT_OK = qw(prepare_test ok is like use_ok skip diag);
 my %env;
 use constant debug => $ENV{'NS_DEBUG'} ? 1 : 0;
 
@@ -115,6 +115,16 @@ sub ok {
 sub is {
     my ($a, $b, $msg) = @_;
     if (! ok($a eq $b, $msg, 1)) {
+        print "#        got: $a\n";
+        print "#   expected: $b\n";
+        return;
+    }
+    return 1;
+}
+
+sub like {
+    my ($a, $b, $msg) = @_;
+    if (! ok($a =~ $b, $msg, 1)) {
         print "#        got: $a\n";
         print "#   expected: $b\n";
         return;
