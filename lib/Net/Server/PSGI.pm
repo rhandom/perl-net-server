@@ -196,6 +196,9 @@ will be called to return the appropriate psgi response handler.  Once
 finished, print_psgi_headers and print_psgi_body are used to print out
 the response.  See L<PSGI>.
 
+Typically this method should not be overridden.  Instead, an appropriate
+method for finding the app should be given to find_psgi_handler or app.
+
 =item C<find_psgi_handler>
 
 Used to lookup the appropriate PSGI handler.  A reference to the
@@ -208,12 +211,46 @@ find_psgi_handler will call the C<app> method.  If that fails a
 reference to the psgi_echo_handler is returned as the default
 application.
 
+    sub find_psgi_handler {
+        my ($self, $env) = @_;
+        if ($env->{'REQUEST_URI'} =~ m{^ /foo \b ($ |/.*$ ) }x) {
+            $env->{'PATH_INFO'} = $1;
+            return \&foo_app;
+        } else {
+            return $self->SUPER::find_psgi_handler($env);
+        }
+    }
+
 =item C<app>
 
 Return a reference to the application being served.  This should
 be a valid PSGI application.  See L<PSGI>.  By default it will look
 at the value of the C<app> configuration option.  The C<app> method
 may also be used to set the C<app> configuration option.
+
+    package MyApp;
+    use base qw(Net::Server::PSGI);
+
+    sub default_server_type { 'Prefork' }
+
+    sub my_app {
+        my $env = shift;
+        return [200, ['Content-type', 'text/html'], ["Hello world"]];
+    }
+
+
+    MyApp->run(app => \&my_app);
+
+
+    # OR
+    sub app { \&my_app }
+    MyApp->run;
+
+
+    # OR
+    my $server = MyApp->new;
+    $server->app(\&my_app);
+    $server->run;
 
 =back
 
