@@ -30,15 +30,25 @@ sub options {
     my $self = shift;
     my $ref  = $self->SUPER::options(@_);
     my $prop = $self->{'server'};
-    $ref->{$_} = \$prop->{$_} for qw(timeout_header timeout_idle server_revision max_header_size psgi_enabled);
+    $ref->{$_} = \$prop->{$_} for qw(timeout_header timeout_idle server_revision max_header_size);
     return $ref;
 }
 
+sub timeout_header  { shift->{'server'}->{'timeout_header'}  }
+sub timeout_idle    { shift->{'server'}->{'timeout_idle'}    }
+sub server_revision { shift->{'server'}->{'server_revision'} }
+sub max_header_size { shift->{'server'}->{'max_header_size'} }
+
+sub default_port { 80 }
+
+sub default_server_type { 'Fork' }
+
 sub post_configure {
     my $self = shift;
-    my $prop = $self->{server};
-    $self->SUPER::post_configure;
+    $self->SUPER::post_configure(@_);
+    my $prop = $self->{'server'};
 
+    # set other defaults
     my $d = {
         timeout_header  => 15,
         timeout_idle    => 60,
@@ -46,69 +56,46 @@ sub post_configure {
         max_header_size => 100_000,
     };
     $prop->{$_} = $d->{$_} foreach grep {!defined($prop->{$_})} keys %$d;
-}
 
-sub timeout_header  { shift->{'server'}->{'timeout_header'}  }
-sub timeout_idle    { shift->{'server'}->{'timeout_idle'}    }
-sub server_revision { shift->{'server'}->{'server_revision'} }
-sub max_header_size { shift->{'server'}->{'max_header_size'} }
-sub psgi_enabled    { shift->{'server'}->{'psgi_enabled'}    }
 
-sub default_port { 80 }
-
-sub default_server_type { 'Fork' }
-
-sub pre_bind {
-    my $self = shift;
-    my $prop = $self->{'server'};
-
-    if ($self->psgi_enabled) {
-        $prop->{'log_handle'} = IO::Handle->new;
-        $prop->{'log_handle'}->fdopen(fileno(STDERR), "w");
-        $prop->{'no_client_stdout'} = 1;
-
-    } else {
-        # install a callback that will handle our outbound header negotiation for the clients similar to what apache does for us
-        my $copy = $self;
-        $prop->{'tie_client_stdout'} = 1;
-        $prop->{'tied_stdout_callback'} = sub {
-            my $client = shift;
-            my $method = shift;
-            alarm($copy->timeout_idle); # reset timeout
-            return $client->$method(@_) if ${*$client}{'headers_sent'};
-            if ($method ne 'print') {
-                $client->print("HTTP/1.0 501 Print\015\012Content-type:text/html\015\012\015\012Headers may only be sent via print method ($method)");
-                die "All headers must be done via print";
-            }
-            my $headers = ${*$client}{'headers'} || '';
-            $headers .= join '', @_;
-            if ($headers !~ /\n\r?\n/) { # headers aren't finished yet
-                ${*$client}{'headers'} = $headers;
-                return;
-            }
-            ${*$client}{'headers_sent'} = 1;
-            delete ${*$client}{'headers'};
-            if ($headers =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)\r?\n}x) {
-                # looks like they are sending their own status
-            }
-            elsif ($headers =~ /^Status:\s+(\d+) (?:|\s+(.+?))\s*$/im) {
-                $copy->send_status($1, $2 || '-');
-            }
-            elsif ($headers =~ /^Location:\s+/im) {
-                $copy->send_status(302, 'bouncing');
-            }
-            elsif ($headers =~ /^Content-type:\s+\S.*/im) {
-                $copy->send_status(200, 'OK');
-            }
-            else {
-                $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
-            }
-            return $client->print($headers);
-        };
-        weaken $copy;
-    }
-
-    return $self->SUPER::pre_bind(@_);
+    # install a callback that will handle our outbound header negotiation for the clients similar to what apache does for us
+    my $copy = $self;
+    $prop->{'tie_client_stdout'} = 1;
+    $prop->{'tied_stdout_callback'} = sub {
+        my $client = shift;
+        my $method = shift;
+        alarm($copy->timeout_idle); # reset timeout
+        return $client->$method(@_) if ${*$client}{'headers_sent'};
+        if ($method ne 'print') {
+            $client->print("HTTP/1.0 501 Print\015\012Content-type:text/html\015\012\015\012Headers may only be sent via print method ($method)");
+            die "All headers must be done via print";
+        }
+        my $headers = ${*$client}{'headers'} || '';
+        $headers .= join '', @_;
+        if ($headers !~ /\n\r?\n/) { # headers aren't finished yet
+            ${*$client}{'headers'} = $headers;
+            return;
+        }
+        ${*$client}{'headers_sent'} = 1;
+        delete ${*$client}{'headers'};
+        if ($headers =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)\r?\n}x) {
+            # looks like they are sending their own status
+        }
+        elsif ($headers =~ /^Status:\s+(\d+) (?:|\s+(.+?))\s*$/im) {
+            $copy->send_status($1, $2 || '-');
+        }
+        elsif ($headers =~ /^Location:\s+/im) {
+            $copy->send_status(302, 'bouncing');
+        }
+        elsif ($headers =~ /^Content-type:\s+\S.*/im) {
+            $copy->send_status(200, 'OK');
+        }
+        else {
+            $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
+        }
+        return $client->print($headers);
+    };
+    weaken $copy;
 }
 
 sub send_status {
@@ -154,21 +141,7 @@ sub process_request {
         $self->process_headers;
 
         alarm($self->timeout_idle);
-        if ($self->psgi_enabled) {
-            my $env = \%ENV;
-            $env->{'psgi.version'}      = [1, 0];
-            $env->{'psgi.url_scheme'}   = ($ENV{'HTTPS'} && $ENV{'HTTPS'} eq 'on') ? 'https' : 'http';
-            $env->{'psgi.input'}        = $self->{'server'}->{'client'};
-            $env->{'psgi.errors'}       = $self->{'server'}->{'log_handle'};
-            $env->{'psgi.multithread'}  = 1;
-            $env->{'psgi.multiprocess'} = 1;
-            $env->{'psgi.nonblocking'}  = 1; # need to make this false if we aren't of a forking type server
-            $env->{'psgi.streaming'}    = 1;
-            local %ENV;
-            $self->process_psgi_request($env);
-        } else {
-            $self->process_http_request;
-        }
+        $self->process_http_request;
         alarm(0);
         1;
     };
@@ -237,56 +210,6 @@ sub process_http_request {
     }
 }
 
-###----------------------------------------------------------------###
-
-sub process_psgi_request {
-    my ($self, $env) = @_;
-    my $app = $self->find_psgi_handler($env);
-    my $resp = $app->($env);
-    return $resp->(sub {
-        my $resp = shift;
-        $self->print_psgi_headers($resp->[0], $resp->[1]);
-        return $self->{'server'}->{'client'} if @$resp == 2;
-        return $self->print_psgi_body($resp->[2]);
-    }) if ref($resp) eq 'CODE';
-    $self->print_psgi_headers($resp->[0], $resp->[1]);
-    $self->print_psgi_body($resp->[2]);
-}
-
-sub find_psgi_handler { \&psgi_echo_handler }
-
-sub print_psgi_headers {
-    my ($self, $status, $headers) = @_;
-    my $client = $self->{'server'}->{'client'};
-    $self->send_status($status);
-    $client->print($headers->[$_*2],': ', $headers->[$_*2 + 1], "\015\012") for 0 .. @{ $headers || [] } / 2 - 1;
-    $client->print("\015\012");
-}
-
-sub print_psgi_body {
-    my ($self, $body) = @_;
-    my $client = $self->{'server'}->{'client'};
-    if (ref $body eq 'ARRAY') {
-        $client->print(@$body);
-    } elsif (blessed($body) && $body->can('getline')) {
-        $client->print($_) while defined($_ = $body->getline);
-    } else {
-        $client->print(<$body>);
-    }
-}
-
-sub psgi_echo_handler {
-    my $env = shift;
-    my $txt = qq{<form method="post" action="/bam"><input type="text" name="foo"><input type="submit"></form>\n};
-    if (eval { require Data::Dumper }) {
-        local $Data::Dumper::Sortkeys = 1;
-        my $form = {};
-        if (eval { require CGI::PSGI }) {  my $q = CGI::PSGI->new($env); $form->{$_} = $q->param($_) for $q->param;  }
-        $txt .= "<pre>".Data::Dumper->Dump([$env, $form], ['env', 'form'])."</pre>";
-    }
-    return [200, ['Content-type', 'text/html'], [$txt]];
-}
-
 1;
 
 __END__
@@ -337,12 +260,12 @@ configuration.
 
 =item C<process_http_request>
 
-Used if psgi_enabled is false (default).  During this method, the %ENV
-will have been set to a standard CGI style environment.  You will need
-to be sure to print the Content-type header.  This is one change from
-the other standard Net::Server base classes.
+During this method, the %ENV will have been set to a standard CGI
+style environment.  You will need to be sure to print the Content-type
+header.  This is one change from the other standard Net::Server base
+classes.
 
-During this method you can read from ENV and STDIN just like a normal
+During this method you can read from %ENV and STDIN just like a normal
 HTTP request in other web servers.  You can print to STDOUT and
 Net::Server will handle the header negotiation for you.
 
@@ -350,24 +273,16 @@ Note: Net::Server::HTTP has no concept of document root or script
 aliases or default handling of static content.  That is up to the
 consumer of Net::Server::HTTP to work out.
 
-
-Net::Server::HTTP comes with a basic ENV display installed as the
-default process_request method.
-
-=item C<process_psgi_request>
-
-Used when psgi_enabled is true.  During this method, find_psgi_handler
-will be called to return the appropriate psgi response handler.  Once
-finished, print_psgi_headers and print_psgi_body are used to print out
-the response.  See L<PSGI>.
+Net::Server::HTTP comes with a basic %ENV display installed as the
+default process_http_request method.
 
 =item C<process_request>
 
 This method has been overridden in Net::Server::HTTP - you should not
-use it while using Net::Server::HTTP.  This method parses the
-environment and sets up request alarms and handles dying failures.  It
-calls process_http_request or process_psgi_request once the request is
-ready and headers have been parsed.
+use it while using Net::Server::HTTP.  This overridden method parses
+the environment and sets up request alarms and handles dying failures.
+It calls process_http_request once the request is ready and headers
+have been parsed.
 
 =item C<send_status>
 
@@ -377,16 +292,7 @@ Takes an HTTP status and a message.  Sends out the correct headers.
 
 Calls send_status with 501 and the argument passed to send_501.
 
-=item C<find_psgi_handler>
-
-Used to lookup the appropriate PSGI handler.  A reference to the
-already parsed $env hashref is passed.  PATH_INFO will be initialized
-to the full path portion of the URI.  SCRIPT_NAME will be initialized
-to the empty string.  This handler should set the appropriate values
-for SCRIPT_NAME and PATH_INFO depending upon the path matched.  A code
-reference for the handler should be returned.  The default
-find_psgi_handler will return a reference to the psgi_echo_handler as
-the default application.
+=back
 
 =head1 OPTIONS
 
@@ -394,11 +300,6 @@ In addition to the command line arguments of the Net::Server base
 classes you can also set the following options.
 
 =over 4
-
-=item psgi_enabled
-
-Defaults false.  When false, process_http_request will be called to
-handle the request.  When true, process_psgi_request will be used.
 
 =item max_header_size
 
