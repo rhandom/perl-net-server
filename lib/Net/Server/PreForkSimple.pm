@@ -342,6 +342,8 @@ sub close_children {
                  QUIT => 'DEFAULT',
                  HUP  => 'DEFAULT',
                  CHLD => 'DEFAULT',
+                 TTIN => 'DEFAULT',
+                 TTOU => 'DEFAULT',
                  );
 }
 

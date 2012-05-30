@@ -211,7 +211,7 @@ sub run_child {
     # Open in child at start
     if ($prop->{'serialize'} eq 'flock') {
         open $prop->{'lock_fh'}, ">", $prop->{'lock_file'}
-        or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
+            or $self->fatal("Couldn't open lock file \"$prop->{'lock_file'}\"[$!]");
     }
 
     $self->log(4, "Child Preforked ($$)");
@@ -258,7 +258,6 @@ sub run_parent {
         PIPE => 'IGNORE',
         INT  => sub { $self->server_close() },
         TERM => sub { $self->server_close() },
-        QUIT => sub { $self->server_close() },
         HUP  => sub { $self->sig_hup() },
         CHLD => sub {
             while (defined(my $chld = waitpid(-1, WNOHANG))) {
@@ -266,6 +265,9 @@ sub run_parent {
                 $self->{'reaped_children'}->{$chld} = 1; # We'll deal with this in coordinate_children to avoid a race
             }
         },
+        QUIT => sub { $self->{'server'}->{'kind_quit'} = 1; $self->server_close() },
+        TTIN => sub { $self->{'server'}->{$_}++ for qw(min_servers max_servers); $self->log(3, "Increasing server count ($self->{'server'}->{'max_servers'})") },
+        TTOU => sub { $self->{'server'}->{$_}-- for qw(min_servers max_servers); $self->log(3, "Decreasing server count ($self->{'server'}->{'max_servers'})") },
     );
 
     $self->register_sig_pass;
@@ -652,6 +654,14 @@ every C<check_for_waiting> seconds.  The first argument is a reference
 to an array of file descriptors that can be read at the moment.
 
 =back
+
+=head1 HOT DEPLOY
+
+Since version 2.000, the PreFork server has accepted the TTIN and TTOU
+signals.  When a TTIN is received, the min and max_servers are
+increased by 1.  If a TTOU signal is received the min max_servers are
+decreased by 1.  This allows for adjusting the number of handling
+processes without having to restart the server.
 
 =head1 BUGS
 
