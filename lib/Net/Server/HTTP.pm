@@ -57,6 +57,7 @@ sub post_configure {
     };
     $prop->{$_} = $d->{$_} foreach grep {!defined($prop->{$_})} keys %$d;
 
+    return if $self->net_server_type ne __PACKAGE__;
 
     # install a callback that will handle our outbound header negotiation for the clients similar to what apache does for us
     my $copy = $self;
