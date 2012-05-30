@@ -1178,6 +1178,8 @@ The default method implements a simple echo server that will repeat
 whatever is sent.  It will quit the child if "quit" is sent, and will
 exit the server if "exit" is sent.
 
+As of version 2.000, the client handle is passed as an argument.
+
 =item C<$self-E<gt>post_process_request>
 
 This method is used to clean up the client connection and to handle
@@ -1265,6 +1267,8 @@ This hook allows for the checking of ip and host information beyond
 the C<$self-E<gt>allow_deny()> routine.  If this hook returns 1, the
 client request will be processed, otherwise, the request will be
 denied processing.
+
+As of version 2.000, the client connection is passed as an argument.
 
 =item C<$self-E<gt>request_denied_hook()>
 
