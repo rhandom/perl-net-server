@@ -1701,6 +1701,8 @@ allow_deny checking for IPv6 addresses.
 Thanks to Tatsuhiko Miyagawa for feedback, and for suggesting adding
 graceful shutdowns and hot deploy (max_servers adjustment).
 
+Thanks to TONVOON@cpan for submitting a patch adding Log4perl functionality.
+
 =head1 SEE ALSO
 
 Please see also
