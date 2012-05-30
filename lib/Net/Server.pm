@@ -32,7 +32,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.000';
+our $VERSION = '2.001';
 
 sub new {
     my $class = shift || die "Missing class";
@@ -155,6 +155,14 @@ sub post_configure {
         });
         $self->open_syslog; # log to syslog
 
+    } elsif ($prop->{'log_file'} eq 'Log::Log4perl') {
+        $self->configure({
+            log4perl_conf   => \$prop->{'log4perl_conf'},
+            log4perl_logger => \$prop->{'log4perl_logger'},
+            log4perl_poll   => \$prop->{'log4perl_poll'},
+        });
+        $self->open_log4perl;
+
     } elsif ($prop->{'log_file'}) {
         die "Unsecure filename \"$prop->{'log_file'}\"" if $prop->{'log_file'} !~ m|^([\:\w\.\-/\\]+)$|;
         $prop->{'log_file'} = $1; # open a logging file
@@ -189,7 +197,9 @@ sub post_configure {
         POSIX::setsid() if $prop->{'setsid'}; # completely remove myself from parent process
     }
 
-    if (length($prop->{'log_file'}) && $prop->{'log_file'} ne 'Sys::Syslog') { # completely daemonize by closing STDERR (should be done after fork)
+    if (length($prop->{'log_file'})
+        && $prop->{'log_file'} ne 'Sys::Syslog'
+        && $prop->{'log_file'} ne 'Log::Log4perl') { # completely daemonize by closing STDERR (should be done after fork)
         open STDERR, '>&_SERVER_LOG' || die "Cannot open STDERR to _SERVER_LOG [$!]";
     } elsif ($prop->{'setsid'}) {
         open STDERR, '>&STDOUT' || die "Cannot open STDERR to STDOUT [$!]";
@@ -899,14 +909,49 @@ sub open_syslog {
 
 $Net::Server::syslog_map = {0 => 'err', 1 => 'warning', 2 => 'notice', 3 => 'info', 4 => 'debug'};
 
+sub open_log4perl {
+    my $self = shift;
+    my $prop = $self->{'server'};
+
+    require Log::Log4perl;
+
+    die "Must specify a log4perl_conf file" if ! $prop->{'log4perl_conf'};
+
+    my $poll = defined($prop->{'log4perl_poll'}) ? $prop->{'log4perl_poll'} : "0";
+    my $logger = $prop->{'log4perl_logger'} || "Net::Server";
+
+    if ($poll eq "0") {
+        Log::Log4perl::init($prop->{'log4perl_conf'});
+    } else {
+        Log::Log4perl::init_and_watch($prop->{'log4perl_conf'}, $poll);
+    }
+
+    my $l4p = Log::Log4perl->get_logger($logger);
+    my $lmap = {
+        1 => "error",
+        2 => "warn",
+        3 => "info",
+        4 => "debug",
+    };
+    $prop->{'log_function'} = sub {
+        my ($level, $msg) = @_;
+        $level = $lmap->{$level} || "error";
+        $l4p->$level($msg);
+    };
+}
+
 sub log {
     my ($self, $level, $msg, @therest) = @_;
     my $prop = $self->{'server'};
     return if ! $prop->{'log_level'};
     $msg = sprintf($msg, @therest) if @therest; # if multiple arguments are passed, assume that the first is a format string
 
-    # log only to syslog if setup to do syslog
-    if (defined($prop->{'log_file'}) && $prop->{'log_file'} eq 'Sys::Syslog') {
+    if ($prop->{'log_function'}) {
+        return if $level !~ /^\d+$/ || $level > $prop->{'log_level'};
+        $prop->{'log_function'}->($level, $msg);
+        return;
+    }
+    elsif (defined($prop->{'log_file'}) && $prop->{'log_file'} eq 'Sys::Syslog') {
         if ($level =~ /^\d+$/) {
             return if $level > $prop->{'log_level'};
             $level = $Net::Server::syslog_map->{$level} || $level;
