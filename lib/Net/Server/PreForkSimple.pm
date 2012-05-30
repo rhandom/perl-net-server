@@ -265,7 +265,7 @@ sub run_parent {
         TTOU => sub {
             $self->{'server'}->{'max_servers'}--;
             $self->log(3, "Decreasing max server count ($self->{'server'}->{'max_servers'})");
-            if (my $pid = each %{ $prop->{'children'} }) {
+            if (defined(my $pid = each %{ $prop->{'children'} })) {
                 $self->delete_child($pid) if ! kill('HUP', $pid);
             }
         },
