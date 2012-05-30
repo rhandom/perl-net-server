@@ -5,16 +5,16 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok diag skip);
-my $env = prepare_test({n_tests => 5, start_port => 20200, n_ports => 1}); # runs three of its own tests
+my $env = prepare_test({n_tests => 5, start_port => 20200, n_ports => 2}); # runs three of its own tests
 
 if (! eval { require File::Temp }
     || ! eval { require Net::SSLeay }
    ) {
-  SKIP: { skip("Cannot load SSleay libraries to test Socket SSL server: $@", 2); };
+  SKIP: { skip("Cannot load Net::SSleay libraries to test Socket SSL server: $@", 2); };
     exit;
 }
 
-my $pem = << 'PEM';
+my $pem = << 'PEM'; # this certificate is invalid, please only use for testing
 -----BEGIN CERTIFICATE-----
 MIICKTCCAZICCQDFxHnOjdmTTjANBgkqhkiG9w0BAQUFADBZMQswCQYDVQQGEwJB
 VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0
@@ -65,6 +65,7 @@ sub accept {
 sub process_request {
     my $self = shift;
     my $client = $self->{'server'}->{'client'};
+    return $self->SUPER::process_request if $client->NS_port == $env->{'ports'}->[1];
     my $offset = 0;
     my $total = 0;
     my $buf;
@@ -95,13 +96,31 @@ my $ok = eval {
     if ($pid) {
         $env->{'block_until_ready_to_test'}->();
 
-        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[1]) || die "Couldn't open child to sock: $!";
 
         my $ctx = Net::SSLeay::CTX_new()
             or Net::SSLeay::die_now("Failed to create SSL_CTX $!");
         Net::SSLeay::CTX_set_options($ctx, &Net::SSLeay::OP_ALL)
             and Net::SSLeay::die_if_ssl_error("ssl ctx set options");
         my $ssl = Net::SSLeay::new($ctx)
+            or Net::SSLeay::die_now("Failed to create SSL $!");
+        Net::SSLeay::set_fd($ssl, $remote->fileno);
+        Net::SSLeay::connect($ssl);
+        my $line = Net::SSLeay::read($ssl);
+        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        diag $line;
+        Net::SSLeay::write($ssl, "quit\n");
+        my $line2 = Net::SSLeay::read($ssl);
+        diag $line2;
+
+
+        $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+
+        $ctx = Net::SSLeay::CTX_new()
+            or Net::SSLeay::die_now("Failed to create SSL_CTX $!");
+        Net::SSLeay::CTX_set_options($ctx, &Net::SSLeay::OP_ALL)
+            and Net::SSLeay::die_if_ssl_error("ssl ctx set options");
+        $ssl = Net::SSLeay::new($ctx)
             or Net::SSLeay::die_now("Failed to create SSL $!");
 
         Net::SSLeay::set_fd($ssl, $remote->fileno);
@@ -118,7 +137,7 @@ my $ok = eval {
             close STDERR;
             Net::Server::Test->run(
                 host  => $env->{'hostname'},
-                port  => $env->{'ports'}->[0],
+                port  => $env->{'ports'},
                 proto => 'ssleay',
                 background => 0,
                 setsid => 0,
