@@ -52,7 +52,7 @@ sub accept { # connection is already accepted
 sub get_client_info {
     my $self = shift;
     my $prop = $self->{'server'};
-    my $sock = $prop->{'client'};
+    my $sock = shift || $prop->{'client'};
 
     if (blessed($sock) && $sock->can('NS_proto') && $sock->NS_proto eq 'UNIX') {
         $self->log(3, $self->log_time." CONNECT UNIX Socket: \"".$sock->NS_unix_path."\"");
