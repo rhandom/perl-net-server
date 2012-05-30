@@ -91,83 +91,79 @@ Net::Server::MultiType - Net::Server personality
 =head1 DESCRIPTION
 
 Please read the pod on Net::Server first.  This module is a
-personality, or extension, or sub class, of the Net::Server
-module.
+personality, or extension, or sub class, of the Net::Server module.
 
-This personality is intended to allow for easy use of
-multiple Net::Server personalities.  Given a list of server
-types, Net::Server::MultiType will require one at a time
-until it finds one that is installed on the system.  It then
-adds that package to its @ISA, thus inheriting the methods
-of that personality.
+This personality is intended to allow for easy use of multiple
+Net::Server personalities.  Given a list of server types,
+Net::Server::MultiType will require one at a time until it finds one
+that is installed on the system.  It then adds that package to its
+@ISA, thus inheriting the methods of that personality.
 
 =head1 ARGUMENTS
 
-In addition to the command line arguments of the Net::Server
-base class, Net::Server::MultiType contains one other
-configurable parameter.
+In addition to the command line arguments of the Net::Server base
+class, Net::Server::MultiType contains one other configurable
+parameter.
 
-  Key               Value            Default
-  server_type       'server_type'    'Single'
+    Key               Value            Default
+    server_type       'server_type'    'Single'
 
 =over 4
 
 =item server_type
 
 May be called many times to build up an array or possible
-server_types.  At execution, Net::Server::MultiType will
-find the first available one and then inherit the methods of
-that personality
+server_types.  At execution, Net::Server::MultiType will find the
+first available one and then inherit the methods of that personality
 
 =back
 
 =head1 CONFIGURATION FILE
 
-C<Net::Server::MultiType> allows for the use of a
-configuration file to read in server parameters.  The format
-of this conf file is simple key value pairs.  Comments and
-white space are ignored.
+C<Net::Server::MultiType> allows for the use of a configuration file
+to read in server parameters.  The format of this conf file is simple
+key value pairs.  Comments and white space are ignored.
 
-  #-------------- file test.conf --------------
+    #-------------- file test.conf --------------
 
-  ### multi type info
-  ### try PreFork first, then go to Single
-  server_type PreFork
-  server_type Single
+    ### multi type info
+    ### try PreFork first, then go to Single
+    server_type PreFork
+    server_type Single
 
-  ### server information
-  min_servers   20
-  max_servers   80
-  spare_servers 10
+    ### server information
+    min_servers   20
+    max_servers   80
+    spare_servers 10
 
-  max_requests  1000
+    max_requests  1000
 
-  ### user and group to become
-  user        somebody
-  group       everybody
+    ### user and group to become
+    user        somebody
+    group       everybody
 
-  ### logging ?
-  log_file    /var/log/server.log
-  log_level   3
-  pid_file    /tmp/server.pid
+    ### logging ?
+    log_file    /var/log/server.log
+    log_level   3
+    pid_file    /tmp/server.pid
 
-  ### access control
-  allow       .+\.(net|com)
-  allow       domain\.com
-  deny        a.+
+    ### access control
+    allow       .+\.(net|com)
+    allow       domain\.com
+    deny        a.+
 
-  ### background the process?
-  background  1
+    ### background the process?
+    background  1
 
-  ### ports to bind
-  host        127.0.0.1
-  port        localhost:20204
-  port        20205
+    ### ports to bind
+    host        127.0.0.1
+    port        localhost:20204
+    port        20205
 
-  ### reverse lookups ?
-  # reverse_lookups on
- 
-  #-------------- file test.conf --------------
+    ### reverse lookups ?
+    # reverse_lookups on
+
+    #-------------- file test.conf --------------
 
 =head1 PROCESS FLOW
 
