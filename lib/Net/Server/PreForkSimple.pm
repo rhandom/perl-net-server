@@ -249,17 +249,27 @@ sub run_parent {
 
     $prop->{'last_checked_for_dead'} = $prop->{'last_checked_for_dequeue'} = time();
 
-    register_sig(PIPE => 'IGNORE',
-                 INT  => sub { $self->server_close() },
-                 TERM => sub { $self->server_close() },
-                 QUIT => sub { $self->server_close() },
-                 HUP  => sub { $self->sig_hup() },
-                 CHLD => sub {
-                     while (defined(my $chld = waitpid(-1, WNOHANG))) {
-                         last unless $chld > 0;
-                         $self->delete_child($chld);
-                     }
-                 });
+    register_sig(
+        PIPE => 'IGNORE',
+        INT  => sub { $self->server_close() },
+        TERM => sub { $self->server_close() },
+        HUP  => sub { $self->sig_hup() },
+        CHLD => sub {
+            while (defined(my $chld = waitpid(-1, WNOHANG))) {
+                last unless $chld > 0;
+                $self->delete_child($chld);
+            }
+        },
+        QUIT => sub { $self->{'server'}->{'kind_quit'} = 1; $self->server_close() },
+        TTIN => sub { $self->{'server'}->{'max_servers'}++; $self->log(3, "Increasing max server count ($self->{'server'}->{'max_servers'})") },
+        TTOU => sub {
+            $self->{'server'}->{'max_servers'}--;
+            $self->log(3, "Decreasing max server count ($self->{'server'}->{'max_servers'})");
+            if (my $pid = each %{ $prop->{'children'} }) {
+                $self->delete_child($pid) if ! kill('HUP', $pid);
+            }
+        },
+        );
 
     $self->register_sig_pass;
 
@@ -533,6 +543,14 @@ setting.
 This hook is called in every pass through the main process wait loop.
 
 =back
+
+=head1 HOT DEPLOY
+
+Since version 2.000, the PreForkSimple server has accepted the TTIN
+and TTOU signals.  When a TTIN is received, the max_servers is
+increased by 1.  If a TTOU signal is received the max_servers is
+decreased by 1.  This allows for adjusting the number of handling
+processes without having to restart the server.
 
 =head1 BUGS
 
