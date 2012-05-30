@@ -135,14 +135,15 @@ sub clear_http_env {
 
 sub process_request {
     my $self = shift;
+    my $client = shift || $self->{'server'}->{'client'};
 
     local $SIG{'ALRM'} = sub { die "Server Timeout\n" };
     my $ok = eval {
         alarm($self->timeout_header);
-        $self->process_headers;
+        $self->process_headers($client);
 
         alarm($self->timeout_idle);
-        $self->process_http_request;
+        $self->process_http_request($client);
         alarm(0);
         1;
     };
@@ -159,6 +160,7 @@ sub script_name { shift->{'script_name'} || '' }
 
 sub process_headers {
     my $self = shift;
+    my $client = shift || $self->{'server'}->{'client'};
 
     $ENV{'REMOTE_PORT'} = $self->{'server'}->{'peerport'};
     $ENV{'REMOTE_ADDR'} = $self->{'server'}->{'peeraddr'};
@@ -166,9 +168,8 @@ sub process_headers {
     $ENV{'SERVER_ADDR'} = $self->{'server'}->{'sockaddr'};
     $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto =~ /SSL/;
 
-    my ($ok, $headers) = $self->{'server'}->{'client'}->read_until($self->max_header_size, qr{\n\r?\n});
-    my $c = $self->{'server'}->{'client'};
-    die "Could not parse headers successfully (${*$c}{'SSLeay_buffer'})" if $ok != 1;
+    my ($ok, $headers) = $client->read_until($self->max_header_size, qr{\n\r?\n});
+    die "Could not parse http headers successfully\n" if $ok != 1;
 
     my ($req, @lines) = split /\r?\n/, $headers;
     if ($req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+HTTP/1\.[01]\s*$ }x) {
@@ -200,7 +201,7 @@ sub process_headers {
 }
 
 sub process_http_request {
-    my $self = shift;
+    my ($self, $client) = @_;
     print "Content-type: text/html\n\n";
     print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
     if (eval { require Data::Dumper }) {
@@ -234,12 +235,14 @@ Net::Server::HTTP - very basic Net::Server based HTTP server class
         print "Content-type: text/html\n\n";
         print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
 
-        if (require Data::Dumper) {
-            local $Data::Dumper::Sortkeys = 1;
-            my $form = {};
-            if (require CGI) {  my $q = CGI->new; $form->{$_} = $q->param($_) for $q->param;  }
-            print "<pre>".Data::Dumper->Dump([\%ENV, $form], ['*ENV', 'form'])."</pre>";
-        }
+        require Data::Dumper;
+        local $Data::Dumper::Sortkeys = 1;
+
+        require CGI;
+        my $form = {};
+        my $q = CGI->new; $form->{$_} = $q->param($_) for $q->param;
+
+        print "<pre>".Data::Dumper->Dump([\%ENV, $form], ['*ENV', 'form'])."</pre>";
     }
 
 =head1 DESCRIPTION
@@ -253,13 +256,17 @@ Net::Server::Fork.  It is easy to change it to any of the other
 Net::Server flavors by passing server_type => $other_flavor in the
 server configurtation.  The port has also been defaulted to port 80 -
 but could easily be changed to another through the server
-configuration.
+configuration.  You can also very easily add ssl by including,
+proto=>"ssl" and provide a SSL_cert_file and SSL_key_file.
 
 =head1 METHODS
 
 =over 4
 
 =item C<process_http_request>
+
+Will be passed the client handle, and will have STDOUT and STDIN tied
+to the client.
 
 During this method, the %ENV will have been set to a standard CGI
 style environment.  You will need to be sure to print the Content-type
