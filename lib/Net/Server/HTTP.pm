@@ -194,7 +194,7 @@ sub process_headers {
         $key = "HTTP_$key" if $key !~ /^CONTENT_(?:LENGTH|TYPE)$/;
         $val =~ s/\s+$//;
         if (exists $ENV{$key}) {
-            $ENV{$key} .= $val;
+            $ENV{$key} .= ", $val";
         } else {
             $ENV{$key} = $val;
         }
