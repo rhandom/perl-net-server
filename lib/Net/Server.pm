@@ -665,7 +665,8 @@ sub run_dequeue { # fork off a child process to handle dequeuing
         exit;
     }
 
-    $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue';
+    $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue'
+        if $self->{'server'}->{'children'};
 }
 
 sub default_port { 20203 }
@@ -695,6 +696,18 @@ sub server_close {
     $self->pre_server_close_hook;
 
     $self->log(2,$self->log_time . " Server closing!");
+
+    if ($prop->{'kind_quit'} && $prop->{'children'}) {
+        $self->log(3, "Attempting a slow shutdown");
+        $prop->{$_} = 0 for qw(min_servers max_servers);
+        $self->hup_children; # send children signal to finish up
+        while (1) {
+            Net::Server::SIG::check_sigs();
+            $self->coordinate_children if $self->can('coordinate_children');
+            last if !keys %{$self->{'server'}->{'children'}};
+            sleep 1;
+        }
+    }
 
     if (defined($prop->{'_HUP'}) && $prop->{'leave_children_open_on_hup'}) {
         $self->hup_children;
