@@ -65,16 +65,17 @@ sub run {
 
 sub run_client_connection {
     my $self = shift;
+    my $c = $self->{'server'}->{'client'};
 
-    $self->post_accept;         # prepare client for processing
-    $self->get_client_info;     # determines information about peer and local
-    $self->post_accept_hook;    # user customizable hook
+    $self->post_accept($c);         # prepare client for processing
+    $self->get_client_info($c);     # determines information about peer and local
+    $self->post_accept_hook($c);    # user customizable hook
 
-    my $ok = $self->allow_deny && $self->allow_deny_hook; # do allow/deny check on client info
+    my $ok = $self->allow_deny($c) && $self->allow_deny_hook($c); # do allow/deny check on client info
     if ($ok) {
-        $self->process_request;   # This is where the core functionality of a Net::Server should be.
+        $self->process_request($c);   # This is where the core functionality of a Net::Server should be.
     } else {
-        $self->request_denied_hook;     # user customizable hook
+        $self->request_denied_hook($c);     # user customizable hook
     }
 
     $self->post_process_request_hook($ok); # user customizable hook
@@ -465,68 +466,72 @@ sub can_read_hook {}
 sub post_accept {
     my $self = shift;
     my $prop = $self->{'server'};
+    my $client = shift || $prop->{'client'};
+
     $prop->{'requests'}++;
     return if $prop->{'udp_true'}; # no need to do STDIN/STDOUT in UDP
 
-    if (my $client = $prop->{'client'}) {
-        $client->post_accept() if $client->can("post_accept");
-        if (! $prop->{'no_client_stdout'}) {
-            close STDIN; # duplicate some handles and flush them
-            close STDOUT;
-            if ($prop->{'tie_client_stdout'} || ($client->can('tie_stdout') && $client->tie_stdout)) {
-                open STDIN,  '<', '/dev/null' or die "Couldn't open STDIN to the client socket: $!";
-                open STDOUT, '>', '/dev/null' or die "Couldn't open STDOUT to the client socket: $!";
-                tie *STDOUT, 'Net::Server::TiedHandle', $client, $prop->{'tied_stdout_callback'} or die "Couldn't tie STDOUT: $!";
-                tie *STDIN,  'Net::Server::TiedHandle', $client, $prop->{'tied_stdin_callback'}  or die "Couldn't tie STDIN: $!";
-            } elsif (defined(my $fileno = fileno $prop->{'client'})) {
-                open STDIN,  '<&', $fileno or die "Couldn't open STDIN to the client socket: $!";
-                open STDOUT, '>&', $fileno or die "Couldn't open STDOUT to the client socket: $!";
-            } else {
-                *STDIN  = \*{ $prop->{'client'} };
-                *STDOUT = \*{ $prop->{'client'} };
-            }
-            STDIN->autoflush(1);
-            STDOUT->autoflush(1);
-            select STDOUT;
-        }
-    } else {
+    if (!$client) {
         $self->log(1,"Client socket information could not be determined!");
+        return;
+    }
+
+    $client->post_accept() if $client->can("post_accept");
+    if (! $prop->{'no_client_stdout'}) {
+        close STDIN; # duplicate some handles and flush them
+        close STDOUT;
+        if ($prop->{'tie_client_stdout'} || ($client->can('tie_stdout') && $client->tie_stdout)) {
+            open STDIN,  '<', '/dev/null' or die "Couldn't open STDIN to the client socket: $!";
+            open STDOUT, '>', '/dev/null' or die "Couldn't open STDOUT to the client socket: $!";
+            tie *STDOUT, 'Net::Server::TiedHandle', $client, $prop->{'tied_stdout_callback'} or die "Couldn't tie STDOUT: $!";
+            tie *STDIN,  'Net::Server::TiedHandle', $client, $prop->{'tied_stdin_callback'}  or die "Couldn't tie STDIN: $!";
+        } elsif (defined(my $fileno = fileno $prop->{'client'})) {
+            open STDIN,  '<&', $fileno or die "Couldn't open STDIN to the client socket: $!";
+            open STDOUT, '>&', $fileno or die "Couldn't open STDOUT to the client socket: $!";
+        } else {
+            *STDIN  = \*{ $client };
+            *STDOUT = \*{ $client };
+        }
+        STDIN->autoflush(1);
+        STDOUT->autoflush(1);
+        select STDOUT;
     }
 }
 
 sub get_client_info {
     my $self = shift;
     my $prop = $self->{'server'};
+    my $client = shift || $prop->{'client'};
 
-    my $sock = $prop->{'client'};
-    if ($sock->NS_proto =~ /^UNIX/) {
-        $self->log(3, $self->log_time." CONNECT ".$sock->NS_proto." Socket: \"".$sock->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
+    if ($client->NS_proto =~ /^UNIX/) {
+        delete @$prop{qw(sockaddr sockport peeraddr peerport peerhost)};
+        $self->log(3, $self->log_time." CONNECT ".$client->NS_proto." Socket: \"".$client->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
         return;
     }
 
-    if (my $sockname = $sock->sockname) {
-        $prop->{'sockaddr'} = $sock->sockhost;
-        $prop->{'sockport'} = $sock->sockport;
+    if (my $sockname = $client->sockname) {
+        $prop->{'sockaddr'} = $client->sockhost;
+        $prop->{'sockport'} = $client->sockport;
     } else {
         @{ $prop }{qw(sockaddr sockhost sockport)} = ($ENV{'REMOTE_HOST'} || '0.0.0.0', 'inet.test', 0); # commandline
     }
 
     my $addr;
     if ($prop->{'udp_true'}) {
-        if ($sock->sockdomain == AF_INET) {
+        if ($client->sockdomain == AF_INET) {
             ($prop->{'peerport'}, $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket::inet_ntoa($addr);
         } else {
             warn "Right here\n";
             ($prop->{'peerport'}, $addr) = Socket6::sockaddr_in6($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket6->can('inet_ntop')
-                                ? Socket6::inet_ntop($sock->sockdomain, $addr)
+                                ? Socket6::inet_ntop($client->sockdomain, $addr)
                                 : Socket::inet_ntoa($addr);
         }
-    } elsif ($prop->{'peername'} = $sock->peername) {
-        $addr               = $sock->peeraddr;
-        $prop->{'peeraddr'} = $sock->peerhost;
-        $prop->{'peerport'} = $sock->peerport;
+    } elsif ($prop->{'peername'} = $client->peername) {
+        $addr               = $client->peeraddr;
+        $prop->{'peeraddr'} = $client->peerhost;
+        $prop->{'peerport'} = $client->peerport;
     } else {
         @{ $prop }{qw(peeraddr peerhost peerport)} = ('0.0.0.0', 'inet.test', 0); # commandline
     }
@@ -541,7 +546,7 @@ sub get_client_info {
     }
 
     $self->log(3, $self->log_time
-               ." CONNECT ".$sock->NS_proto
+               ." CONNECT ".$client->NS_proto
                ." Peer: \"[$prop->{'peeraddr'}]:$prop->{'peerport'}\""
                ." Local: \"[$prop->{'sockaddr'}]:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
 }
@@ -551,7 +556,7 @@ sub post_accept_hook {}
 sub allow_deny {
     my $self = shift;
     my $prop = $self->{'server'};
-    my $sock = $prop->{'client'};
+    my $sock = shift || $prop->{'client'};
 
     # unix sockets are immune to this check
     return 1 if $sock && $sock->NS_proto =~ /^UNIX/;
@@ -598,11 +603,12 @@ sub process_request { # sample echo server - override for full functionality
     my $prop = $self->{'server'};
 
     if ($prop->{'udp_true'}) { # udp echo server
+        my $client = shift || $prop->{'client'};
         if ($prop->{'udp_data'} =~ /dump/) {
             require Data::Dumper;
-            return $prop->{'client'}->send(Data::Dumper::Dumper($self), 0);
+            return $client->send(Data::Dumper::Dumper($self), 0);
         }
-        return $prop->{'client'}->send("You said \"$prop->{'udp_data'}\"", 0);
+        return $client->send("You said \"$prop->{'udp_data'}\"", 0);
     }
 
     print "Welcome to \"".ref($self)."\" ($$)\015\012";
