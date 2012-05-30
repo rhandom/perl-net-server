@@ -77,7 +77,7 @@ sub post_bind {
         if (defined $prop->{'lock_file'}) {
             $prop->{'lock_file_unlink'} = undef;
         } else {
-            $prop->{'lock_file'} = eval { require File::Temp } ? File::Temp::tempfile() : POSIX::tmpnam();
+            $prop->{'lock_file'} = eval { require File::Temp } ? File::Temp::tmpnam() : POSIX::tmpnam();
             $prop->{'lock_file_unlink'} = 1;
         }
 
