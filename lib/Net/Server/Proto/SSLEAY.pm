@@ -330,8 +330,11 @@ sub sysread  {
     return $length;
 }
 
+sub error { my $client = shift; return ${*$client}{'_error'} }
+
 sub syswrite {
     my ($client, $buf, $length, $offset) = @_;
+    delete ${*$client}{'_error'};
 
     $length = length $buf unless defined $length;
     $offset = 0 unless defined $offset;
@@ -339,8 +342,11 @@ sub syswrite {
 
     my $write = Net::SSLeay::write_partial($ssl, $offset, $length, $buf);
 
-    return  if $!{EAGAIN} || $!{EINTR};
-    die "SSLeay print: $!\n" if $write < 0;
+    return if $!{EAGAIN} || $!{EINTR};
+    if ($write < 0) {
+        ${*$client}{'_error'} = "SSLeay print: $!\n";
+        return;
+    }
 
     return $write;
 }
@@ -364,6 +370,7 @@ sub getlines {
 
 sub print {
     my $client = shift;
+    delete ${*$client}{'_error'};
     my $buf    = @_ == 1 ? $_[0] : join('', @_);
     my $ssl    = $client->SSLeay;
     while (length $buf) {
@@ -372,7 +379,10 @@ sub print {
 
         my $write = Net::SSLeay::write($ssl, $buf);
         return 0 if $client->SSLeay_check_error('SSLeay write');
-        die "SSLeay print: $!\n" if $write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
+        if ($write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS}) {
+            ${*$client}{'_error'} = "SSLeay print: $!\n";
+            return;
+        }
         substr($buf, 0, $write, "") if $write > 0;
     }
     return 1;
@@ -562,6 +572,10 @@ Takes bytes and match qr.  If bytes is defined - it will read until
 that many bytes are found.  If match qr is defined, it will read until
 the buffer matches that qr.  If both are undefined, it will read until
 there is nothing left to read.
+
+=item C<error>
+
+If an error occurred while writing, this method will return that error.
 
 =back
 
