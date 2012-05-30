@@ -188,6 +188,7 @@ sub process_headers {
     foreach my $l (@lines) {
         my ($key, $val) = split /\s*:\s*/, $l, 2;
         $key = uc($key);
+        $key = 'COOKIE' if $key eq 'COOKIES';
         $key =~ y/-/_/;
         $key =~ s/^\s+//;
         $key = "HTTP_$key" if $key !~ /^CONTENT_(?:LENGTH|TYPE)$/;
