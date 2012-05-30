@@ -792,7 +792,7 @@ sub hup_children {
 
     return unless defined $prop->{'children'} && scalar keys %{ $prop->{'children'} };
     return if ! $self->is_prefork;
-    $self->log(2, "Sending children hup signal during HUP on prefork server");
+    $self->log(2, "Sending children hup signal");
 
     kill(1, $_) for keys %{ $prop->{'children'} };
 }
