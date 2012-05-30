@@ -44,6 +44,8 @@ Net::Server - Extensible, general Perl server engine
     * Basic allow/deny access control
     * Customized logging (choose Syslog, log_file, or STDERR)
     * HUP able server (clean restarts via sig HUP)
+    * Graceful shutdowns (via sig QUIT)
+    * Hot deploy in Fork and PreFork modes (via sig TTIN and TTOU)
     * Dequeue ability in all Fork and PreFork modes.
     * Taint clean
     * Written in Perl
@@ -1462,6 +1464,26 @@ items before doing a restart.
         $self->commandline(\@untainted)
     }
 
+=head1 SHUTDOWN
+
+Each of the Fork and PreFork personalities support graceful shutdowns
+via the QUIT signal.  When a QUIT is recieved, the parent will signal
+the children and then wait for them to exit.
+
+All server personalities support the normal TERM and INT signal
+shutdowns.
+
+=head1 HOT DEPLOY
+
+Since version 2.000, the Fork and PreFork personalities have accepted
+the TTIN and TTOU signals.  When a TTIN is received, the max_servers
+is increased by 1.  If a TTOU signal is received the max_servers is
+decreased by 1.  This allows for adjusting the number of handling
+processes without having to restart the server.
+
+If the log_level is set to at 3, then the new value is displayed in
+the logs.
+
 =head1 FILES
 
 The following files are installed as part of this distribution.
@@ -1645,6 +1667,9 @@ Thanks to stefanos@cpan for fixes to PreFork under Win32
 Thanks to the munin developers and Nicolai Langfeldt for hosting the
 development verion of Net::Server for so long and for fixes to the
 allow_deny checking for IPv6 addresses.
+
+Thanks to Tatsuhiko Miyagawa for feedback, and for suggesting adding
+graceful shutdowns and hot deploy (max_servers adjustment).
 
 =head1 SEE ALSO
 
