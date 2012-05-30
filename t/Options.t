@@ -11,8 +11,8 @@ package FooServer;
 use strict;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok is use_ok);
-prepare_test({n_tests => 66, plan_only => 1});
+use NetServerTest qw(prepare_test ok is use_ok skip like);
+prepare_test({n_tests => 73, plan_only => 1});
 
 use_ok('Net::Server');
 @FooServer::ISA = qw(Net::Server);
@@ -239,3 +239,57 @@ $prop = eval { FooServer->new({
 })->{'server'} };
 $prop ||= {};
 is($prop->{'group'}, 'confgroup', "Right group \"$prop->{'group'}\"");
+
+
+
+###----------------------------------------------------------------###
+
+if (!eval { require Log::Log4perl; require File::Temp }) {
+  SKIP: { skip("Log::Log4perl not installed: $@", 7) };
+} else {
+
+    $prop = eval { FooServer->run(
+        log_file => "Log::Log4perl"
+    ) };
+    like("$@", qr/Must specify a log4perl_conf file/, "Got error due to missing log4perl_conf");
+
+    my ($log_fh, $log4perl_file) = File::Temp::tempfile(SUFFIX => '.log', UNLINK => 1);
+    unlink $log4perl_file;
+
+    my $conf = << "EOF";
+log4perl.logger.tester = WARN, FileAppndr1
+
+log4perl.appender.FileAppndr1 = Log::Log4perl::Appender::File
+log4perl.appender.FileAppndr1.filename = ${log4perl_file}
+log4perl.appender.FileAppndr1.layout = Log::Log4perl::Layout::SimpleLayout
+EOF
+
+    my ($conf_fh, $conf_file) = File::Temp::tempfile(SUFFIX => '.log4perl', UNLINK => 1);
+    print $conf_fh $conf;
+    close $conf_fh;
+
+    # This log file is same as specified in Options.t.log4perl
+    open my $old_stdout, ">&", STDOUT; # save this off because setting a log_file is going to force close STDIN and STDOUT
+    $prop = eval { FooServer->run(
+        log_file => "Log::Log4perl",
+        log4perl_conf => $conf_file,
+        log4perl_logger => "tester",
+    )->{'server'} };
+    my $err = "$@";
+    open STDOUT, ">&", $old_stdout; # restore it
+
+    # There was a test for a bad log4perl_conf file, but log4perl only allows you to initialise once
+    # so subsequent initialisations always had the bad filename
+    #like( $@, qr/Cannot open config file '.*?'/, "Got error due to missing log4perl_conf file" );
+    ok(!$err, "No Log4perl errors");
+    is(ref($prop->{'log_function'}), "CODE", "Log4perl initialised with function created");
+    ok(-e $log4perl_file, "Log file $log4perl_file found");
+    ok(! -s $log4perl_file, "Log file is 0 bytes");
+
+    $prop->{'log_function'}->(1, "A test message");
+    ok(-s $log4perl_file, "Log file now has data");
+
+    open my $fh, '<', $log4perl_file;
+    my $data = <$fh>;
+    is($data, "ERROR - A test message\n", "Got expected log message");
+}
