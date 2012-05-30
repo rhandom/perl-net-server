@@ -1,11 +1,15 @@
 Revision history for Perl extension Net::Server.
 
-2.000  May 29 2012
+2.000  May 30 2012
+        - Sorry for the amazingly long delay.  This release represents change to much of the code base.  Future patch submissions should be more promptly handled
+
         - Bring Net::Server::Proto::SSL back.  It is now fully functional under all scenarios, including IPv4 and IPv6
         - Change Proto interface to allow passing more information.  This represents an internal API change.
         - Updates to the HUP mechanisms to make sure we rebind all types of ports correctly.
-        - Internal code retidying
         - Add IPv6 integration via ::1 style addresses as well as the ipv configuration parameter
+        - Added graceful shutdown (Tatsuhiko Miyagawa)
+        - Added hot deploy via TTIN and TTOU (Tatsuhiko Miyagawa)
+        - Internal code retidying
         - Finish out support for connecting to ports by service name
         - Don't loose track of fork and prefork children on a hup - make sure to actively wait them off
         - Correct accept to take a classname, and optionally be called in array context
