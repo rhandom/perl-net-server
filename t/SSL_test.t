@@ -80,7 +80,7 @@ my $ok = eval {
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         diag $line;
-        print $remote "quit\n";
+        print $remote "exit\n";
         my $line2 = <$remote>;
         diag $line2;
         return 1;
@@ -90,7 +90,7 @@ my $ok = eval {
         eval {
             alarm $env->{'timeout'};
             close STDERR;
-            Net::Server::Test->run(
+            my $s = Net::Server::Test->run(
                 host  => $env->{'hostname'},
                 port  => $env->{'ports'}->[0],
                 proto => 'ssl',
