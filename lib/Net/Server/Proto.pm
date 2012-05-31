@@ -65,7 +65,9 @@ sub parse_info {
     }
     $proto = lc $info->{'proto'};
 
-
+    if ($info->{'proto'} =~ /^UNIX/i) {
+        return ({%$info, ipv => '*'});
+    }
     $ipv = $info->{'ipv'} || $ipv || '';
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
     $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
