@@ -129,6 +129,9 @@ sub psgi_echo_handler {
     return [200, ['Content-type', 'text/html'], [$txt]];
 }
 
+sub exec_cgi { die "Not implemented" }
+sub exec_trusted_perl { die "Not implemented" }
+
 1;
 
 __END__
@@ -140,6 +143,7 @@ Net::Server::PSGI - basic Net::Server based PSGI HTTP server class
 =head1 TEST ONE LINER
 
     perl -e 'use base qw(Net::Server::PSGI); main->run(port => 8080, ipv => "*")'
+    # runs a default echo server
 
 =head1 SYNOPSIS
 
@@ -165,6 +169,13 @@ Net::Server::PSGI - basic Net::Server based PSGI HTTP server class
 
 =head1 DESCRIPTION
 
+If you want a more fully featured PSGI experience, it would be wise to
+look at the L<Plack> and L<Starman> set of modules.  Net::Server::PSGI
+is intended as an easy gateway into PSGI.  But to get the most out of
+all that PSGI has to offer, you should review the L<Plack> and
+L<Plack::Middleware>.  If you only need something a little more
+rudimentary, then Net::Server::PSGI may be good for you.
+
 Net::Server::PSGI takes Net::Server::HTTP one level farther.  It
 begins with base type MultiType defaulting to Net::Server::Fork.  It
 is easy to change it to any of the other Net::Server flavors by
@@ -174,8 +185,18 @@ changed to another through the server configuration.  You can also
 very easily add ssl by including, proto=>"ssl" and provide a
 SSL_cert_file and SSL_key_file.
 
-If you want a more fully featured PSGI experience, it would be wise
-to look at the L<Plack> and L<Starman> set of modules.
+For example, here is a basic server that will bind to all interfaces,
+will speak both HTTP on port 8080 as well as HTTPS on 8443, and will
+speak both IPv4, as well as IPv6 if it is available.
+
+    use base qw(Net::Server::PSGI);
+
+    __PACKAGE__->run(
+        port  => [8080, "8443/ssl"],
+        ipv   => '*', # IPv6 if available
+        SSL_key_file  => '/my/key',
+        SSL_cert_file => '/my/cert',
+    );
 
 =head1 METHODS
 
@@ -213,12 +234,13 @@ application.
 
     sub find_psgi_handler {
         my ($self, $env) = @_;
-        if ($env->{'REQUEST_URI'} =~ m{^ /foo \b ($ |/.*$ ) }x) {
-            $env->{'PATH_INFO'} = $1;
+
+        if ($env->{'PATH_INFO'} && $env->{'PATH_INFO'} =~ s{^ (/foo) (?= $ | /) }{}x) {
+            $env->{'SCRIPT_NAME'} = $1;
             return \&foo_app;
-        } else {
-            return $self->SUPER::find_psgi_handler($env);
         }
+
+        return $self->SUPER::find_psgi_handler($env);
     }
 
 =item C<app>
