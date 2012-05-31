@@ -260,6 +260,19 @@ but could easily be changed to another through the server
 configuration.  You can also very easily add ssl by including,
 proto=>"ssl" and provide a SSL_cert_file and SSL_key_file.
 
+For example, here is a basic server that will bind to all interfaces,
+will speak both HTTP on port 8080 as well as HTTPS on 8443, and will
+speak both IPv4, as well as IPv6 if it is available.
+
+    use base qw(Net::Server::HTTP);
+
+    __PACKAGE__->run(
+        port  => [8080, "8443/ssl"],
+        ipv   => '*', # IPv6 if available
+        SSL_key_file  => '/my/key',
+        SSL_cert_file => '/my/cert',
+    );
+
 =head1 METHODS
 
 =over 4
