@@ -1,5 +1,11 @@
 Revision history for Perl extension Net::Server.
 
+2.002  May 31 2012
+        - Make HTTP output header parsing more consistent - and catch more errors
+        - Add exec_cgi and exec_trusted_perl methods to HTTP
+        - Add bugfix for ipv=>"*" combined with UNIX sockets. (Mark Martinec)
+        - Fix the SSL_test.t to use exit rather than quit so the parent departs
+
 2.001  May 30 2012
         - Bug fix wrong usage of File::Temp::tempfile.
         - Fix HTTP_COOKIES to be HTTP_COOKIE
@@ -12,7 +18,7 @@ Revision history for Perl extension Net::Server.
         - Bring Net::Server::Proto::SSL back.  It is now fully functional under all scenarios, including IPv4 and IPv6
         - Change Proto interface to allow passing more information.  This represents an internal API change.
         - Updates to the HUP mechanisms to make sure we rebind all types of ports correctly.
-        - Add IPv6 integration via ::1 style addresses as well as the ipv configuration parameter
+        - Add IPv6 integration via ::1 style addresses as well as the ipv configuration parameter (Mark Martinec)
         - Added graceful shutdown (Tatsuhiko Miyagawa)
         - Added hot deploy via TTIN and TTOU (Tatsuhiko Miyagawa)
         - Internal code retidying
