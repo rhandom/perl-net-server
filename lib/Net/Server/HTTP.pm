@@ -66,35 +66,40 @@ sub post_configure {
         my $client = shift;
         my $method = shift;
         alarm($copy->timeout_idle); # reset timeout
-        return $client->$method(@_) if ${*$client}{'headers_sent'};
-        if ($method ne 'print') {
-            $client->print("HTTP/1.0 501 Print\015\012Content-type:text/html\015\012\015\012Headers may only be sent via print method ($method)");
-            die "All headers must be done via print";
+        return $client->$method(@_) if $copy->{'headers_sent'};
+        die "All headers must only be sent via print ($method)\n" if $method ne 'print';
+
+        my $headers = ${*$client}{'headers'} || {unparsed => '', parsed => ''};
+        $headers->{'unparsed'} .= join('', @_);
+        while ($headers->{'unparsed'} =~ s/^(.*?)\015?\012//) {
+            my $line = $1;
+            if (!$headers && $line =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)$ }x) {
+                $headers->{'status'} = [];
+            }
+            elsif ($line =~ /^Status:\s+(\d+) (?:|\s+(.+?))$/ix) {
+                $headers->{'status'} = [$1, $2 || '-'];
+            }
+            elsif ($line =~ /^Location:\s+/i) {
+                $headers->{'status'} = [302, 'bouncing'];
+            }
+            elsif ($line =~ /^Content-type:\s+\S.*/i) {
+                $headers->{'status'} ||= [200, 'OK'];
+            }
+            elsif (! length $line) {
+                my $s = $headers->{'status'} || die "Premature end of script headers\n";
+                delete ${*$client}{'headers'};
+                $copy->send_status(@$s) if @$s;
+                $client->print($headers->{'parsed'}."\015\012");
+                $copy->{'headers_sent'} = 1;
+                return $client->print($headers->{'unparsed'});
+            }
+            elsif ($line !~ /^\w(?:-(?:\w+))*:./) {
+                my $invalid = ($line =~ /(.{0,40})/) ? "$1..." : '';
+                $invalid =~ s/</&lt;/g;
+                die "Premature end of script headers: $invalid<br>\n";
+            }
+            $headers->{'parsed'} .= "$line\015\012";
         }
-        my $headers = ${*$client}{'headers'} || '';
-        $headers .= join '', @_;
-        if ($headers !~ /\n\r?\n/) { # headers aren't finished yet
-            ${*$client}{'headers'} = $headers;
-            return;
-        }
-        ${*$client}{'headers_sent'} = 1;
-        delete ${*$client}{'headers'};
-        if ($headers =~ m{^HTTP/1.[01] \s+ \d+ (?: | \s+ .+)\r?\n}x) {
-            # looks like they are sending their own status
-        }
-        elsif ($headers =~ /^Status:\s+(\d+) (?:|\s+(.+?))\s*$/im) {
-            $copy->send_status($1, $2 || '-');
-        }
-        elsif ($headers =~ /^Location:\s+/im) {
-            $copy->send_status(302, 'bouncing');
-        }
-        elsif ($headers =~ /^Content-type:\s+\S.*/im) {
-            $copy->send_status(200, 'OK');
-        }
-        else {
-            $copy->send_501("Not sure what type of headers to send - couldn't find valid headers");
-        }
-        return $client->print($headers);
     };
     weaken $copy;
 }
@@ -110,14 +115,15 @@ sub send_status {
     );
 }
 
-sub send_501 {
+sub send_500 {
     my ($self, $err) = @_;
-    $self->send_status(500, 'Died');
+    $self->send_status(500, 'Internal Server Error');
     $self->{'server'}->{'client'}->print(
         "Content-type: text/html\015\012\015\012",
-        "<h1>Internal Server</h1>",
+        "<h1>Internal Server Error</h1>",
         "<p>$err</p>",
     );
+    $self->{'headers_sent'} = 1;
 }
 
 ###----------------------------------------------------------------###
@@ -137,6 +143,7 @@ sub process_request {
     my $self = shift;
     my $client = shift || $self->{'server'}->{'client'};
 
+    local $self->{'headers_sent'};
     local $SIG{'ALRM'} = sub { die "Server Timeout\n" };
     my $ok = eval {
         alarm($self->timeout_header);
@@ -151,7 +158,7 @@ sub process_request {
 
     if (! $ok) {
         my $err = "$@" || "Something happened";
-        $self->send_501($err);
+        $self->send_500($err);
         die $err;
     }
 }
@@ -203,6 +210,7 @@ sub process_headers {
 
 sub process_http_request {
     my ($self, $client) = @_;
+
     print "Content-type: text/html\n\n";
     print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
     if (eval { require Data::Dumper }) {
@@ -211,6 +219,80 @@ sub process_http_request {
         if (eval { require CGI }) {  my $q = CGI->new; $form->{$_} = $q->param($_) for $q->param;  }
         print "<pre>".Data::Dumper->Dump([\%ENV, $form], ['*ENV', 'form'])."</pre>";
     }
+}
+
+###----------------------------------------------------------------###
+
+sub exec_trusted_perl {
+    my ($self, $file) = @_;
+    die "File $file is not executable\n" if ! -x $file;
+    local $!;
+    my $pid = fork;
+    die "Could not spawn child process: $!\n" if ! defined $pid;
+    if (!$pid) {
+        if (!eval { require $file }) {
+            my $err = "$@" || "Error while running trusted perl script\n";
+            $err =~ s{\s*Compilation failed in require at lib/Net/Server/HTTP\.pm line \d+\.\s*\z}{\n};
+            die $err if !$self->{'headers_sent'};
+            warn $err;
+        }
+        exit;
+    } else {
+        waitpid $pid, 0;
+        return;
+    }
+}
+
+sub exec_cgi {
+    my ($self, $file) = @_;
+
+    my $done = 0;
+    my $pid;
+    Net::Server::SIG::register_sig(CHLD => sub {
+        while (defined(my $chld = waitpid(-1, POSIX::WNOHANG()))) {
+            $done = ($? >> 8) || -1 if $pid == $chld;
+            last unless $chld > 0;
+        }
+    });
+
+    require IPC::Open3;
+    require Symbol;
+    my $in;
+    my $out;
+    my $err = Symbol::gensym();
+    $pid = eval { IPC::Open3::open3($in, $out, $err, $file) } or die "Could not run external script: $@";
+    my $len = $ENV{'CONTENT_LENGTH'} || 0;
+    my $s_in  = $len ? IO::Select->new($in) : undef;
+    my $s_out = IO::Select->new($out, $err);
+    my $printed;
+    while (!$done) {
+        my ($o, $i, $e) = IO::Select->select($s_out, $s_in, undef);
+        Net::Server::SIG::check_sigs();
+        for my $fh (@$o) {
+            read($fh, my $buf, 4096) || next;
+            if ($fh == $out) {
+                print $buf;
+                $printed ||= 1;
+            } else {
+                print STDERR $buf;
+            }
+        }
+        if (@$i) {
+            my $bytes = read(STDIN, my $buf, $len);
+            print $in $buf if $bytes;
+            $len -= $bytes;
+            $s_in = undef if $len <= 0;
+        }
+    }
+    if (!$self->{'headers_sent'}) {
+        if (!$printed) {
+            $self->send_500("Premature end of script headers");
+        } elsif ($done > 0) {
+            $self->send_500("Script exited unsuccessfully");
+        }
+    }
+
+    Net::Server::SIG::unregister_sig('CHLD');
 }
 
 1;
@@ -224,6 +306,7 @@ Net::Server::HTTP - very basic Net::Server based HTTP server class
 =head1 TEST ONE LINER
 
     perl -e 'use base qw(Net::Server::HTTP); main->run(port => 8080)'
+    # will start up an echo server
 
 =head1 SYNOPSIS
 
@@ -310,9 +393,63 @@ have been parsed.
 
 Takes an HTTP status and a message.  Sends out the correct headers.
 
-=item C<send_501>
+=item C<send_500>
 
-Calls send_status with 501 and the argument passed to send_501.
+Calls send_status with 500 and the argument passed to send_500.
+
+=item C<exec_cgi>
+
+Allow for calling an external script as a CGI.  This will use IPC::Open3 to
+fork a new process and read/write from it.
+
+    use base qw(Net::Server::HTTP);
+    __PACKAGE__->run;
+
+    sub process_http_request {
+        my $self = shift;
+
+        if ($ENV{'PATH_INFO'} && $ENV{'PATH_INFO'} =~ s{^ (/foo) (?= $ | /) }{}x) {
+           $ENV{'SCRIPT_NAME'} = $1;
+           my $file = "/var/www/cgi-bin/foo"; # assuming this exists
+           return $self->exec_cgi($file);
+        }
+
+        print "Content-type: text/html\n\n";
+        print "<a href=/foo>Foo</a>";
+    }
+
+At this first release, the parent server is not tracking the child
+script which may cause issues if the script is running when a HUP is
+received.
+
+=item C<exec_trusted_perl>
+
+Allow for calling an external perl script.  This method will still
+fork, but instead of using IPC::Open3, it simply requires the perl
+script.  That means that the running script will be able to make use
+of any shared memory.  It also means that the STDIN/STDOUT/STDERR
+handles the script is using are those directly bound by the server
+process.
+
+    use base qw(Net::Server::HTTP);
+    __PACKAGE__->run;
+
+    sub process_http_request {
+        my $self = shift;
+
+        if ($ENV{'PATH_INFO'} && $ENV{'PATH_INFO'} =~ s{^ (/foo) (?= $ | /) }{}x) {
+           $ENV{'SCRIPT_NAME'} = $1;
+           my $file = "/var/www/cgi-bin/foo"; # assuming this exists
+           return $self->exec_trusted_perl($file);
+        }
+
+        print "Content-type: text/html\n\n";
+        print "<a href=/foo>Foo</a>";
+    }
+
+At this first release, the parent server is not tracking the child
+script which may cause issues if the script is running when a HUP is
+received.
 
 =back
 
