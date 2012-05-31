@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok diag skip);
-prepare_test({n_tests => 48, plan_only => 1});
+prepare_test({n_tests => 49, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -244,34 +244,38 @@ if (!eval { require IO::Socket::UNIX }) {
     };
 } else {
     p_c([port => 'foo/bar/unix'], {
-        bind => [{host => '*', port => 'foo/bar', proto => 'unix', ipv => 4}],
+        bind => [{host => '*', port => 'foo/bar', proto => 'unix', ipv => '*'}],
     });
 
     p_c([port => '/foo/bar|unix', udp_recv_len => 500], {
-        bind => [{host => '*', port => '/foo/bar', proto => 'unix', ipv => 4}],
+        bind => [{host => '*', port => '/foo/bar', proto => 'unix', ipv => '*'}],
         sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_ipv => '*', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM'}],
     });
 
     p_c([port => '/foo/bar|unixdgram', udp_recv_len => 500], {
-        bind => [{host => '*', port => '/foo/bar', proto => 'unixdgram', ipv => 4}],
+        bind => [{host => '*', port => '/foo/bar', proto => 'unixdgram', ipv => '*'}],
         sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIXDGRAM', NS_recv_len => 500, NS_recv_flags => 0, NS_unix_type => 'SOCK_DGRAM', NS_ipv => '*'}],
     });
 
     p_c([port => 'foo/bar|sock_dgram|unix'], {
-        bind => [{host => '*', port => 'foo/bar', proto => 'unix', unix_type => 'sock_dgram', ipv => 4}],
+        bind => [{host => '*', port => 'foo/bar', proto => 'unix', unix_type => 'sock_dgram', ipv => '*'}],
     });
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7}], {
-        bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7, ipv => 4}],
+        bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7, ipv => '*'}],
         sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_unix_type => 'SOCK_STREAM', NS_listen => 7, NS_ipv => '*'}],
     });
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_dgram'}], {
-        bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_dgram', ipv => 4}],
+        bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_dgram', ipv => '*'}],
     });
 
     p_c([port => {port => '/foo/bar', proto => 'unixdgram'}], {
-        bind => [{host => '*', port => '/foo/bar', proto => 'unixdgram', ipv => 4}],
+        bind => [{host => '*', port => '/foo/bar', proto => 'unixdgram', ipv => '*'}],
+    });
+
+    p_c([port => 'foo/bar/unix', ipv => "*"], {
+        bind => [{host => '*', port => 'foo/bar', proto => 'unix', ipv => '*'}],
     });
 
 }
@@ -323,9 +327,9 @@ if (!eval { require IO::Socket::SSL }) {
 if (!eval {
     require Socket6;
     require IO::Socket::INET6;
-    IO::Socket::INET6->new->configure({LocalPort => 20200, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
-    IO::Socket::INET6->new->configure({LocalAddr => '::1', LocalPort => 20200, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
-    IO::Socket::INET6->new->configure({LocalAddr => 'localhost', LocalPort => 20200, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
+    IO::Socket::INET6->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
+    IO::Socket::INET6->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
+    IO::Socket::INET6->new->configure({LocalAddr => 'localhost', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
 }) {
     chomp(my $err = $@);
   SKIP: {
