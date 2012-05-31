@@ -1694,6 +1694,9 @@ Thanks to mbarbon@users. for adding tally dequeue to prefork server.
 
 Thanks to stefanos@cpan for fixes to PreFork under Win32
 
+Thanks to Mark Martinec for much of the initial work towards getting
+IPv6 going.
+
 Thanks to the munin developers and Nicolai Langfeldt for hosting the
 development verion of Net::Server for so long and for fixes to the
 allow_deny checking for IPv6 addresses.
