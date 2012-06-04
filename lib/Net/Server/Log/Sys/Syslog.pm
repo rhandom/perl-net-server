@@ -1,3 +1,21 @@
+# -*- perl -*-
+#
+#  Net::Server::Log::Sys::Syslog - Net::Server Logging module
+#
+#  $Id$
+#
+#  Copyright (C) 2012
+#
+#    Paul Seamons
+#    paul@seamons.com
+#
+#  This package may be distributed under the terms of either the
+#  GNU General Public License
+#    or the
+#  Perl Artistic License
+#
+################################################################
+
 package Net::Server::Log::Sys::Syslog;
 
 use strict;
@@ -64,3 +82,81 @@ sub handle_log_error {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Net::Server::Log::Sys::Syslog - log via Syslog
+
+=head1 SYNOPSIS
+
+    use base qw(Net::Server::PreFork);
+    __PACKAGE__->run(
+        log_file => 'Sys::Syslog',
+        syslog_ident => 'myapp',
+    );
+
+=head1 CONFIGURATION
+
+=over 4
+
+=head1 log_file
+
+To begin using Sys::Syslog logging, simply set the Net::Server
+log_file configuration parameter to "Sys::Syslog".
+
+If the magic name "Sys::Syslog" is used, all logging will take place
+via the Sys::Syslog module.  If syslog is used the parameters
+C<syslog_logsock>, C<syslog_ident>, and C<syslog_logopt>,and
+C<syslog_facility> may also be defined.
+
+=item syslog_logsock
+
+Only available if C<log_file> is equal to "Sys::Syslog".  May be
+either unix, inet, native, console, stream, udp, or tcp, or an
+arrayref of the types to try.  Default is "unix" if the version of
+Sys::Syslog < 0.15 - otherwise the default is to not call setlogsock.
+
+See L<Sys::Syslog>.
+
+=item syslog_ident
+
+Only available if C<log_file> is equal to "Sys::Syslog".  Id to
+prepend on syslog entries.  Default is "net_server".  See
+L<Sys::Syslog>.
+
+=item syslog_logopt
+
+Only available if C<log_file> is equal to "Sys::Syslog".  May be
+either zero or more of "pid","cons","ndelay","nowait".  Default is
+"pid".  See L<Sys::Syslog>.
+
+=item syslog_facility
+
+Only available if C<log_file> is equal to "Sys::Syslog".  See
+L<Sys::Syslog> and L<syslog>.  Default is "daemon".
+
+=back
+
+=head1 DEFAULT ARGUMENTS FOR Net::Server
+
+The following arguments are available in the default C<Net::Server> or
+C<Net::Server::Single> modules.  (Other personalities may use
+additional parameters and may optionally not use parameters from the
+base class.)
+
+    Key               Value                    Default
+
+    ## syslog parameters (if log_file eq Sys::Syslog)
+    syslog_logsock    (native|unix|inet|udp
+                       |tcp|stream|console)    unix (on Sys::Syslog < 0.15)
+    syslog_ident      "identity"               "net_server"
+    syslog_logopt     (cons|ndelay|nowait|pid) pid
+    syslog_facility   \w+                      daemon
+
+=head1 LICENCE
+
+Distributed under the same terms as Net::Server
+
+=cut
