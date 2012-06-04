@@ -47,10 +47,10 @@ sub initialize {
     }
 
     return sub {
-        my ($level, $msg) = @_;
+        my ($level, $msg, $server_level) = @_;
 
         if ($level =~ /^\d+$/) {
-            return if $level > ($prop->{'log_level'} || 0);
+            return if $level > ($server_level || 0);
             $level = $syslog_map{$level} || $level;
         }
 
