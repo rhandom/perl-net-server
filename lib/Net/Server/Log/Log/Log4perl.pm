@@ -14,8 +14,6 @@
 #    or the
 #  Perl Artistic License
 #
-#  All rights reserved.
-#
 ################################################################
 
 package Net::Server::Log::Log::Log4perl;
