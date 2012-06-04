@@ -92,10 +92,15 @@ Net::Server::Log::Sys::Syslog - log via Syslog
 =head1 SYNOPSIS
 
     use base qw(Net::Server::PreFork);
+
     __PACKAGE__->run(
         log_file => 'Sys::Syslog',
         syslog_ident => 'myapp',
     );
+
+=head1 DESCRIPTION
+
+This module provides Sys::Syslog logging to the Net::Server system.
 
 =head1 CONFIGURATION
 
@@ -154,6 +159,27 @@ base class.)
     syslog_ident      "identity"               "net_server"
     syslog_logopt     (cons|ndelay|nowait|pid) pid
     syslog_facility   \w+                      daemon
+
+=head1 METHODS
+
+=over 4
+
+=item C<initialize>
+
+This method is called during the initilize_logging method of
+Net::Server.  It returns a single code ref that will be stored under
+the log_function property of the Net::Server object.  That code ref
+takes log_level, message, and server_log_level as arguments and calls
+the initialized log4perl system.
+
+=item C<handle_log_error>
+
+This method is called if the log_function fails for some reason.  It
+is passed the Net::Server object, the error that occurred while
+logging and an arrayref containing the log level and the message.  In
+turn, this calls the legacy Net::Server::handle_syslog_error method.
+
+=back
 
 =head1 LICENCE
 
