@@ -125,6 +125,20 @@ base class.)
     log4perl_poll     number or HUP            0 (no polling)
     log4perl_logger   "name"                   "Net::Server"
 
+=head1 METHODS
+
+=over4
+
+=item C<initialize>
+
+This method is called during the initilize_logging method of
+Net::Server.  It returns a single code ref that will be stored under
+the log_function property of the Net::Server object.  That code ref
+takes log_level, message, and server_log_level as arguments and calls
+the initilized log4perl system.
+
+=back
+
 =head1 LICENCE
 
 Distributed under the same terms as Net::Server
