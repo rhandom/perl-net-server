@@ -25,6 +25,8 @@ lib/Net/Server/Proto/UNIXDGRAM.pm Proto interface to IO::Socket::UNIX under SOCK
 lib/Net/Server/PSGI.pm		Sub class allowing for easy HTTP PSGI daemon creation
 lib/Net/Server/SIG.pm		Module to make signals safer
 lib/Net/Server/Single.pm	Sub class allowing for parallelism of base class
+lib/Net/Server/Log/Log/Log4perl.pm
+lib/Net/Server/Log/Sys/Syslog.pm
 Makefile.PL			Makefile script
 MANIFEST			This file
 MANIFEST.SKIP			Files to skip when making the dist
