@@ -65,6 +65,19 @@ Net::Server::Log::Log::Log4perl - log via Log4perl
 
 =head1 SYNOPSIS
 
+    use base qw(Net::Server::PreFork);
+
+    __PACKAGE__->run(
+        log_file => 'Log::Log4perl',
+        log4perl_conf => '/path/to/my/log4perl.conf',
+        log4perl_logger => 'myapp',
+    );
+
+=head1 DESCRIPTION
+
+This module provides Log::Log4perl style logging to the Net::Server
+system.
+
 =head1 CONFIGURATION
 
 =over 4
