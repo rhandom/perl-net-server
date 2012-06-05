@@ -33,6 +33,7 @@ sub options {
     return $ref;
 }
 
+sub default_server_type { 'Fork' }
 
 sub run {
     my $self = ref($_[0]) ? shift() : shift->new;
@@ -55,6 +56,19 @@ sub run {
         if ($@){
             warn "Couldn't become server type \"$pkg\" [$@]\n";
             next;
+        }
+
+        # handle items like HTTP and PSGI that aren't true Net::Server flavors, but themselves are MultiType
+        if ($pkg->isa(__PACKAGE__)) {
+            my $type = $self->default_server_type || 'Single';
+            $type = ($type =~ /^(\w+)$/) ? $1 : next; # satisfy taint
+            my $_pkg = ($type =~ /::/) ? $type : "Net::Server::$type";
+            $prop->{'_recursive_multitype'} = $_pkg;
+            (my $file = "$_pkg.pm") =~ s{::}{/}g;
+            eval { require $file } or die "Trouble becoming server type $pkg while loading default package $_pkg: $@\n";
+            die "Recursive inheritance - Package $pkg inherits from $_pkg.\n" if $_pkg->isa($pkg);
+            no strict 'refs';
+            @{"${pkg}::ISA"} = ($_pkg);
         }
 
         # cludgy - doesn't allow multiple Net::Server::MultiType servers within same process
