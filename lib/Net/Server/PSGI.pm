@@ -43,6 +43,8 @@ sub post_configure {
     $self->SUPER::post_configure(@_);
 }
 
+sub _tie_client_stdout {} # the client should not print directly
+
 sub process_request {
     my $self = shift;
 
@@ -99,21 +101,41 @@ sub app {
 
 sub print_psgi_headers {
     my ($self, $status, $headers) = @_;
-    my $client = $self->{'server'}->{'client'};
     $self->send_status($status);
-    $client->print($headers->[$_*2],': ', $headers->[$_*2 + 1], "\015\012") for 0 .. @{ $headers || [] } / 2 - 1;
-    $client->print("\015\012");
+    my $request_info = $self->{'request_info'};
+    my $out = '';
+    for my $i (0 .. @{ $headers || [] } / 2 - 1) {
+        my $key = "\u\L$headers->[$i*2]";
+        my $val = $headers->[$i*2 + 1];
+        $key =~ y/_/-/;
+        $out .= "$key: $val\015\012";
+        push @{ $request_info->{'response_headers'} }, [$key, $val];
+    }
+    $out .= "\015\012";
+    $request_info->{'response_header_size'} += length $out;
+    $self->{'server'}->{'client'}->print($out);
+    $request_info->{'headers_sent'} = 1;
 }
 
 sub print_psgi_body {
     my ($self, $body) = @_;
     my $client = $self->{'server'}->{'client'};
+    my $request_info = $self->{'request_info'};
     if (ref $body eq 'ARRAY') {
-        $client->print(@$body);
+        for my $chunk (@$body) {
+            $client->print($chunk);
+            $request_info->{'response_size'} += length $chunk;
+        }
     } elsif (blessed($body) && $body->can('getline')) {
-        $client->print($_) while defined($_ = $body->getline);
+        while (defined(my $chunk = $body->getline)) {
+            $client->print($chunk);
+            $request_info->{'response_size'} += length $chunk;
+        }
     } else {
-        $client->print(<$body>);
+        while (defined(my $chunk = <$body>)) {
+            $client->print($chunk);
+            $request_info->{'response_size'} += length $chunk;
+        }
     }
 }
 
