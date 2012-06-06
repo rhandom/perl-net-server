@@ -48,6 +48,8 @@ sub parse_info {
 
 
     $info->{'host'} ||= (defined($host) && length($host)) ? $host : '*';
+    $ipv  = $1 if $info->{'host'} =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv*
+    $ipv .= $1 if $info->{'host'} =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv4|IPv6 stacked
     if (     $info->{'host'} =~ m{^ \[ ([\w/.\-:]+ | \*?) \] $ }x) { # allow for [::1] or [host.example.com]
         $info->{'host'} = length($1) ? $1 : '*';
     } elsif ($info->{'host'} =~ m{^    ([\w/.\-:]+ | \*?)    $ }x) {
@@ -58,6 +60,8 @@ sub parse_info {
 
 
     $info->{'proto'} ||= $proto || 'tcp';
+    $ipv  = $1 if $info->{'proto'} =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv*
+    $ipv .= $1 if $info->{'proto'} =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv4|IPv6 stacked
     if ($info->{'proto'} =~ /^(\w+ (?:::\w+)*)$/x) {
         $info->{'proto'} = $1;
     } else {
@@ -68,7 +72,7 @@ sub parse_info {
     if ($info->{'proto'} =~ /^UNIX/i) {
         return ({%$info, ipv => '*'});
     }
-    $ipv = $info->{'ipv'} || $ipv || '';
+    $ipv = $info->{'ipv'} || $ipv || $ENV{'IPV'} || '';
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
     $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
     my @_info;
@@ -296,6 +300,50 @@ properties were found.  Can be used at any time.
 
 =back
 
+=head1 HOST
+
+The hostname may be either blank, '*', be an IPv4 address, an IPv6 address,
+a bare hostname, or a hostname with IPv* specifications.
+
+    host => "127.0.0.1",  # an IPv4 address
+
+    host => "::1",        # an IPv6 address
+
+    host => 'localhost',  # addresses returned by localhost (default IPv4)
+
+    ipv  => 6,
+    host => 'localhost',  # addresses returned by localhost (IPv6)
+
+    ipv  => '*',
+    host => 'localhost',  # addresses returned by localhost (any IPv6 or IPv4)
+
+    host => 'localhost/IPv*',  # same
+
+    ipv  => 'IPv4 IPv6',
+    host => 'localhost',  # addresses returned by localhost (requires IPv6 and IPv4)
+
+
+    host => '*',          # any local interfaces (default IPv4)
+
+    ipv  => '*',
+    host => '*',          # any local interfaces (any IPv6 or IPv4)
+
+    host => '*/IPv*',     # same
+
+=head1 IPV
+
+In addition to being able to specify IPV as a separate parameter, ipv may
+also be passed as a part of the host, as part of the port, as part of the protocol
+or may be specified via $ENV{'IPV'}.  The order of precidence is as follows:
+
+     1) Explicit IPv4 or IPv6 address - wins
+     2) ipv specified in port
+     3) ipv specified in host
+     4) ipv specified in proto
+     5) ipv specified in default settings
+     6) ipv specified in $ENV{'IPV'}
+     7) default to IPv4
+
 =head1 PORT
 
 The port is the most important argument passed to the sub
@@ -505,6 +553,20 @@ examples:
 
     # example 12 #----------------------------------
 
+    $port = "[::1]:20203 tcp";
+    $def_host  = "default-domain.com/IPv6";
+    $def_proto = "tcp";
+    $def_ipv   = undef;
+    @info = Net::Server::Proto->parse_info($port,$def_host,$def_proto,$def_ipv);
+    # @info = {
+    #     host  => '::1',
+    #     port  => 20203,
+    #     proto => 'tcp', # will use Net::Server::Proto::TCP
+    #     ipv   => 6,
+    # };
+
+    # example 13 #----------------------------------
+
     $port = "[someother.com]:20203 ipv6 ipv4 tcp";
     $def_host  = "default-domain.com";
     $def_proto = "tcp";
@@ -522,10 +584,51 @@ examples:
     #     ipv   => 6,
     # });
 
-    # example 13 #----------------------------------
+    # example 14 #----------------------------------
 
     # depending upon your configuration
-    $port = "localhost:20203 ipv* tcp";
+    $port = "localhost:20203 ipv*";
+    $def_host  = "default-domain.com";
+    $def_proto = "tcp";
+    $def_ipv   = undef;
+    @info = Net::Server::Proto->parse_info($port,$def_host,$def_proto,$def_ipv);
+    # @info = ({
+    #     host  => '127.0.0.1',
+    #     port  => 20203,
+    #     proto => 'tcp', # will use Net::Server::Proto::TCP
+    #     ipv   => 4, # IPv4
+    # }, {
+    #     host  => '::1',
+    #     port  => 20203,
+    #     proto => 'tcp', # will use Net::Server::Proto::TCP
+    #     ipv   => 6, # IPv6
+    # });
+
+    # example 15 #----------------------------------
+
+    # depending upon your configuration
+    $port = "localhost:20203";
+    $def_host  = "default-domain.com IPv*";
+    $def_proto = "tcp";
+    $def_ipv   = undef;
+    @info = Net::Server::Proto->parse_info($port,$def_host,$def_proto,$def_ipv);
+    # @info = ({
+    #     host  => '127.0.0.1',
+    #     port  => 20203,
+    #     proto => 'tcp', # will use Net::Server::Proto::TCP
+    #     ipv   => 4, # IPv4
+    # }, {
+    #     host  => '::1',
+    #     port  => 20203,
+    #     proto => 'tcp', # will use Net::Server::Proto::TCP
+    #     ipv   => 6, # IPv6
+    # });
+
+    # example 16 #----------------------------------
+
+    # depending upon your configuration
+    $ENV{'IPV'} = '*';
+    $port = "localhost:20203";
     $def_host  = "default-domain.com";
     $def_proto = "tcp";
     $def_ipv   = undef;
