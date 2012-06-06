@@ -12,7 +12,7 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok diag skip);
-prepare_test({n_tests => 49, plan_only => 1});
+prepare_test({n_tests => 51, plan_only => 1});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -249,7 +249,7 @@ if (!eval { require IO::Socket::UNIX }) {
 
     p_c([port => '/foo/bar|unix', udp_recv_len => 500], {
         bind => [{host => '*', port => '/foo/bar', proto => 'unix', ipv => '*'}],
-        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_ipv => '*', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM'}],
+        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_ipv => '*', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM', NS_unix_path => '/foo/bar'}],
     });
 
     p_c([port => '/foo/bar|unixdgram', udp_recv_len => 500], {
@@ -263,7 +263,7 @@ if (!eval { require IO::Socket::UNIX }) {
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7}], {
         bind => [{host => '*', port => '/foo/bar', proto => 'unix', unix_type => 'sock_stream', listen => 7, ipv => '*'}],
-        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_unix_type => 'SOCK_STREAM', NS_listen => 7, NS_ipv => '*'}],
+        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_unix_type => 'SOCK_STREAM', NS_listen => 7, NS_ipv => '*', NS_unix_path => '/foo/bar'}],
     });
 
     p_c([port => {port => '/foo/bar', proto => 'unix', unix_type => 'sock_dgram'}], {
@@ -362,6 +362,15 @@ if (!eval {
         sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
     });
 
+    p_c([port => 20201, host => 'localhost/IPv6'], {
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
+        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+    });
+
+    p_c([port => 20201, host => 'localhost', proto => 'udp IPv6'], {
+        bind => [{host => 'localhost', port => 20201, proto => 'udp', ipv => 6}],
+    });
+
     p_c([port => ['[localhost]:20201:IPv4', 'localhost:20201:IPv6']], {
         bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
         sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }},
@@ -389,6 +398,10 @@ if (!eval {
     });
 
     #p_c([port => 20201, host => 'localhost', ipv => '*'], {
+    #    bind => [{host => '::1', port => 20201, proto => 'tcp', ipv => 6}, {host => '127.0.0.1', port => 20201, proto => 'tcp', ipv => 4}],
+    #});
+    #
+    #p_c([port => 20201, host => 'localhost IPv*'], {
     #    bind => [{host => '::1', port => 20201, proto => 'tcp', ipv => 6}, {host => '127.0.0.1', port => 20201, proto => 'tcp', ipv => 4}],
     #});
     #
