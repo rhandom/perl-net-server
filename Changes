@@ -1,5 +1,16 @@
 Revision history for Perl extension Net::Server.
 
+2.003  Jun 06 2012
+        - Make the logging system pluggable
+        - Added net-server server executor for writing easier one line servers
+        - Sys::Syslog and Log::Log4perl are now moved out to their own module subsystems
+        - Added full apache style HTTP log formatting for the HTTP server
+        - Allow for ipv to be specified as part of host, or proto, or passed via $ENV{'IPV'}
+        - Add apache style access logging (access_log_file and access_log_format) to HTTP
+        - Allow HTTP header parsing to not untaint the headers (thanks Miko O'Sullivan)
+        - Fix missing legacy NS_unix_path call (missing since 2.000)
+        - Fix a bug in MultiType that prevented calling server_type HTTP
+
 2.002  May 31 2012
         - Make HTTP output header parsing more consistent - and catch more errors
         - Add exec_cgi and exec_trusted_perl methods to HTTP
