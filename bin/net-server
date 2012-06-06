@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 package net_server;
 
@@ -15,6 +15,7 @@ my $pkg;
 if (@ARGV && $ARGV[0] && $ARGV[0] =~ /^(\w+)$/ && ($pkg = $1) && eval { require "Net/Server/$pkg.pm" }) {
     $pkg = "Net::Server::$pkg";
 } else {
+    die "Error trying to become a Net::Server::$pkg:\n\n$@" if $pkg && grep {-e "$_/Net/Server/$pkg.pm"} @INC;
     $pkg = 'Net::Server::MultiType';
 }
 
