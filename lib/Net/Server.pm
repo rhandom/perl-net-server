@@ -142,35 +142,7 @@ sub post_configure {
 
     $prop->{'log_level'} = 2 if ! defined($prop->{'log_level'}) || $prop->{'log_level'} !~ /^\d+$/;
     $prop->{'log_level'} = 4 if $prop->{'log_level'} > 4;
-
-    if (! defined($prop->{'log_file'})) {
-        $prop->{'log_file'} = ''; # log to STDERR
-
-    } elsif ($prop->{'log_file'} eq 'Sys::Syslog') {
-        $self->configure({
-            syslog_logsock  => \$prop->{'syslog_logsock'},
-            syslog_ident    => \$prop->{'syslog_ident'},
-            syslog_logopt   => \$prop->{'syslog_logopt'},
-            syslog_facility => \$prop->{'syslog_facility'},
-        });
-        $self->open_syslog; # log to syslog
-
-    } elsif ($prop->{'log_file'} eq 'Log::Log4perl') {
-        $self->configure({
-            log4perl_conf   => \$prop->{'log4perl_conf'},
-            log4perl_logger => \$prop->{'log4perl_logger'},
-            log4perl_poll   => \$prop->{'log4perl_poll'},
-        });
-        $self->open_log4perl;
-
-    } elsif ($prop->{'log_file'}) {
-        die "Unsecure filename \"$prop->{'log_file'}\"" if $prop->{'log_file'} !~ m|^([\:\w\.\-/\\]+)$|;
-        $prop->{'log_file'} = $1; # open a logging file
-        open(_SERVER_LOG, ">>", $prop->{'log_file'})
-            || die "Couldn't open log file \"$prop->{'log_file'}\" [$!].";
-        _SERVER_LOG->autoflush(1);
-        $prop->{'chown_log_file'} = 1;
-    }
+    $self->initialize_logging;
 
     if ($prop->{'pid_file'}) { # see if a daemon is already running
         if (! eval{ check_pid_file($prop->{'pid_file'}) }) {
@@ -219,6 +191,36 @@ sub post_configure {
     $prop->{$_} = [] for grep {! ref $prop->{$_}} qw(allow deny cidr_allow cidr_deny);
 }
 
+sub initialize_logging {
+    my $self = shift;
+    my $prop = $self->{'server'};
+    if (! defined($prop->{'log_file'})) {
+        $prop->{'log_file'} = ''; # log to STDERR
+        return;
+    }
+
+    # pluggable logging
+    if ($prop->{'log_file'} =~ /^([a-zA-Z]\w*(?:::[a-zA-Z]\w*)*)$/) {
+        my $pkg  = "Net::Server::Log::$prop->{'log_file'}";
+        (my $file = "$pkg.pm") =~ s|::|/|g;
+        if (eval { require $file }) {
+            $prop->{'log_function'} = $pkg->initialize($self);
+            $prop->{'log_class'}    = $pkg;
+            return;
+        } elsif ($file =~ /::/ || grep {-e "$_/$file"} @INC) {
+            $self->fatal("Unable to load log module $pkg from file $file: $@");
+        }
+    }
+
+    # regular file based logging
+    die "Unsecure filename \"$prop->{'log_file'}\"" if $prop->{'log_file'} !~ m|^([\:\w\.\-/\\]+)$|;
+    $prop->{'log_file'} = $1; # open a logging file
+    open(_SERVER_LOG, ">>", $prop->{'log_file'})
+        || die "Couldn't open log file \"$prop->{'log_file'}\" [$!].";
+    _SERVER_LOG->autoflush(1);
+    push @{ $prop->{'chown_files'} }, $prop->{'log_file'};
+}
+
 sub post_configure_hook {}
 
 sub _server_type { ref($_[0]) }
@@ -229,7 +231,10 @@ sub pre_bind { # make sure we have good port parameters
 
     my $super = $self->net_server_type;
     my $type  = $self->_server_type;
-    $super = "$super -> MultiType -> ".Net::Server::MultiType->net_server_type if $self->isa('Net::Server::MultiType');
+    if ($self->isa('Net::Server::MultiType')) {
+        my $base = delete($prop->{'_recursive_multitype'}) || Net::Server::MultiType->net_server_type;
+        $super = "$super -> MultiType -> $base";
+    }
     $type .= " (type $super)" if $type ne $super;
     $self->log(2, $self->log_time ." $type starting! pid($$)");
 
@@ -365,7 +370,7 @@ sub post_bind { # secure the process and background it
         push @chown_files, map {$_->NS_port} grep {$_->NS_proto =~ /^UNIX/} @{ $prop->{'sock'} };
         push @chown_files, $prop->{'pid_file'}  if $prop->{'pid_file_unlink'};
         push @chown_files, $prop->{'lock_file'} if $prop->{'lock_file_unlink'};
-        push @chown_files, $prop->{'log_file'}  if delete $prop->{'chown_log_file'};
+        push @chown_files, @{ $prop->{'chown_files'} || [] };
         my $uid = $prop->{'user'};
         my $gid = (split /\ /, $prop->{'group'})[0];
         foreach my $file (@chown_files){
@@ -872,104 +877,30 @@ sub fatal_hook {}
 
 ###----------------------------------------------------------###
 
-sub open_syslog {
-    my $self = shift;
-    my $prop = $self->{'server'};
-
-    require Sys::Syslog;
-    if (ref($prop->{'syslog_logsock'}) eq 'ARRAY') {
-        # do nothing - assume they have what they want
-    } else {
-        if (! defined $prop->{'syslog_logsock'}) {
-            $prop->{'syslog_logsock'} = ($Sys::Syslog::VERSION < 0.15) ? 'unix' : '';
-        }
-        if ($prop->{'syslog_logsock'} =~ /^(|native|tcp|udp|unix|inet|stream|console)$/) {
-            $prop->{'syslog_logsock'} = $1;
-        } else {
-            $prop->{'syslog_logsock'} = ($Sys::Syslog::VERSION < 0.15) ? 'unix' : '';
-        }
-    }
-
-    my $ident = defined($prop->{'syslog_ident'}) ? $prop->{'syslog_ident'} : 'net_server';
-    $prop->{'syslog_ident'} = ($ident =~ /^([\ -~]+)$/) ? $1 : 'net_server';
-
-    my $opt = defined($prop->{'syslog_logopt'}) ? $prop->{'syslog_logopt'} : $Sys::Syslog::VERSION ge '0.15' ? 'pid,nofatal' : 'pid';
-    $prop->{'syslog_logopt'} = ($opt =~ /^( (?: (?:cons|ndelay|nowait|pid|nofatal) (?:$|[,|]) )* )/x) ? $1 : 'pid';
-
-    my $fac = defined($prop->{'syslog_facility'}) ? $prop->{'syslog_facility'} : 'daemon';
-    $prop->{'syslog_facility'} = ($fac =~ /^((\w+)($|\|))*/) ? $1 : 'daemon';
-
-    if ($prop->{'syslog_logsock'}) {
-        Sys::Syslog::setlogsock($prop->{'syslog_logsock'}) || die "Syslog err [$!]";
-    }
-    if (! Sys::Syslog::openlog($prop->{'syslog_ident'}, $prop->{'syslog_logopt'}, $prop->{'syslog_facility'})) {
-        die "Couldn't open syslog [$!]" if $prop->{'syslog_logopt'} ne 'ndelay';
-    }
-}
-
-$Net::Server::syslog_map = {0 => 'err', 1 => 'warning', 2 => 'notice', 3 => 'info', 4 => 'debug'};
-
-sub open_log4perl {
-    my $self = shift;
-    my $prop = $self->{'server'};
-
-    require Log::Log4perl;
-
-    die "Must specify a log4perl_conf file" if ! $prop->{'log4perl_conf'};
-
-    my $poll = defined($prop->{'log4perl_poll'}) ? $prop->{'log4perl_poll'} : "0";
-    my $logger = $prop->{'log4perl_logger'} || "Net::Server";
-
-    if ($poll eq "0") {
-        Log::Log4perl::init($prop->{'log4perl_conf'});
-    } else {
-        Log::Log4perl::init_and_watch($prop->{'log4perl_conf'}, $poll);
-    }
-
-    my $l4p = Log::Log4perl->get_logger($logger);
-    my $lmap = {
-        1 => "error",
-        2 => "warn",
-        3 => "info",
-        4 => "debug",
-    };
-    $prop->{'log_function'} = sub {
-        my ($level, $msg) = @_;
-        $level = $lmap->{$level} || "error";
-        $l4p->$level($msg);
-    };
-}
-
 sub log {
     my ($self, $level, $msg, @therest) = @_;
     my $prop = $self->{'server'};
     return if ! $prop->{'log_level'};
+    return if $level =~ /^\d+$/ && $level > $prop->{'log_level'};
     $msg = sprintf($msg, @therest) if @therest; # if multiple arguments are passed, assume that the first is a format string
 
     if ($prop->{'log_function'}) {
-        return if $level !~ /^\d+$/ || $level > $prop->{'log_level'};
-        $prop->{'log_function'}->($level, $msg);
-        return;
-    }
-    elsif (defined($prop->{'log_file'}) && $prop->{'log_file'} eq 'Sys::Syslog') {
-        if ($level =~ /^\d+$/) {
-            return if $level > $prop->{'log_level'};
-            $level = $Net::Server::syslog_map->{$level} || $level;
+        return if eval { $prop->{'log_function'}->($level, $msg); 1 };
+        my $err = $@;
+        if ($prop->{'log_class'} && $prop->{'log_class'}->can('handle_error')) {
+            $prop->{'log_class'}->handle_log_error($self, $err, [$level, $msg]);
+        } else {
+            $self->handle_log_error($err, [$level, $msg]);
         }
-
-        if (! eval { Sys::Syslog::syslog($level, '%s', $msg); 1 }) {
-            my $err = $@;
-            $self->handle_syslog_error($err, [$level, $msg]);
-        }
-        return;
     }
 
-    return if $level !~ /^\d+$/ || $level > $prop->{'log_level'};
+    return if $level !~ /^\d+$/;
     $self->write_to_log_hook($level, $msg);
 }
 
 
-sub handle_syslog_error { my ($self, $error) = @_; die $error }
+sub handle_log_error { my ($self, $error) = @_; die $error }
+sub handle_syslog_error { &handle_log_error }
 
 sub write_to_log_hook {
     my ($self, $level, $msg) = @_;
