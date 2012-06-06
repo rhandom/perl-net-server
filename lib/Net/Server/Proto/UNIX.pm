@@ -159,9 +159,13 @@ been returned as legacy bridges.
 
   Key               Value                    Default
 
-  # UNIX socket parameters
+  # deprecated UNIX socket parameters
   unix_type         (SOCK_STREAM|SOCK_DGRAM) SOCK_STREAM
   port              "filename"               undef
+
+  # more recent usage
+  port              "filename / UNIX"
+  port              "filename / UNIXDGRAM"
 
 =head1 LICENCE
 
