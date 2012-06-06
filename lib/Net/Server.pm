@@ -32,7 +32,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.002';
+our $VERSION = '2.003';
 
 sub new {
     my $class = shift || die "Missing class";
@@ -170,10 +170,9 @@ sub post_configure {
     }
 
     if (length($prop->{'log_file'})
-        && $prop->{'log_file'} ne 'Sys::Syslog'
-        && $prop->{'log_file'} ne 'Log::Log4perl') { # completely daemonize by closing STDERR (should be done after fork)
+        && !$prop->{'log_function'}) {
         open STDERR, '>&_SERVER_LOG' || die "Cannot open STDERR to _SERVER_LOG [$!]";
-    } elsif ($prop->{'setsid'}) {
+    } elsif ($prop->{'setsid'}) { # completely daemonize by closing STDERR (should be done after fork)
         open STDERR, '>&STDOUT' || die "Cannot open STDERR to STDOUT [$!]";
     }
 
