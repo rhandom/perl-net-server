@@ -1,3 +1,4 @@
+bin/net-server                  Simple executor
 Changes				Module History
 examples/connection_test.pl	Sample connection on all protocols
 examples/httpd			Sample http daemon

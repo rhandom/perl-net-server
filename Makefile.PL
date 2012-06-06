@@ -7,6 +7,7 @@ my %args =
    VERSION_FROM  => 'lib/Net/Server.pm',
    ABSTRACT_FROM => 'lib/Net/Server.pod',
    AUTHOR        => 'Paul Seamons (paul@seamons.com) and Rob Brown (bbb@cpan.org)',
+   EXE_FILES     => [ 'bin/net-server' ],
    PREREQ_PM  => {
      'IO::Socket' => 0,
      Socket       => 0,
