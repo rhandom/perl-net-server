@@ -65,13 +65,8 @@ sub initialize {
     }
 
     return sub {
-        my ($level, $msg, $server_level) = @_;
-
-        if ($level =~ /^\d+$/) {
-            return if $level > ($server_level || 0);
-            $level = $syslog_map{$level} || $level;
-        }
-
+        my ($level, $msg) = @_;
+        $level = $syslog_map{$level} || $level if $level =~ /^\d+$/;
         syslog($level, '%s', $msg);
     };
 }
@@ -169,8 +164,8 @@ base class.)
 This method is called during the initilize_logging method of
 Net::Server.  It returns a single code ref that will be stored under
 the log_function property of the Net::Server object.  That code ref
-takes log_level, message, and server_log_level as arguments and calls
-the initialized log4perl system.
+takes log_level and message as arguments and calls the initialized
+log4perl system.
 
 =item C<handle_log_error>
 
