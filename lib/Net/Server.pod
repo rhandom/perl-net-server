@@ -24,6 +24,13 @@ Net::Server - Extensible, general Perl server engine
     # one liner to get going quickly
     perl -e 'use base qw(Net::Server); main->run(port => 20208)'
 
+    NOTE: beginning in Net::Server 2.005, the default value for
+          ipv will be IPv* meaning that if no host is passed, or
+          a hostname is past, any available IPv4 and IPv6 sockets will be
+          bound.  You can force IPv4 only by adding an ipv => 4
+          configuration in any of the half dozen ways we let you
+          specify it.
+
 =head1 FEATURES
 
     * Full IPv6 support (via IPv6 style addr, or via ipv => "IPv6")

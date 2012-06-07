@@ -80,6 +80,11 @@ sub parse_info {
         && (!$ipv
             || $ipv =~ /4/
             || ($ipv =~ /[*]/ && $info->{'host'} !~ /:/ && !eval{ require Socket6; require IO::Socket::INET6; require Socket }))) {
+        if (!$ipv
+            && ($info->{'host'} !~ /^\d{1,3}(\.\d{1,3}){3}$/)) {
+            $server->log(1, "NOTE: The default value for ipv will be changing to '*' in the next Net::Server release.");
+            $server->log(1, "NOTE: If you would like to continue only binding IPv4 ports and exclude IPv6 ports, you will need to add an explicit ipv => 'IPv4' to your configuration.");
+        }
         push @_info, {%$info, ipv => '4'};
     }
     if ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
@@ -150,6 +155,13 @@ __END__
 Net::Server::Proto - Net::Server Protocol compatibility layer
 
 =head1 SYNOPSIS
+
+    NOTE: beginning in Net::Server 2.005, the default value for
+          ipv will be IPv* meaning that if no host is passed, or
+          a hostname is past, all available socket types will be
+          bound.  You can force IPv4 only by adding an ipv => 4
+          configuration in any of the half dozen ways we let you
+          specify it.
 
     # Net::Server::Proto and its accompanying modules are not
     # intended to be used outside the scope of Net::Server.
