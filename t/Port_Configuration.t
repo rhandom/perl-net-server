@@ -240,7 +240,7 @@ p_c([port => [{port => 20202, listen => 6}]], {
 if (!eval { require IO::Socket::UNIX }) {
     my $err = $@;
   SKIP: {
-      skip "Cannot load IO::Socket::UNIX - skipping UNIX proto tests", 7;
+      skip "Cannot load IO::Socket::UNIX - skipping UNIX proto tests", 8;
     };
 } else {
     p_c([port => 'foo/bar/unix'], {
@@ -333,7 +333,7 @@ if (!eval {
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 11;
+      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 13;
     };
 
 } else {
