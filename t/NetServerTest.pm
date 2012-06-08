@@ -4,13 +4,23 @@ use strict;
 use IO::Socket;
 use Exporter;
 @NetServerTest::ISA = qw(Exporter);
-@NetServerTest::EXPORT_OK = qw(prepare_test ok is like use_ok skip diag);
+@NetServerTest::EXPORT_OK = qw(prepare_test client_connect ok is like use_ok skip diag);
 my %env;
 use constant debug => $ENV{'NS_DEBUG'} ? 1 : 0;
 
 END {
     warn "# number of tests ran ".($env{'_ok_n'} || 0)." did not match number of specified tests ".($env{'_ok_N'} || 0)."\n"
         if ($env{'_ok_N'} || 0) ne ($env{'_ok_n'} || 0) && ($env{'_ok_pid'} || 0) == $$;
+}
+
+sub client_connect {
+    shift if $_[0] && $_[0] eq __PACKAGE__;
+    if ($env{'ipv'} && $env{'ipv'} ne 4) {
+        require IO::Socket::INET6;
+        return IO::Socket::INET6->new(@_);
+    } else {
+        return IO::Socket::INET->new(@_);
+    }
 }
 
 # most of our tests need forking, a certain number of ports, and some pipes
