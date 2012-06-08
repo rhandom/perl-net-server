@@ -30,7 +30,7 @@ my $ok = eval {
         eval {
             alarm $env->{'timeout'};
             # pretend we're inetd
-            my $sock = NetServerTest::client_connect( # not really a client - client_connect is a raw passthrough to IO::Socket::INET->new
+            my $sock = NetServerTest::client_connect(
                 LocalAddr => $env->{'hostname'},
                 LocalPort => $env->{'ports'}->[0],
                 Listen    => 5,
