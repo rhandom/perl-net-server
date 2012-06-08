@@ -137,9 +137,14 @@ sub get_addr_info {
     } elsif ($host =~ /:/) {
         die "Unresolveable host [$host]:$port - could not load IO::Socket::INET6: $@";
     } else {
-        my $addr = ($host eq '*') ? Socket::INADDR_ANY() : gethostbyname($host);
-        die "Unresolveable host [$host]:$port via IPv4 gethostbyname\n" if ! $addr;
-        push @info, [Socket::inet_ntoa($addr), $port, 4];
+        my @addr;
+        if ($host eq '*') {
+            push @addr, Socket::INADDR_ANY();
+        } else {
+            (undef, undef, undef, undef, @addr) = gethostbyname($host);
+            die "Unresolveable host [$host]:$port via IPv4 gethostbyname\n" if !@addr;
+        }
+        push @info, [Socket::inet_ntoa($_), $port, 4] for @addr
     }
 
     return @info;
