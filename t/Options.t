@@ -70,9 +70,14 @@ is($prop->{'log_level'}, 2,  "Correct default log_level");
 is($prop->{'log_file'}, "", "Correct default log_file");
 ok(! $prop->{'user'},          "Correct default user");
 is(scalar(@{ $prop->{'_bind'} }), 1,        "Had 1 configured ports");
-is(scalar(@{ $prop->{'sock'} }), 1,         "Had 1 configured socket");
-my $sock = eval {$prop->{'sock'}->[0]};
-is(eval { $sock->NS_host  }, '*',   "Right host");
+my @socks = @{ $prop->{'sock'} };
+is(scalar(@socks), 1,         "Had 1 configured socket");
+my $sock = $socks[0];
+if ($sock->NS_ipv == 4) {
+    is(eval { $sock->NS_host  }, '0.0.0.0',   "Right host");
+} else {
+    is(eval { $sock->NS_host  }, '::',   "Right host");
+}
 is(eval { $sock->NS_port  }, 20203, "Right port");
 is(eval { $sock->NS_proto }, 'TCP', "Right proto");
 
