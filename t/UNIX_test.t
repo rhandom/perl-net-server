@@ -41,9 +41,11 @@ my $ok = eval {
         print $remote "quite\n";
 
         ### connect to child under tcp
-        $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'},
-                                        PeerPort => $env->{'ports'}->[0],
-                                        Proto    => 'tcp') || die "Couldn't open to sock: $!";
+        $remote = NetServerTest::client_connect(
+            PeerAddr => $env->{'hostname'},
+            PeerPort => $env->{'ports'}->[0],
+            Proto    => 'tcp') || die "Couldn't open to sock: $!";
+
         $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         print $remote "exit\n";
@@ -53,11 +55,16 @@ my $ok = eval {
     } else {
         eval {
             close STDERR;
-            Net::Server::Test->run(port  => "$env->{'ports'}->[0]/tcp",
-                                   port  => "$socket_file|unix",
-                                   user  => $UID, # user  accepts id as well
-                                   group => $GID, # group accepts id as well
-                                   host  => $env->{'hostname'}, background => 0, setsid => 0);
+            Net::Server::Test->run(
+                port  => "$env->{'ports'}->[0]/tcp",
+                port  => "$socket_file|unix",
+                user  => $UID, # user  accepts id as well
+                group => $GID, # group accepts id as well
+                host  => $env->{'hostname'},
+                ipv   => $env->{'ipv'},
+                background => 0,
+                setsid => 0,
+            );
         } || diag("Trouble running server: $@");
         exit;
     }

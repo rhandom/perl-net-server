@@ -30,7 +30,7 @@ my $ok = eval {
     if ($pid) {
         $env->{'block_until_ready_to_test'}->();
 
-        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+        my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
 
         print $remote "GET / HTTP/1.0\nFoo: bar\n\n";
 
@@ -45,7 +45,14 @@ my $ok = eval {
         eval {
             alarm $env->{'timeout'};
             close STDERR;
-            Net::Server::Test->run(port => $env->{'ports'}->[0], host => $env->{'hostname'}, server_type => 'Single', background => 0, setsid => 0, ipv=>4);
+            Net::Server::Test->run(
+                port => $env->{'ports'}->[0],
+                host => $env->{'hostname'},
+                ipv  => $env->{'ipv'},
+                server_type => 'Single',
+                background => 0,
+                setsid => 0,
+            );
         } || diag("Trouble running server: $@");
         alarm(0);
         exit;

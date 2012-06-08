@@ -26,9 +26,11 @@ my $ok = eval {
         $env->{'block_until_ready_to_test'}->();
 
         ### connect to child under udp
-        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'},
-                                           PeerPort => $env->{'ports'}->[0],
-                                           Proto    => 'udp');
+        my $remote = NetServerTest::client_connect(
+            PeerAddr => $env->{'hostname'},
+            PeerPort => $env->{'ports'}->[0],
+            Proto    => 'udp');
+
         ### send a packet, get a packet
         $remote->send("Are you there?",0);
         my $data = undef;
@@ -37,9 +39,11 @@ my $ok = eval {
         die "Didn't get the data we wanted" if $data !~ /Are you there/;
 
         ### connect to child under tcp
-        $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'},
-                                        PeerPort => $env->{'ports'}->[0],
-                                        Proto    => 'tcp') || die "Couldn't open to sock: $!";
+        $remote = NetServerTest::client_connect(
+            PeerAddr => $env->{'hostname'},
+            PeerPort => $env->{'ports'}->[0],
+            Proto    => 'tcp') || die "Couldn't open to sock: $!";
+
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         print $remote "exit\n";
@@ -49,11 +53,14 @@ my $ok = eval {
     } else {
         eval {
             close STDERR;
-            Net::Server::Test->run(port => "$env->{'ports'}->[0]/tcp",
-                                   port => "$env->{'ports'}->[0]/udp",
-                                   host => $env->{'hostname'},
-                                   background => 0,
-                                   setsid => 0);
+            Net::Server::Test->run(
+                port => "$env->{'ports'}->[0]/tcp",
+                port => "$env->{'ports'}->[0]/udp",
+                host => $env->{'hostname'},
+                ipv  => $env->{'ipv'},
+                background => 0,
+                setsid => 0,
+            );
         } || diag("Trouble running server: $@");
         exit;
     }

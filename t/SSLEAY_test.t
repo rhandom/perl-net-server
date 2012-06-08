@@ -96,7 +96,7 @@ my $ok = eval {
     if ($pid) {
         $env->{'block_until_ready_to_test'}->();
 
-        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[1]) || die "Couldn't open child to sock: $!";
+        my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[1]) || die "Couldn't open child to sock: $!";
 
         my $ctx = Net::SSLeay::CTX_new()
             or Net::SSLeay::die_now("Failed to create SSL_CTX $!");
@@ -114,7 +114,7 @@ my $ok = eval {
         diag $line2;
 
 
-        $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+        $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
 
         $ctx = Net::SSLeay::CTX_new()
             or Net::SSLeay::die_now("Failed to create SSL_CTX $!");
@@ -138,6 +138,7 @@ my $ok = eval {
             Net::Server::Test->run(
                 host  => $env->{'hostname'},
                 port  => $env->{'ports'},
+                ipv   => $env->{'ipv'},
                 proto => 'ssleay',
                 background => 0,
                 setsid => 0,
