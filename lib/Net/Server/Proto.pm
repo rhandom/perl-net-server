@@ -77,21 +77,7 @@ sub parse_info {
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
     $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
     my @_info;
-    if ($info->{'host'} !~ /:/
-        && (!$ipv
-            || $ipv =~ /4/
-            || ($ipv =~ /[*]/ && $info->{'host'} !~ /:/ && !eval{ require Socket6; require IO::Socket::INET6 }))) {
-        if (!$ipv
-            && ($info->{'host'} !~ /^\d{1,3}(\.\d{1,3}){3}$/)) {
-            $server->log(1, "NOTE: The default value for ipv will be changing to '*' in the next Net::Server release.");
-            $server->log(1, "NOTE: If you would like to continue only binding IPv4 ports and exclude IPv6 ports, you will need to add an explicit ipv => 'IPv4' to your configuration.");
-        }
-        push @_info, {%$info, ipv => '4'};
-    }
-    if ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
-        push @_info, {%$info, ipv => '6'};
-        $requires_ipv6++ if $proto ne 'ssl'; # IO::Socket::SSL does its own determination
-    } elsif ($ipv =~ /[*]/) {
+    if (!$ipv || $ipv =~ /[*]/) {
         my @rows = eval { $class->get_addr_info(@$info{qw(host port proto)}) };
         $server->fatal($@ || "Could not find valid addresses for [$info->{'host'}]:$info->{'port'} with ipv set to '*'") if ! @rows;
         foreach my $row (@rows) {
@@ -102,6 +88,12 @@ sub parse_info {
             push @_info, {host => $host, port => $port, ipv => $ipv, proto => $info->{'proto'}};
             $requires_ipv6++ if $ipv ne '4' && $proto ne 'ssl'; # we need to know if Proto::TCP needs to reparent as a child of IO::Socket::INET6
         }
+    } elsif ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
+        push @_info, {%$info, ipv => '6'};
+        $requires_ipv6++ if $proto ne 'ssl'; # IO::Socket::SSL does its own determination
+        push @_info, {%$info, ipv => '4'} if $ipv =~ /4/ && $info->{'host'} !~ /:/;
+    } else {
+        push @_info, {%$info, ipv => '4'};
     }
 
     return @_info;
@@ -119,7 +111,7 @@ sub get_addr_info {
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = Socket::inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
         push @info, [Socket::inet_ntoa($addr), $port, 4]
-    } elsif (eval { require Socket6; require IO::Socket::INET6 }) {
+    } elsif (!$ENV{'NO_IPV6'} && eval { require Socket6; require IO::Socket::INET6 }) {
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? Socket::SOCK_DGRAM() : Socket::SOCK_STREAM();
         my @res = Socket6::getaddrinfo($host eq '*' ? '' : $host, $port, Socket::AF_UNSPEC(), $socktype, $proto_id, Socket6::AI_PASSIVE());
