@@ -94,6 +94,7 @@ if (!eval {
       skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 25;
     };
 } else {
+    local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
     p_c([], {
         bind => [{
             host => '*',
@@ -301,7 +302,15 @@ if (!eval { require Net::SSLeay; 1 }) {
   SKIP: {
       skip "Cannot load Net::SSLeay - skipping SSLEAY proto tests", 3;
     };
+} elsif (!eval {
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+}) {
+    chomp(my $err = $@);
+  SKIP: {
+      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 3;
+    };
 } else {
+    local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
 
     p_c([proto => 'ssleay'], {
         bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssleay', ipv => 4}],
@@ -326,7 +335,16 @@ if (!eval { require IO::Socket::SSL }) {
   SKIP: {
       skip "Cannot load Net::SSLeay - skipping SSLEAY proto tests", 1;
     };
+} elsif (!eval {
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+}) {
+    chomp(my $err = $@);
+  SKIP: {
+      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 1;
+    };
 } else {
+    local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
+
     p_c([proto => 'ssl'], {
         bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssl', ipv => 4}],
         sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSL', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
@@ -350,6 +368,7 @@ if (!eval {
     };
 
 } else {
+    local $ENV{'IPV'} = 4; # skew the default back to 4 for now
 
     p_c([port => 20201], {
         bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}], # still defaults off even with library loaded
@@ -391,19 +410,19 @@ if (!eval {
     });
 
     p_c([port => 'localhost, 20201, IPv6, IPv4'], {
-        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}],
     });
 
     p_c([port => [{port => '20201', host => 'localhost', ipv => [6, 4]}]], {
-        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}],
     });
 
-    p_c([port => 'localhost, 20201', ipv => 'IPv6, IPv4'], {
-        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
+    p_c([port => 'localhost, 20201', ipv => 'IPv4, IPv6'], {
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}],
     });
 
     p_c([port => [{port => '20201', host => 'localhost', ipv => 'IPv6, IPv4'}]], {
-        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}],
     });
 
     p_c([port => 20201, host => '::1', ipv => '*'], {
@@ -418,8 +437,14 @@ if (!eval {
     #    bind => [{host => '::1', port => 20201, proto => 'tcp', ipv => 6}, {host => '127.0.0.1', port => 20201, proto => 'tcp', ipv => 4}],
     #});
     #
-    #p_c([port => 20201, host => '*', ipv => '*'], {
+    #p_c([port => 20201, host => '*', ipv => '*'], { # BSD will have two by default, linux has 1
     #    bind => [{host => '::', port => 20201, proto => 'tcp', ipv => 6}],
     #});
+    #
+    #delete $ENV{'IPV'};
+    #p_c([port => 20201], { # BSD will have two by default, linux has 1
+    #    bind => [{host => '::', port => 20201, proto => 'tcp', ipv => 6}],
+    #});
+
 
 }
