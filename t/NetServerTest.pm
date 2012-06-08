@@ -24,8 +24,21 @@ sub prepare_test {
     return if $args->{'plan_only'};
 
     $env{'_ok_n'} = 0;
-    $env{'hostname'} ||= 'localhost';
     $env{'timeout'}  ||= 5;
+
+    # allow for finding a hostname that we can use in our tests that appears to be valid
+    if (!$env{'hostname'}) {
+        eval { require Net::Server::Proto } || do { SKIP: { skip("Could not load Net::Server::Proto to lookup host: $@", $N - 1) }; exit; };
+        foreach my $host (qw(localhost localhost6 localhost.localdomain * ::1)) { # try local bindings first to avoid opening external ports during testing
+            my @info = eval { Net::Server::Proto->get_addr_info($host) };
+            next if ! @info;
+            @info = sort {$a->[2] <=> $b->[2]} @info; # try IPv4 first in the name of consistency, but let IPv6 work too
+            $env{'hostname'} = $info[0]->[0];
+            $env{'ipv'}      = $info[0]->[2];
+            last;
+        }
+        die "Could not find a hostname to test connections with (tried localhost, *, ::1)" if ! $env{'hostname'};
+    }
 
     warn "# Checking can_fork\n" if debug;
     ok(can_fork(), "Can fork on this platform") || do { SKIP: { skip("Fork doesn't work on this platform", $N - 1) }; exit; };
