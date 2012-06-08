@@ -19,7 +19,7 @@ my $ok = eval {
     ### parent does the client
     if ($pid) {
         $env->{'block_until_ready_to_test'}->();
-        my $remote = IO::Socket::INET->new(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+        my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         print $remote "exit\n";
@@ -30,17 +30,26 @@ my $ok = eval {
         eval {
             alarm $env->{'timeout'};
             # pretend we're inetd
-            my $sock = IO::Socket::INET->new(LocalAddr => $env->{'hostname'},
-                                             LocalPort => $env->{'ports'}->[0],
-                                             Listen    => 5,
-                                             ReuseAddr => 1, Reuse => 1) || die "Couldn't setup server: $!";
+            my $sock = NetServerTest::client_connect( # not really a client - client_connect is a raw passthrough to IO::Socket::INET->new
+                LocalAddr => $env->{'hostname'},
+                LocalPort => $env->{'ports'}->[0],
+                Listen    => 5,
+                ReuseAddr => 1,
+                Reuse => 1,
+            ) || die "Couldn't setup server: $!";
             $env->{'signal_ready_to_test'}->();
             my $client = $sock->accept || die "Couldn't accept";
             # map these to look like inetd
             local *STDIN  = \*{ $client };
             local *STDOUT = \*{ $client };
             close STDERR;
-            Net::Server::Test->run(port => $env->{'ports'}->[0], host => $env->{'hostname'}, background => 0, setsid => 0);
+            Net::Server::Test->run(
+                port => $env->{'ports'}->[0],
+                host => $env->{'hostname'},
+                ipv  => $env->{'ipv'},
+                background => 0,
+                setsid => 0,
+            );
         } || diag("Trouble running server: $@");
         exit;
     }
