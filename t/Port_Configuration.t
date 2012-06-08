@@ -12,7 +12,11 @@ use strict;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok diag skip);
-prepare_test({n_tests => 51, plan_only => 1});
+prepare_test({
+    n_tests   => 51,
+    plan_only => 1,
+    hostname  => 'localhost', # passing in an explicit one keeps it from doing IPv* resolution
+});
 #use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
@@ -82,157 +86,166 @@ sub NS_props {
 ###----------------------------------------------------------------###
 # tcp, udp
 
-p_c([], {
-    bind => [{
-        host => '*',
-        port => Net::Server::default_port(),
-        ipv  => '4',
-        proto => 'tcp',
-    }],
-    sock => [{
-        NS_host => '*',
-        NS_port => Net::Server::default_port(),
-        NS_ipv  => '4',
-        NS_proto => 'TCP',
-        NS_listen => eval { Socket::SOMAXCONN() },
-    }],
-});
+if (!eval {
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+}) {
+    chomp(my $err = $@);
+  SKIP: {
+      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 25;
+    };
+} else {
+    p_c([], {
+        bind => [{
+            host => '*',
+            port => Net::Server::default_port(),
+            ipv  => '4',
+            proto => 'tcp',
+        }],
+        sock => [{
+            NS_host => '*',
+            NS_port => Net::Server::default_port(),
+            NS_ipv  => '4',
+            NS_proto => 'TCP',
+            NS_listen => eval { Socket::SOMAXCONN() },
+        }],
+    });
 
-p_c([port => 20201], {
-    bind => [{host => '*', port => 20201, proto => 'tcp', ipv => '4'}],
-});
-
-
-p_c([port => "localhost:20202"], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => ["localhost:20202/tcp"]], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => "localhost:20202/ipv4"], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => ["localhost:20201/ipv4/tcp", "localhost:20202/tcp/IPv4"]], {
-    bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => ["localhost|20201|ipv4|tcp", "localhost,20202,tcp,IPv4"]], {
-    bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => ["localhost 20201 ipv4 tcp", "localhost, 20202, tcp, IPv4"]], {
-    bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
-});
-
-p_c([port => "localhost:20202/udp"], {
-    bind => [{host => 'localhost', port => 20202, proto => 'udp', ipv => '4'}],
-    sock => [{
-        NS_broadcast => undef,
-        NS_host => 'localhost',
-        NS_port => 20202,
-        NS_ipv  => '4',
-        NS_proto => 'UDP',
-        NS_recv_flags => 0,
-        NS_recv_len => 4096,
-    }],
-});
-
-p_c([port => 20202, listen => 5], {
-    bind => [{host => '*', port => 20202, proto => 'tcp', ipv => '4'}],
-    sock => [{
-        NS_host => '*',
-        NS_port => 20202,
-        NS_proto => 'TCP',
-        NS_listen => 5,
-        NS_ipv => '4',
-    }],
-});
+    p_c([port => 20201], {
+        bind => [{host => '*', port => 20201, proto => 'tcp', ipv => '4'}],
+    });
 
 
+    p_c([port => "localhost:20202"], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
-p_c([port => ["bar.com:20201/udp", "foo.com:20202/tcp"]], {bind => [
-   {host => 'bar.com', port => 20201, proto => 'udp', ipv => '4'},
-   {host => 'foo.com', port => 20202, proto => 'tcp', ipv => '4'},
-]});
+    p_c([port => ["localhost:20202/tcp"]], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
+    p_c([port => "localhost:20202/ipv4"], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
-p_c([port => 20201, host => 'bar.com', proto => 'UDP'], {
-    bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => '4'}],
-});
+    p_c([port => ["localhost:20201/ipv4/tcp", "localhost:20202/tcp/IPv4"]], {
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
+    p_c([port => ["localhost|20201|ipv4|tcp", "localhost,20202,tcp,IPv4"]], {
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
-p_c([{port => 20201, host => 'bar.com', proto => 'UDP', udp_recv_len => 400}], {
-    bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => '4'}],
-    sock => [{NS_host => 'bar.com', NS_port => 20201, NS_proto => 'UDP', NS_ipv => '4', NS_recv_len => 400, NS_recv_flags => 0, NS_broadcast => undef}],
-});
+    p_c([port => ["localhost 20201 ipv4 tcp", "localhost, 20202, tcp, IPv4"]], {
+        bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => '4'}, {host => 'localhost', port => 20202, proto => 'tcp', ipv => '4'}],
+    });
 
+    p_c([port => "localhost:20202/udp"], {
+        bind => [{host => 'localhost', port => 20202, proto => 'udp', ipv => '4'}],
+        sock => [{
+            NS_broadcast => undef,
+            NS_host => 'localhost',
+            NS_port => 20202,
+            NS_ipv  => '4',
+            NS_proto => 'UDP',
+            NS_recv_flags => 0,
+            NS_recv_len => 4096,
+        }],
+    });
 
-p_c([port => 20201, host => 'bar.com', proto => 'UDP'], {
-    bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4}],
-}, 'new');
-
-
-p_c([{port => 20201, host => 'bar.com', proto => 'UDP'}], {
-    bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4}],
-}, 'new');
-
-
-p_c([port => [20201, "foo.com:20202/tcp"], host => 'bar.com', proto => 'UDP'], {bind => [
-   {host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4},
-   {host => 'foo.com', port => 20202, proto => 'tcp', ipv => 4},
-]});
-
-
-p_c([port => ["localhost|20202|tcp"]], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
-});
-
-
-p_c([port => ["localhost,20202,tcp"]], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
-});
-
-
-p_c([port => ["[localhost]:20202/tcp"]], {
-    bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
-});
-
-p_c([port => ["localhost,20202,Net::Server::Proto::TCP"]], {
-    bind => [{host => 'localhost', port => 20202, proto => 'Net::Server::Proto::TCP', ipv => 4}],
-});
+    p_c([port => 20202, listen => 5], {
+        bind => [{host => '*', port => 20202, proto => 'tcp', ipv => '4'}],
+        sock => [{
+            NS_host => '*',
+            NS_port => 20202,
+            NS_proto => 'TCP',
+            NS_listen => 5,
+            NS_ipv => '4',
+        }],
+    });
 
 
-p_c([port => {port => 20201}], {
-    bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
-});
 
-p_c([port => [{port => 20201}]], {
-    bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
-});
+    p_c([port => ["bar.com:20201/udp", "foo.com:20202/tcp"]], {bind => [
+                                                                   {host => 'bar.com', port => 20201, proto => 'udp', ipv => '4'},
+                                                                   {host => 'foo.com', port => 20202, proto => 'tcp', ipv => '4'},
+                                                                   ]});
 
 
-p_c([port => [{port => 20201, host => 'foo.com', proto => 'udp'}]], {
-    bind => [{host => 'foo.com', port => 20201, proto => 'udp', ipv => 4}],
-});
+    p_c([port => 20201, host => 'bar.com', proto => 'UDP'], {
+        bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => '4'}],
+    });
 
 
-p_c([port => [{port => 20201}], host => 'foo.com', proto => 'udp'], {
-    bind => [{host => 'foo.com', port => 20201, proto => 'udp', ipv => 4}],
-});
+    p_c([{port => 20201, host => 'bar.com', proto => 'UDP', udp_recv_len => 400}], {
+        bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => '4'}],
+        sock => [{NS_host => 'bar.com', NS_port => 20201, NS_proto => 'UDP', NS_ipv => '4', NS_recv_len => 400, NS_recv_flags => 0, NS_broadcast => undef}],
+    });
 
-p_c([port => [{port => 20202, listen => 6}]], {
-    bind => [{host => '*', port => 20202, proto => 'tcp', listen => 6, ipv => 4}],
-    sock => [{
-        NS_host => '*',
-        NS_port => 20202,
-        NS_proto => 'TCP',
-        NS_listen => 6,
-        NS_ipv => 4,
-    }],
-});
+
+    p_c([port => 20201, host => 'bar.com', proto => 'UDP'], {
+        bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4}],
+    }, 'new');
+
+
+    p_c([{port => 20201, host => 'bar.com', proto => 'UDP'}], {
+        bind => [{host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4}],
+    }, 'new');
+
+
+    p_c([port => [20201, "foo.com:20202/tcp"], host => 'bar.com', proto => 'UDP'], {bind => [
+                                                                                        {host => 'bar.com', port => 20201, proto => 'UDP', ipv => 4},
+                                                                                        {host => 'foo.com', port => 20202, proto => 'tcp', ipv => 4},
+                                                                                        ]});
+
+
+    p_c([port => ["localhost|20202|tcp"]], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
+    });
+
+
+    p_c([port => ["localhost,20202,tcp"]], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
+    });
+
+
+    p_c([port => ["[localhost]:20202/tcp"]], {
+        bind => [{host => 'localhost', port => 20202, proto => 'tcp', ipv => 4}],
+    });
+
+    p_c([port => ["localhost,20202,Net::Server::Proto::TCP"]], {
+        bind => [{host => 'localhost', port => 20202, proto => 'Net::Server::Proto::TCP', ipv => 4}],
+    });
+
+
+    p_c([port => {port => 20201}], {
+        bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
+    });
+
+    p_c([port => [{port => 20201}]], {
+        bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}],
+    });
+
+
+    p_c([port => [{port => 20201, host => 'foo.com', proto => 'udp'}]], {
+        bind => [{host => 'foo.com', port => 20201, proto => 'udp', ipv => 4}],
+    });
+
+
+    p_c([port => [{port => 20201}], host => 'foo.com', proto => 'udp'], {
+        bind => [{host => 'foo.com', port => 20201, proto => 'udp', ipv => 4}],
+    });
+
+    p_c([port => [{port => 20202, listen => 6}]], {
+        bind => [{host => '*', port => 20202, proto => 'tcp', listen => 6, ipv => 4}],
+        sock => [{
+            NS_host => '*',
+            NS_port => 20202,
+            NS_proto => 'TCP',
+            NS_listen => 6,
+            NS_ipv => 4,
+        }],
+    });
+}
 
 ###----------------------------------------------------------------###
 # unix, unixdgram
