@@ -92,16 +92,18 @@ sub get_ports {
         local $SIG{'ALRM'} = sub { die };
         alarm $env{'timeout'};
         for my $port ($start_port .. $start_port + 99){
-            my $serv = IO::Socket::INET->new(LocalAddr => $env{'hostname'},
-                                             LocalPort => $port,
-                                             Timeout   => 2,
-                                             Listen    => 1,
-                                             ReuseAddr => 1, Reuse => 1,
-                ) || do { warn "Couldn't open server socket on port $port: $!\n" if $env{'trace'}; next };
-            my $client = IO::Socket::INET->new(PeerAddr => $env{'hostname'},
-                                               PeerPort => $port,
-                                               Timeout  => 2,
-                ) || do { warn "Couldn't open client socket on port $port: $!\n" if $env{'trace'}; next };
+            my $serv = client_connect(
+                LocalAddr => $env{'hostname'},
+                LocalPort => $port,
+                Timeout   => 2,
+                Listen    => 1,
+                ReuseAddr => 1, Reuse => 1,
+            ) || do { warn "Couldn't open server socket on port $port: $!\n" if $env{'trace'}; next };
+            my $client = client_connect(
+                PeerAddr => $env{'hostname'},
+                PeerPort => $port,
+                Timeout  => 2,
+            ) || do { warn "Couldn't open client socket on port $port: $!\n" if $env{'trace'}; next };
             my $sock = $serv->accept || do { warn "Didn't accept properly on server: $!" if $env{'trace'}; next };
             $sock->autoflush(1);
             print $sock "hi from server\n";
