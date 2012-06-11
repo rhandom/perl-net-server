@@ -72,7 +72,7 @@ sub process_request {
 
     if (! $ok) {
         my $err = "$@" || "Something happened";
-        $self->send_501($err);
+        $self->send_500($err);
         die $err;
     }
 }
