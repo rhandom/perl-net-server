@@ -69,9 +69,10 @@ my $prop = eval { $server->{'server'} } || {};
 is($prop->{'log_level'}, 2,  "Correct default log_level");
 is($prop->{'log_file'}, "", "Correct default log_file");
 ok(! $prop->{'user'},          "Correct default user");
-is(scalar(@{ $prop->{'_bind'} }), 1,        "Had 1 configured ports");
+my $configured_ports = scalar(@{ $prop->{'_bind'} });
+ok($configured_ports == 1 || $configured_ports == 2, "Had correct configured ports ($configured_ports)");
 my @socks = @{ $prop->{'sock'} };
-is(scalar(@socks), 1,         "Had 1 configured socket");
+is(scalar(@socks), scalar(@{ $prop->{'_bind'} }), "Sockets matched ports");
 my $sock = $socks[0];
 if ($sock->NS_ipv == 4) {
     is(eval { $sock->NS_host  }, '0.0.0.0',   "Right host");
