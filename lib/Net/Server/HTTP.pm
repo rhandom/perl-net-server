@@ -303,8 +303,8 @@ sub process_request {
 
     if (! $ok) {
         my $err = "$@" || "Something happened";
+        $self->log(1, $err);
         $self->send_500($err);
-        die $err;
     }
 }
 
@@ -384,12 +384,10 @@ sub http_note {
     return $self->{'request_info'}->{'notes'}->{$key};
 }
 
-sub dispatch {
-    my ($self, $client) = @_;
-    $client ||= $self->{'server'}->{'client'};
+sub http_dispatch {
+    my ($self, $dispatch_qr, $dispatch_table) = @_;
 
-    my $qr = $self->{'dispatch_qr'} or die "Dispatch was not correctly setup\n";
-    $ENV{'PATH_INFO'} =~ s{^($qr)(?=/|$|(?<=/))}{} or die "Dispatch not found\n";
+    $ENV{'PATH_INFO'} =~ s{^($dispatch_qr)(?=/|$|(?<=/))}{} or die "Dispatch not found\n";
     if ($ENV{'PATH_INFO'}) {
         $ENV{'PATH_INFO'} = "/$ENV{'PATH_INFO'}" if $ENV{'PATH_INFO'} !~ m{^/};
         $ENV{'PATH_INFO'} =~ s/%([a-fA-F0-9]{2})/chr(hex $1)/eg;
@@ -403,8 +401,16 @@ sub dispatch {
 sub process_http_request {
     my ($self, $client) = @_;
 
-    return $self->dispatch($client) if $self->{'dispatch'};
+    if (my $table = $self->{'dispatch'}) {
+        my $qr = $self->{'dispatch_qr'} or die "Dispatch was not correctly setup\n";
+        return $self->http_dispatch($qr, $table)
+    }
 
+    return $self->http_echo;
+}
+
+sub http_echo {
+    my $self = shift;
     print "Content-type: text/html\n\n";
     print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
     if (eval { require Data::Dumper }) {
@@ -897,14 +903,18 @@ This method is called after the fork of exec_trusted_perl and exec_cgi
 hooks.  It is passed the pid (0 if the child) and the file being ran.
 Note, that the hook will not be called from the child during exec_cgi.
 
-=item C<dispatch>
+=item C<http_dispatch>
 
 Called if the default process_http_request and process_request methods
 have not been overridden and C<app> configuration parameters have been
 passed.  In this case this replaces the default echo server.  You can
 also enable this subsystem for your own direct use by setting
 enable_dispatch to true during configuration.  See the C<app>
-configuration item.
+configuration item.  It will be passed a dispatch qr (regular
+expression) generated during _check_dispatch, and a dispatch table.
+The qr will be applied to path_info.  This mechanism could be used to
+augment Net::Server::HTTP with document root and virtual host
+capabilities.
 
 =back
 
@@ -1006,7 +1016,19 @@ module.
     # you could also do this on the commandline
     net-server HTTP app ../../foo.cgi app /=./bar.cgi
 
-    # extended options
+    # extended options when configured from code
+
+    Net::Server::HTTP->run(app => { # loses order of matching
+      '/' => sub { ... },
+      '/foo' => sub { ... },
+      '/bar' => '/path/to/some.cgi',
+    });
+
+    Net::Server::HTTP->run(app => [
+      '/' => sub { ... },
+      '/foo' => sub { ... },
+      '/bar' => '/path/to/some.cgi',
+    ]);
 
 =back
 
