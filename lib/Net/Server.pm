@@ -651,6 +651,11 @@ sub post_client_connection_hook {}
 
 sub post_process_request {
     my $self = shift;
+    $self->close_client_stdout;
+}
+
+sub close_client_stdout {
+    my $self = shift;
     my $prop = $self->{'server'};
     return if $prop->{'udp_true'};
 
@@ -1081,6 +1086,8 @@ sub SYSWRITE { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'syswrite', @_) : $s-
 sub SEEK     { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'seek',     @_) : $s->[0]->seek(@_) }
 sub BINMODE  {}
 sub FILENO   {}
+sub CLOSE    { my $s = shift; $s->[1] ? $s->[1]->($s->[0], 'close',    @_) : $s->[0]->close(@_) }
+
 
 1;
 
