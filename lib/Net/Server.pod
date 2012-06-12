@@ -25,7 +25,7 @@ Net::Server - Extensible, general Perl server engine
     perl -e 'use base qw(Net::Server); main->run(port => 20208)'
 
     NOTE: beginning in Net::Server 2.005, the default value for
-          ipv will be IPv* meaning that if no host is passed, or
+          ipv is IPv* meaning that if no host is passed, or
           a hostname is past, any available IPv4 and IPv6 sockets will be
           bound.  You can force IPv4 only by adding an ipv => 4
           configuration in any of the half dozen ways we let you
@@ -33,7 +33,7 @@ Net::Server - Extensible, general Perl server engine
 
 =head1 FEATURES
 
-    * Full IPv6 support (via IPv6 style addr, or via ipv => "IPv6")
+    * Full IPv6 support
     * Working SSL sockets and https (both with and without IO::Socket::SSL)
     * Single Server Mode
     * Inetd Server Mode
@@ -64,9 +64,6 @@ Net::Server - Extensible, general Perl server engine
 =head1 DESCRIPTION
 
 C<Net::Server> is an extensible, generic Perl server engine.
-C<Net::Server> combines the good properties from C<Net::Daemon>
-(0.34), C<NetServer::Generic> (1.03), and C<Net::FTPServer> (1.0), and
-also from various concepts in the Apache Webserver.
 
 C<Net::Server> attempts to be a generic server as in C<Net::Daemon>
 and C<NetServer::Generic>.  It includes with it the ability to run as
@@ -256,6 +253,23 @@ using the PreFork personality.  When building a server layer over the
 Net::Server, it is important to use features such as timeouts to
 prevent Denial Of Service attacks.
 
+Net::Server comes with a built in echo server by default.  You can test it
+out by simply running the following from the commandline:
+
+    net-server
+
+If you wanted to try another flavor you could try
+
+    net-server PreFork
+
+If you wanted to try out a basic HTTP server you could use
+
+    net-server HTTP
+
+Or if you wanted to test out a CGI you are writing you could use
+
+    net-server HTTP --app ../../mycgi.cgi
+
 =head1 ARGUMENTS
 
 There are at least five possible ways to pass arguments to
@@ -420,7 +434,7 @@ base class.)
 
     port              \d+                      20203
     host              "host"                   "*"
-    ipv               (4|6|*)                  4
+    ipv               (4|6|*)                  *
     proto             (tcp|udp|unix)           "tcp"
     listen            \d+                      SOMAXCONN
 
@@ -544,7 +558,7 @@ C<host:port/proto/ipv, C<host:port>, C<port/proto>, or C<port>, where
 I<host> represents a hostname residing on the local box, where I<port>
 represents either the number of the port (eg. "80") or the service
 designation (eg. "http"), where I<ipv> represents the IP protocol version
-(IPv4 or IPv6) and where I<proto> represents the protocol to be
+(IPv4 or IPv6 or IPv*) and where I<proto> represents the protocol to be
 used. See L<Net::Server::Proto>.  The following are some valid port
 strings:
 
@@ -552,11 +566,12 @@ strings:
     localhost:20203                  # host and port
     localhost:http                   # localhost bound to port 80
     localhost:20203/tcp              # host, port, protocol
-    localhost:20203/tcp/IPv4         # host, port, protocol and family
-    localhost, 20203, tcp, IPv4      # same
-    localhost | 20203 | tcp | IPv4   # same
-    localhost:20203/IPv4/IPv6        # bind localhost on IPv4 and 6
-    localhost:20203/IPv*             # bind configured interfaces for IPv4 or 6
+    localhost:20203/tcp/IPv*         # host, port, protocol and family
+    localhost, 20203, tcp, IPv*      # same
+    localhost | 20203 | tcp | IPv*   # same
+    localhost:20203/IPv*             # bind any configured interfaces for IPv4 or 6 (default)
+    localhost:20203/IPv4/IPv6        # bind localhost on IPv4 and 6 (fails if it cannot do both)
+
     *:20203                          # bind all local interfaces
 
 Additionally, when passed in the code (non-commandline, and non-config),
@@ -572,12 +587,12 @@ the port may be passed as a hashref or array hashrefs of information:
     port => [{
         host  => '*',
         port  => '20203',
-        ipv   => 4,     # IPv4 only (default)
+        ipv   => 4,     # IPv4 only
         proto => 'tcp', # (default)
     }, {
         host  => 'localhost',
         port  => '20204',
-        ipv   => '*',      # all IPv4 and IPv6 interfaces tied to localhost
+        ipv   => '*',      # default - all IPv4 and IPv6 interfaces tied to localhost
         proto => 'ssleay', # or ssl - Using SSL
     }],
 
@@ -596,7 +611,7 @@ will default to C<host> specified in the arguments.  If C<host> is not
 specified there it will default to "*".  Default port is 20203.
 Configuration passed to new or run may be either a scalar containing a
 single port number or an arrayref of ports.  If C<ipv> is not specified
-it will default to "4" (IPv4).
+it will default to "*" (Any resolved addresses under IPv4 or IPv6).
 
 If you are working with unix sockets, you may also specify
 C<socket_file|unix> or C<socket_file|type|unix> where type is SOCK_DGRAM
@@ -631,26 +646,26 @@ specification can be passed as part of the hostname.
 
     host => "::1",        # an IPv6 address
 
-    host => 'localhost',  # addresses matched by localhost (default IPv4)
+    host => 'localhost',  # addresses matched by localhost (default any IPv4 and/or IPv6)
+
+    host => 'localhost/IPv*',  # same
 
     ipv  => 6,
     host => 'localhost',  # addresses matched by localhost (IPv6)
 
-    ipv  => '*',
-    host => 'localhost',  # addresses matched by localhost (any IPv6 or IPv4)
-
-    host => 'localhost/IPv*',  # same
+    ipv  => 4,
+    host => 'localhost',  # addresses matched by localhost (IPv4)
 
     ipv  => 'IPv4 IPv6',
     host => 'localhost',  # addresses matched by localhost (requires IPv6 and IPv4)
 
-
-    host => '*',          # any local interfaces (default IPv4)
-
-    ipv  => '*',
     host => '*',          # any local interfaces (any IPv6 or IPv4)
 
     host => '*/IPv*',     # same (any IPv6 or IPv4)
+
+    ipv  => 4,
+    host => '*',          # any local IPv4 interfaces interfaces
+
 
 =item proto
 
@@ -670,16 +685,29 @@ Additionally the proto may also contain the ipv specification.
 
 See L<Net::Server::Proto>.
 
-IPv6 is now available under Net::Server though it is not enabled as a
-default parameter.  It must be requested explictly by passing either a
-value of 6, or IPv6, or a "*" or IPv* to the ipv configuration
-parameter.  Additionally if you use an IPv6 address as the hostname,
-ipv will default to 6 automatically.  Trying to pass an IPv4 address
-when ipv is set to 6 will result in an error.  The following port
-string specifications would use IPv6.
+IPv6 is now available under Net::Server.  It will be used
+automatically if an IPv6 address is passed, or if the ipv is set
+explicitly to IPv6, or if ipv is left as the default value of IPv*.
+This is a significant change from version 2.004 and earlier where the
+default value was IPv4.  However, the previous behavior led to
+confusion on IPv6 only hosts, and on hosts that only had IPv6 entries
+for a local hostname.  Trying to pass an IPv4 address when ipv is set
+to 6 (only 6 - not * or 4) will result in an error.
+
+    localhost:20203 # will use IPv6 if there is a corresponding entry for localhost
+                    # it will also use IPv4 if there is a corresponding v4 entry for localhost
+
+    localhost:20203:IPv*  # same (default)
 
     localhost:20203:IPv6  # will use IPv6
-    [::1]:20203           # defaults to IPv6
+
+    [::1]:20203           # will use IPv6 (IPv6 style address)
+
+    localhost:20203:IPv4  # will use IPv4
+
+    127.0.0.1:20203       # will use IPv4 (IPv4 style address
+
+    localhost:20203:IPv4:IPv6 # will bind to both v4 and v6 - fails otherwise
 
     # or as a hashref as
     port => {
@@ -705,23 +733,17 @@ string specifications would use IPv6.
         host => "localhost IPv4 IPv6",  # must create both
     }
 
-In many proposed Net::Server solutions, IPv* was enabled by default,
-however doing so brings immediate security implications, as well as
-potential speed bottlenecks, and all of this in addition to hostname
-ambiguity (such a problem exists in IO::Socket::SSL).  Therefore, it
-is left as an easy option to set and enable - and Net::Server has gone
-to great lengths to make it easy to enable (it can specified directly,
-as part of port, part of host, part of protocol, or you can set
-$ENV{IPV}).  Additionally, if a hostname is used, ipv can be set to
-"*".  If IPv6 is enabled on the box and there is one or more IPv6 or
-IPv4 interfaces associated with that name, they will all be bound.
+In many proposed Net::Server solutions, IPv* was enabled by default.
+For versions 2.000 through 2.004, the previous default of IPv4 was
+used.  We have attempted to make it easy to set IPv4, IPv6, or IPv*.
+If you do not want or need IPv6, simply set ipv to 4, pass IPv4 along
+in the port specification, set $ENV{'IPV'}=4; before running the
+server, or uninstall IO::Socket::INET6.
 
-For example, on my local box the following command results in the
-following output:
+On my local box the following command results in the following output:
 
-    perl -e 'use base qw(Net::Server); main->run(host => "localhost", ipv => "*")'
+    perl -e 'use base qw(Net::Server); main->run(host => "localhost")'
 
-    2012/05/24-16:44:29 main (type Net::Server) starting! pid(31904)
     Resolved [localhost]:20203 to [::1]:20203, IPv6
     Resolved [localhost]:20203 to [127.0.0.1]:20203, IPv4
     Binding to TCP port 20203 on host ::1 with IPv6
@@ -729,45 +751,66 @@ following output:
 
 My local box has IPv6 enabled and there are entries for localhost on
 both IPv6 ::1 and IPv4 127.0.0.1.  I could also choose to explictly
-bind ports rather than depending upon "*" to resolve them for me.
+bind ports rather than depending upon ipv => "*" to resolve them for
+me as in the following:
 
     perl -e 'use base qw(Net::Server); main->run(port => [20203,20203], host => "localhost", ipv => [4,6])'
 
-    2012/05/24-16:48:36 main (type Net::Server) starting! pid(409)
     Binding to TCP port 20203 on host localhost with IPv4
     Binding to TCP port 20203 on host localhost with IPv6
 
-There is a special case of using host => "*" as well as ipv => "*".  In
-this case, if IPv6 is available, it will answer (at least on linux) for
-both IPv6 as well as IPv4.  In this special case ipv => "*" will only
-return one resolution:
+There is a special case of using host => "*" as well as ipv => "*".
+The Net::Server::Proto::_bindv6only method is used to check the system
+setting for C<sysctl -n net.ipv6.bindv6only> (or
+net.inet6.ip6.v6only).  If this setting is false, then an IPv6 socket
+will listen for the corresponding IPv4 address.  For example the
+address [::] (IPv6 equivalent of INADDR_ANY) will also listen for
+0.0.0.0.  The address ::FFFF:127.0.0.1 (IPv6) would also listen to
+127.0.0.1 (IPv4).  In this case, only one socket will be created
+because it will handle both cases (an error is returned if an attempt
+is made to listen to both addresses when bindv6only is false).
 
-    perl -e 'use base qw(Net::Server); main->run(host => "*", ipv => "*")'
+However, if net.ipv6.bindv6only (or equivalent) is true, then a
+hostname (such as *) resolving to both a IPv4 entry as well as an IPv6
+will result in both an IPv4 socket as well as an IPv6 socket.
 
-    2012/05/24-16:54:21 main (type Net::Server) starting! pid(2051)
-    Resolved [*]:20203 to [0.0.0.0]:20203, IPv4
-    Resolved [*]:20203 to [::]:20203, IPv6
-    Removing doubly bound port [0.0.0.0] IPv4 because it should be handled by [::] IPv6
-    Binding to TCP port 20203 on host :: with IPv6
+On my linux box which defaults to net.ipv6.bindv6only=0, the following is output.
 
-An INET socket can only accept IPv4 connections. An INET6 socket
-accepts IPv6 connections, but may also accept IPv4 connections
-depending on OS and its settings. For example, on FreeBSD systems
-setting a sysctl net.inet6.ip6.v6only to 0 will allow IPv4 connections
-to an INET6 socket.  If this is the case, specifying "::" as a binding
-address instead of a "*" might be desired to reduce the number of
-sockets needed and remove any of the associated overhead. Note that a
-textual representation of a peer's IPv4 address as connected to an
-INET6 socket will typically be in a form of an IPv4-mapped IPv6
+    perl -e 'use base qw(Net::Server); main->run(host => "*")'
+
+    Resolved [*]:8080 to [::]:8080, IPv6
+    Not including resolved host [0.0.0.0] IPv4 because it will be handled by [::] IPv6
+    Binding to TCP port 8080 on host :: with IPv6
+
+If I issue a C<sudo /sbin/sysctl -w net.ipv6.bindv6only=1>, the following is output.
+
+    perl -e 'use base qw(Net::Server); main->run(host => "*")'
+
+    Resolved [*]:8080 to [0.0.0.0]:8080, IPv4
+    Resolved [*]:8080 to [::]:8080, IPv6
+    Binding to TCP port 8080 on host 0.0.0.0 with IPv4
+    Binding to TCP port 8080 on host :: with IPv6
+
+BSD differs from linux and generally defaults to
+net.inet6.ip6.v6only=0.  If it cannot be determined on your OS, it
+will default to false and the log message will change from "it will be
+handled" to "it should be handled" (if you have a non-resource
+intensive way to check on your platform, feel free to email me).  Be
+sure to check the logs as you test your server to make sure you have
+bound the ports you desire.  You can always pass in individual
+explicit IPv4 and IPv6 port specifications if you need.  For example,
+if your system has both IPv4 and IPv6 interfaces but you'd only like
+to bind to IPv6 entries, then you should use a hostname of [::]
+instead of [*].
+
+If bindv6only (or equivalent) is false, and you receive an IPv4
+connection on a bound IPv6 port, the textual representation of the
+peer's IPv4 address will typically be in a form of an IPv4-mapped IPv6
 addresses, e.g. "::FFFF:127.0.0.1" .
 
-Restricting binding to a loopback interface on systems where an INET6
-socket does not accept IPv4 connections requires creating two sockets,
-one bound to address "127.0.0.1" and the other bound to address "::1".
-
-Essentially, the ipv parameter was chosen because it does not conflict
-with any other existing usage, it is very similar to ipv4 or ipv6, it
-allows for user code to not need to know about Socket::AF_INET or
+The ipv parameter was chosen because it does not conflict with any
+other existing usage, it is very similar to ipv4 or ipv6, it allows
+for user code to not need to know about Socket::AF_INET or
 Socket6::AF_INET6 or Socket::AF_UNSPEC, and it is short.
 
 =item listen
@@ -1720,7 +1763,8 @@ graceful shutdowns and hot deploy (max_servers adjustment).
 Thanks to TONVOON@cpan for submitting a patch adding Log4perl functionality.
 
 Thanks to Miko O'Sullivan for fixes to HTTP to correct tainting issues
-and passing initial log fixes.
+and passing initial log fixes, and for patches to fix CLOSE on tied stdout
+and various other HTTP issues.
 
 =head1 SEE ALSO
 
