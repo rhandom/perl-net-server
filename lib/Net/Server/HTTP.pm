@@ -34,7 +34,7 @@ sub options {
     my $ref  = $self->SUPER::options(@_);
     my $prop = $self->{'server'};
     $ref->{$_} = \$prop->{$_} for qw(timeout_header timeout_idle server_revision max_header_size
-                                     access_log_format access_log_file);
+                                     access_log_format access_log_file enable_dispatch);
     return $ref;
 }
 
@@ -65,6 +65,13 @@ sub post_configure {
     $self->_init_access_log;
 
     $self->_tie_client_stdout;
+}
+
+sub post_bind {
+    my $self = shift;
+    $self->SUPER::post_bind(@_);
+
+    $self->_check_dispatch;
 }
 
 sub _init_access_log {
@@ -166,6 +173,54 @@ sub _tie_client_stdout {
         }
     };
     weaken $copy;
+}
+
+sub _check_dispatch {
+    my $self = shift;
+    if (! $self->{'server'}->{'enable_dispatch'}) {
+        return if __PACKAGE__->can('process_request') ne $self->can('process_request');
+        return if __PACKAGE__->can('process_http_request') ne $self->can('process_http_request');
+    }
+
+    my $app = $self->{'server'}->{'app'};
+    if (! $app || (ref($app) eq 'ARRAY' && !@$app)) {
+        $app = [];
+        $self->configure({app => $app});
+    }
+
+    my %dispatch;
+    my $first;
+    my @dispatch;
+    foreach my $a (ref($app) eq 'ARRAY' ? @$app : $app) {
+        next if ! $a;
+        my @pairs = ref($a) eq 'ARRAY' ? @$a
+                  : ref($a) eq 'HASH'  ? %$a
+                  : ref($a) eq 'CODE'  ? ('/', $a)
+                  : $a =~ m{^(.+?)\s+(.+)$} ? ($1, $2)
+                  : $a =~ m{^(.+?)=(.+)$}   ? ($1, $2)
+                  : ($a, $a);
+        for (my $i = 0; $i < @pairs; $i+=2) {
+            my ($key, $val) = ("/$pairs[$i]", $pairs[$i+1]);
+            $key =~ s|//+|/|g;
+            if ($dispatch{$key}) {
+                $self->log(2, "Already found a path matching \"$key\" - skipping.");
+                next;
+            }
+            $dispatch{$key} = $val;
+            push @dispatch, $key;
+            $first ||= $key;
+            $self->log(2, "  Dispatch: $key => $val");
+        }
+    }
+    if (@dispatch) {
+        if (! $dispatch{'/'} && $first) {
+            $dispatch{'/'} = $dispatch{$first};
+            push @dispatch, '/';
+            $self->log(2, "  Dispatch: / => $dispatch{$first} (default)");
+        }
+        $self->{'dispatch_qr'} = join "|", map {"\Q$_\E"} @dispatch;
+        $self->{'dispatch'} = \%dispatch;
+    }
 }
 
 sub http_base_headers {
@@ -325,8 +380,25 @@ sub http_note {
     return $self->{'request_info'}->{'notes'}->{$key};
 }
 
+sub dispatch {
+    my ($self, $client) = @_;
+    $client ||= $self->{'server'}->{'client'};
+    my $qr = $self->{'dispatch_qr'} or return $self->send_500("Dispatch was not correctly setup");
+    $ENV{'PATH_INFO'} =~ s{^($qr)(?=/|$|(?<=/))}{} or return $self->send_status(400, "Dispatch not found", "<h1>Dispatch not found</h1>");
+    if ($ENV{'PATH_INFO'}) {
+        $ENV{'PATH_INFO'} = "/$ENV{'PATH_INFO'}" if $ENV{'PATH_INFO'} !~ m{^/};
+        $ENV{'PATH_INFO'} =~ s/%([a-fA-F0-9]{2})/chr(hex $1)/eg;
+    }
+    $ENV{'SCRIPT_NAME'} = $1;
+    my $code = $self->{'dispatch'}->{$1};
+    return $self->$code() if ref $code;
+    $self->exec_cgi($code);
+}
+
 sub process_http_request {
     my ($self, $client) = @_;
+
+    return $self->dispatch($client) if $self->{'dispatch'};
 
     print "Content-type: text/html\n\n";
     print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
@@ -446,12 +518,15 @@ sub http_log_constat {
 
 ###----------------------------------------------------------------###
 
+sub exec_fork_hook {}
+
 sub exec_trusted_perl {
     my ($self, $file) = @_;
     die "File $file is not executable\n" if ! -x $file;
     local $!;
     my $pid = fork;
     die "Could not spawn child process: $!\n" if ! defined $pid;
+    $self->exec_fork_hook($pid, $file);
     if (!$pid) {
         if (!eval { require $file }) {
             my $err = "$@" || "Error while running trusted perl script\n";
@@ -484,6 +559,7 @@ sub exec_cgi {
     my $out;
     my $err = Symbol::gensym();
     $pid = eval { IPC::Open3::open3($in, $out, $err, $file) } or die "Could not run external script: $@";
+    $self->exec_fork_hook($pid, $file); # won't occur for the child
     my $len = $ENV{'CONTENT_LENGTH'} || 0;
     my $s_in  = $len ? IO::Select->new($in) : undef;
     my $s_out = IO::Select->new($out, $err);
@@ -809,6 +885,21 @@ At this first release, the parent server is not tracking the child
 script which may cause issues if the script is running when a HUP is
 received.
 
+=item C<exec_fork_hook>
+
+This method is called after the fork of exec_trusted_perl and exec_cgi
+hooks.  It is passed the pid (0 if the child) and the file being ran.
+Note, that the hook will not be called from the child during exec_cgi.
+
+=item C<dispatch>
+
+Called if the default process_http_request and process_request methods
+have not been overridden and C<app> configuration parameters have been
+passed.  In this case this replaces the default echo server.  You can
+also enable this subsystem for your own direct use by setting
+enable_dispatch to true during configuration.  See the C<app>
+configuration item.
+
 =back
 
 =head1 OPTIONS
@@ -851,6 +942,20 @@ the http_log_format method for more information.
 The default value is the NCSA extended/combined log format:
 
     '%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"'
+
+=item app
+
+Takes one or more items and registers them for dispatch.  Arguments
+may be supplied as an arrayref containing a path/target pairs, a
+hashref containing a path/target pairs, a string string with a space
+indicating "path target", a string containing "path=target", or
+finally a string that will be used as both path and target.  For items
+passed as an arrayref or hashref, the target may be a coderef which
+will be called and should handle the request.  In all other cases the
+target should be a valid executable suitable for passing to exec_cgi.
+
+
+
 
 =back
 
