@@ -201,7 +201,9 @@ sub _check_dispatch {
                   : ($a, $a);
         for (my $i = 0; $i < @pairs; $i+=2) {
             my ($key, $val) = ("/$pairs[$i]", $pairs[$i+1]);
-            $key =~ s|//+|/|g;
+            $key =~ s{/\./}{/}g;
+            $key =~ s{(?:/[^/]+|)/\../}{/}g;
+            $key =~ s{//+}{/}g;
             if ($dispatch{$key}) {
                 $self->log(2, "Already found a path matching \"$key\" - skipping.");
                 next;
@@ -253,6 +255,8 @@ sub send_status {
         $request_info->{'response_header_size'} += length $out;
         $self->{'server'}->{'client'}->print($out);
         $request_info->{'headers_sent'} = 1;
+        $self->{'server'}->{'client'}->print($body);
+        $request_info->{'response_size'} += length $body;
     }
 }
 
@@ -383,8 +387,9 @@ sub http_note {
 sub dispatch {
     my ($self, $client) = @_;
     $client ||= $self->{'server'}->{'client'};
-    my $qr = $self->{'dispatch_qr'} or return $self->send_500("Dispatch was not correctly setup");
-    $ENV{'PATH_INFO'} =~ s{^($qr)(?=/|$|(?<=/))}{} or return $self->send_status(400, "Dispatch not found", "<h1>Dispatch not found</h1>");
+
+    my $qr = $self->{'dispatch_qr'} or die "Dispatch was not correctly setup\n";
+    $ENV{'PATH_INFO'} =~ s{^($qr)(?=/|$|(?<=/))}{} or die "Dispatch not found\n";
     if ($ENV{'PATH_INFO'}) {
         $ENV{'PATH_INFO'} = "/$ENV{'PATH_INFO'}" if $ENV{'PATH_INFO'} !~ m{^/};
         $ENV{'PATH_INFO'} =~ s/%([a-fA-F0-9]{2})/chr(hex $1)/eg;
@@ -558,7 +563,8 @@ sub exec_cgi {
     my $in;
     my $out;
     my $err = Symbol::gensym();
-    $pid = eval { IPC::Open3::open3($in, $out, $err, $file) } or die "Could not run external script: $@";
+    local $!;
+    $pid = eval { IPC::Open3::open3($in, $out, $err, $file) } or die "Could not run external script $file: $!\n";
     $self->exec_fork_hook($pid, $file); # won't occur for the child
     my $len = $ENV{'CONTENT_LENGTH'} || 0;
     my $s_in  = $len ? IO::Select->new($in) : undef;
@@ -946,16 +952,61 @@ The default value is the NCSA extended/combined log format:
 =item app
 
 Takes one or more items and registers them for dispatch.  Arguments
-may be supplied as an arrayref containing a path/target pairs, a
-hashref containing a path/target pairs, a string string with a space
-indicating "path target", a string containing "path=target", or
-finally a string that will be used as both path and target.  For items
+may be supplied as an arrayref containing a location/target pairs, a
+hashref containing a location/target pairs, a bare code ref that will
+use "/" as the location and the codref as the target, a string with a space
+indicating "location target", a string containing "location=target", or
+finally a string that will be used as both location and target.  For items
 passed as an arrayref or hashref, the target may be a coderef which
 will be called and should handle the request.  In all other cases the
 target should be a valid executable suitable for passing to exec_cgi.
 
+The locations will be added in the order that they are configured.
+They will be added to a regular expression which will be applied to
+the incoming PATH_INFO string.  If the match is successful, the
+$ENV{'SCRIPT_NAME'} will be set to the matched portion and the matched
+portion will be removed from $ENV{'PATH_INFO'}.
+
+Once an app has been passed, it is necessary for the server to listen
+on /.  Therefore if "/" has not been specifically configured for
+dispatch, the first found dispatch target will also be used to handle
+"/".
+
+For convenience, if the log_level is 2 or greater, the dispatch table
+is output to the log.
+
+This mechanism is left as a generic mechanism suitable for overriding
+by servers meant to handle more complex dispatch.  At the moment there
+is no handling of virtual hosts.  At some point we will add in the
+default ability to play static content and likely for the ability to
+configure virtual hosts - or that may have to wait for a third party
+module.
+
+    app => "/home/paul/foo.cgi",
+      # Dispatch: /home/paul/foo.cgi => home/paul/foo.cgi
+      # Dispatch: / => home/paul/foo.cgi (default)
 
 
+    app => "../../foo.cgi",
+    app => "./bar.cgi",
+    app => "baz ./bar.cgi",
+    app => "bim=./bar.cgi",
+      # Dispatch: /foo.cgi => ../../foo.cgi
+      # Dispatch: /bar.cgi => ./bar.cgi
+      # Dispatch: /baz => ./bar.cgi
+      # Dispatch: /bim => ./bar.cgi
+      # Dispatch: / => ../../foo.cgi (default)
+
+
+    app => "../../foo.cgi",
+    app => "/=./bar.cgi",
+      # Dispatch: /foo.cgi => ../../foo.cgi
+      # Dispatch: / => ./bar.cgi
+
+    # you could also do this on the commandline
+    net-server HTTP app ../../foo.cgi app /=./bar.cgi
+
+    # extended options
 
 =back
 
