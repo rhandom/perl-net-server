@@ -718,7 +718,7 @@ Used to read in the incoming headers and set the ENV.
 Called at the end of process_headers.  Initializes the contents of
 http_request_info.
 
-=item C<http_request_info
+=item C<http_request_info>
 
 Returns a hashref of information specific to the current request.
 This information will be used for logging later on.
