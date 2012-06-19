@@ -128,11 +128,18 @@ sub get_addr_info {
         if ((scalar(keys %ipv6mapped)
              && grep {$ipv6mapped{$_->[0]}} @info)
             && not my $only = $class->_bindv6only) {
-            for (my $i = 0; $i < @info; $i++) {
-                my $base = $ipv6mapped{$info[$i]->[0]} || next;
-                $base->[3] = "Not including resolved host [$info[$i]->[0]] IPv4 because it ".(length($only) ? 'will' : 'should')." be handled by [$base->[0]] IPv6";
-                splice @info, $i--, 1, ();
+            for my $i4 (@info) {
+                my $i6 = $ipv6mapped{$i4->[0]} || next;
+                if ($host eq '*' && $i6->[0] eq '::' && !length($only)
+                    && !eval{IO::Socket::INET6->new->configure({LocalAddr => '', LocalPort => 0, Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die $!}) {
+                    $i4->[3] = "Host [*] resolved to IPv6 address [::] but IO::Socket::INET6->new fails: $@";
+                    $i6->[0] = '';
+                } else {
+                    $i6->[3] = "Not including resolved host [$i4->[0]] IPv4 because it ".(length($only) ? 'will' : 'should')." be handled by [$i6->[0]] IPv6";
+                    $i4->[0] = '';
+                }
             }
+            @info = grep {length $_->[0]} @info;
         }
     } elsif ($host =~ /:/) {
         die "Unresolveable host [$host]:$port - could not load IO::Socket::INET6: $@";
@@ -166,8 +173,8 @@ sub _sysctl {
         chomp $val;
         return $val;
     } elsif (-x "/sbin/sysctl") {
-        my $val = (split /\s+/, `/sbin/sysctl -n $key`)[0];
-        return $val;
+        my $val = (split /\s+/, `/sbin/sysctl -n $key 2>/dev/null`)[0];
+        return defined($val) ? $val : '';
     }
     return '';
 }
