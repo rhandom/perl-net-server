@@ -554,7 +554,7 @@ See L<Net::Server::Proto> for further examples of configuration.
 Local port/socket on which to bind.  If it is a low port, the process
 must start as root.  If multiple ports are given, all will be bound at
 server startup.  May be of the form C<host:port/proto>,
-C<host:port/proto/ipv, C<host:port>, C<port/proto>, or C<port>, where
+C<host:port/proto/ipv>, C<host:port>, C<port/proto>, or C<port>, where
 I<host> represents a hostname residing on the local box, where I<port>
 represents either the number of the port (eg. "80") or the service
 designation (eg. "http"), where I<ipv> represents the IP protocol version
