@@ -292,7 +292,7 @@ sub bind { # bind to the port (This should serve all but INET)
         $self->restart_open_hook;
         $self->log(2, "Binding open file descriptors");
         my %map;
-        foreach my $info (split /\n/, $ENV{'BOUND_SOCKETS'}) {
+        foreach my $info (split /\s*;\s*/, $ENV{'BOUND_SOCKETS'}) {
             my ($fd, $host, $port, $proto, $ipv, $orig) = split /\|/, $info;
             $orig = $port if ! defined $orig; # allow for things like service ports or port 0
             $fd = ($fd =~ /^(\d+)$/) ? $1 : $self->fatal("Bad file descriptor");
@@ -846,7 +846,7 @@ sub sig_hup {
         $i++;
     }
     delete $prop->{'select'}; # remove any blocking obstacle
-    $ENV{'BOUND_SOCKETS'} = join "\n", @fd;
+    $ENV{'BOUND_SOCKETS'} = join "; ", @fd;
 
     if ($prop->{'leave_children_open_on_hup'} && scalar keys %{ $prop->{'children'} }) {
         $ENV{'HUP_CHILDREN'} = join "\n", map {"$_\t$prop->{'children'}->{$_}->{'status'}"} sort keys %{ $prop->{'children'} };
