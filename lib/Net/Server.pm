@@ -587,7 +587,8 @@ sub allow_deny {
 
     # if the addr or host matches a deny, reject it immediately
     foreach (@{ $prop->{'deny'} }) {
-        return 0 if $prop->{'peerhost'} =~ /^$_$/ && defined $prop->{'reverse_lookups'};
+        return 0 if $prop->{'reverse_lookups'}
+            && defined($prop->{'peerhost'}) && $prop->{'peerhost'} =~ /^$_$/;
         return 0 if $peeraddr =~ /^$_$/;
     }
     if (@{ $prop->{'cidr_deny'} }) {
@@ -597,7 +598,8 @@ sub allow_deny {
 
     # if the addr or host isn't blocked yet, allow it if it is allowed
     foreach (@{ $prop->{'allow'} }) {
-        return 1 if $prop->{'peerhost'} =~ /^$_$/ && defined $prop->{'reverse_lookups'};
+        return 1 if $prop->{'reverse_lookups'}
+            && defined($prop->{'peerhost'}) && $prop->{'peerhost'} =~ /^$_$/;
         return 1 if $peeraddr =~ /^$_$/;
     }
     if (@{ $prop->{'cidr_allow'} }) {
