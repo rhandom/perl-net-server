@@ -69,6 +69,7 @@ sub object {
         $sock->NS_recv_len($len);
         $sock->NS_recv_flags($flg);
         $sock->NS_broadcast(exists($info->{'udp_broadcast'}) ? $info->{'udp_broadcast'} : $udp->{'upd_broadcast'});
+        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
     }
     return wantarray ? @sock : $sock[0];
 }

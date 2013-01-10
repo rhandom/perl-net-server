@@ -78,6 +78,7 @@ sub object {
         $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                         : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
                         : Socket::SOMAXCONN());
+        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
 
         for my $key (@ssl_args) {
             my $val = defined($info->{$key}) ? $info->{$key}
