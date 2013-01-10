@@ -105,13 +105,8 @@ sub commandline {
 
 sub _get_commandline {
     my $self = shift;
-    if (open my $fh, "<", "/proc/$$/cmdline") { # see if we can find the full command line - unix specific
-        my $line = do { local $/ = undef; <$fh> };
-        close $fh;
-        return [split /\0/, $1] if $line =~ /^(.+)$/; # need to untaint to allow for later hup
-    }
     my $script = $0;
-    $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^[^/]+/| && $ENV{'PWD'}; # add absolute to relative
+    $script = $ENV{'PWD'} .'/'. $script if $script =~ m|^[^/]+/| && $ENV{'PWD'}; # add absolute to relative - avoid Cwd
     $script =~ /^(.+)$/; # untaint for later use in hup
     return [$1, @ARGV]
 }
