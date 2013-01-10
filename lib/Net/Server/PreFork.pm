@@ -508,7 +508,8 @@ You really should also see L<Net::Server::PreForkSimple>.
     max_servers         \d+                     50
     max_requests        \d+                     1000
 
-    serialize           (flock|semaphore|pipe)  undef
+    serialize           (flock|semaphore
+                         |pipe|none)            undef
     # serialize defaults to flock on multi_port or on Solaris
     lock_file           "filename"              File::Temp::tempfile or POSIX::tmpnam
 
@@ -564,6 +565,10 @@ $self->{'server'}->{'parent_sock'}.  The parent will be notified
 through child_is_talking_hook where the first argument is the socket
 to the child.  The child's socket is stored in
 $self->{'server'}->{'children'}->{$child_pid}->{'sock'}.
+
+=item serialize
+
+See the documentation under L<Net::Server::PreForkSimple>.
 
 =back
 
