@@ -52,6 +52,7 @@ sub mux_input {
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
+    my $ppid = $$;
     my $pid = fork;
     die "Trouble forking: $!" if ! defined $pid;
 
@@ -77,7 +78,10 @@ my $ok = eval {
                 background => 0,
                 setsid => 0,
             );
-        } || diag("Trouble running server: $@");
+        } || do {
+            diag("Trouble running server: $@");
+            kill(9, $ppid) && ok(0, "Failed during run of server");
+        };
         exit;
     }
     alarm(0);

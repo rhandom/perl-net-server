@@ -1,5 +1,22 @@
 Revision history for Perl extension Net::Server.
 
+2.007  Jan 09 2013
+        - Update run_dequeue to clear out signals after fork.
+        - Add serialize none for PreFork and PreForkSimple servers that at not multi-port.
+        - Allow for auto-assigned port to be the same when hostname resolves to multiple ips/ipvs (RT #78024)
+        - Fix bug in header parsing (RT #82125)
+        - Fix warning bug (RT #78828)
+        - Fix wrong wantarray context in Proto::TCP (RT #31437)
+        - Simplify _get_commandline to just use $0 - no fishing in proc (RT #80260)
+        - Fix uninitialized begin (RT #78830)
+        - Fix misplaced +2 (RT #78827)
+        - Fix various spelling errors and pod nits (RT #77994)
+        - Allow for log calls from the MUX object (RT #78514)
+        - Give an error at begin time of SSLEAY if the need Fcntl function is not available on this platform (RT #82542)
+        - Make all of the tests self cancel much earlier if there is an error handling the request.
+        - Add a stronger timeout to PreFork tests - ideally we'd like to find a real way to test these one windows (RT #811411, #81993) - still broken - but shouldn't hang
+        - Superficial changes to help packagers not list Log4perl as dependency (it is optional)
+
 2.006  Jun 20 2012
         - Allow for case where host is *, and IO::Socket::INET6 is installed, but IPv6 doesn't really work.
         - Add missing child_init_hook in Fork server (so Fork can be more parallel with PreFork in some respects)

@@ -93,6 +93,7 @@ sub process_request {
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
+    my $ppid = $$;
     my $pid = fork;
     die "Trouble forking: $!" if ! defined $pid;
 
@@ -149,7 +150,10 @@ my $ok = eval {
                 SSL_cert_file => $pem_filename,
                 SSL_key_file  => $pem_filename,
                 );
-        } || diag("Trouble running server: $@");
+        } || do {
+            diag("Trouble running server: $@");
+            kill(9, $ppid) && ok(0, "Failed during run of server");
+        };
         exit;
     }
     alarm(0);
