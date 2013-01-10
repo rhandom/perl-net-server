@@ -160,6 +160,7 @@ sub run_n_children {
             ($parentsock, $childsock) = IO::Socket::UNIX->socketpair(IO::Socket::AF_UNIX, IO::Socket::SOCK_STREAM, IO::Socket::PF_UNSPEC);
         }
 
+        $self->pre_fork_hook;
         local $!;
         my $pid = fork;
         if (! defined $pid) {

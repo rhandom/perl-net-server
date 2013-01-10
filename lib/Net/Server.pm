@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2012
+#  Copyright (C) 2001-2013
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -671,11 +671,13 @@ sub done {
     return $self->{'server'}->{'done'};
 }
 
+sub pre_fork_hook {}
 sub child_init_hook {}
 sub child_finish_hook {}
 
 sub run_dequeue { # fork off a child process to handle dequeuing
     my $self = shift;
+    $self->pre_fork_hook('dequeue');
     my $pid  = fork;
     $self->fatal("Bad fork [$!]") if ! defined $pid;
     if (!$pid) { # child

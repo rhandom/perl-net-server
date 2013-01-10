@@ -139,6 +139,7 @@ sub run_n_children {
     $self->log(3, "Starting \"$n\" children");
 
     for (1 .. $n) {
+        $self->pre_fork_hook;
         local $!;
         my $pid = fork;
         $self->fatal("Bad fork [$!]") if ! defined $pid;
