@@ -427,7 +427,8 @@ sub http_echo {
 sub post_process_request {
     my $self = shift;
     my $info = $self->{'request_info'};
-    $info->{'elapsed'} = time - $info->{'begin'} if defined $info->{'begin'};
+    $info->{'begin'} = time unless defined $info->{'begin'};
+    $info->{'elapsed'} = time - $info->{'begin'};
     $self->SUPER::post_process_request(@_);
     $self->log_http_request($info);
 }
