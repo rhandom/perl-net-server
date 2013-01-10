@@ -193,8 +193,6 @@ sub run_child {
 
 }
 
-sub child_init_hook {}
-sub child_finish_hook {}
 sub is_prefork { 1 }
 
 ### We can only let one process do the selecting at a time

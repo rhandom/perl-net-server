@@ -1421,6 +1421,18 @@ that were already opened.
 This hook occurs if a server has been HUPed (restarted via the HUP
 signal.  It occurs just before restarting the server via exec.
 
+=item C<$self-E<gt>child_init_hook()>
+
+This hook is called during the forking servers.  It is also called
+during run_dequeue.  It runs just after the fork and after signals
+have been cleaned up.  If it is a dequeue process, the string
+'dequeue' will be passed as an argument.
+
+=item C<$self-E<gt>child_finish_hook()>
+
+Similar to the child_init_hook, but ran when the forked process is
+about to finish up.
+
 =back
 
 =head1 OTHER METHODS
