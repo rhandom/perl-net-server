@@ -34,6 +34,7 @@ BEGIN {
     for my $sub (qw(load_error_strings SSLeay_add_ssl_algorithms ENGINE_load_builtin_engines ENGINE_register_all_complete randomize)) {
         Net::SSLeay->can($sub)->();
     }
+    eval { [Fcntl::F_GETFL(), Fcntl::F_SETFL(), Fcntl::O_NONBLOC()] } || die "Could not access Fcntl constant while loading ".__PACKAGE__.": $@";
 }
 
 our @ISA = qw(IO::Socket::INET);
