@@ -1437,6 +1437,10 @@ maintain the same random seed unless changed).
         srand(time ^ $$ ^ unpack "%L*", `ps axww | gzip -f`);
     }
 
+=item C<$self-E<gt>pre_fork_hook()>
+
+Similar to the child_init_hook, but occurs just before the fork.
+
 =item C<$self-E<gt>child_finish_hook()>
 
 Similar to the child_init_hook, but ran when the forked process is

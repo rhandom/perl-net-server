@@ -218,8 +218,6 @@ sub close_children {
                  );
 }
 
-sub pre_fork_hook {}
-
 1;
 
 __END__
@@ -300,10 +298,6 @@ provided by the Net::Server base class.  See L<Net::Server>
 =item C<$self-E<gt>pre_accept_hook()>
 
 This hook occurs just before the accept is called.
-
-=item C<$self-E<gt>pre_fork_hook()>
-
-This hook occurs just after accept but before the fork.
 
 =item C<$self-E<gt>post_accept_hook()>
 
