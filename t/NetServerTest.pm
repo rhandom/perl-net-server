@@ -39,7 +39,7 @@ sub prepare_test {
     # allow for finding a hostname that we can use in our tests that appears to be valid
     if (!$env{'hostname'}) {
         eval { require Net::Server::Proto } || do { SKIP: { skip("Could not load Net::Server::Proto to lookup host: $@", $N - 1) }; exit; };
-        foreach my $host (qw(localhost localhost6 localhost.localdomain * ::1)) { # try local bindings first to avoid opening external ports during testing
+        foreach my $host (qw(localhost localhost.localdomain localhost6 * ::1)) { # try local bindings first to avoid opening external ports during testing
             my @info = eval { Net::Server::Proto->get_addr_info($host) };
             next if ! @info;
             @info = sort {$a->[2] <=> $b->[2]} @info; # try IPv4 first in the name of consistency, but let IPv6 work too
