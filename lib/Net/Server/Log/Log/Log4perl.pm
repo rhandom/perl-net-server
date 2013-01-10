@@ -20,13 +20,14 @@ package Net::Server::Log::Log::Log4perl;
 
 use strict;
 use warnings;
-use Log::Log4perl;
 
 our %log4perl_map = (1 => "error", 2 => "warn", 3 => "info", 4 => "debug");
 
 sub initialize {
     my ($class, $server) = @_;
     my $prop = $server->{'server'};
+
+    require Log::Log4perl;
 
     $server->configure({
         log4perl_conf   => \$prop->{'log4perl_conf'},
