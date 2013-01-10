@@ -101,7 +101,7 @@ This module provides Sys::Syslog logging to the Net::Server system.
 
 =over 4
 
-=head1 log_file
+=item log_file
 
 To begin using Sys::Syslog logging, simply set the Net::Server
 log_file configuration parameter to "Sys::Syslog".

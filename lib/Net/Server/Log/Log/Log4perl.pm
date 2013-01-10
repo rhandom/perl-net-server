@@ -82,7 +82,7 @@ system.
 
 =over 4
 
-=head1 log_file
+=item log_file
 
 To begin using Log::Log4perl logging, simply set the Net::Server
 log_file configuration parameter to "Log::Log4perl".
@@ -127,7 +127,7 @@ base class.)
 
 =head1 METHODS
 
-=over4
+=over 4
 
 =item C<initialize>
 

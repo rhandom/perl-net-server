@@ -149,7 +149,7 @@ script located in the examples directory of this distribution.
 
 Takes key/value pairs where the key is the signal name, and the
 argument is either a code ref, or the words 'DEFAULT' or 'IGNORE'.
-The function register_sig must be used in conjuction with check_sigs,
+The function register_sig must be used in conjunction with check_sigs,
 and with a blocking select() function call -- otherwise, you will
 observe the registered signal mysteriously vanish.
 

@@ -227,6 +227,8 @@ Basic dumper of properties stored in the glob.
 
 Handle accessor methods.
 
+=back
+
 =head1 LICENCE
 
 Distributed under the same terms as Net::Server

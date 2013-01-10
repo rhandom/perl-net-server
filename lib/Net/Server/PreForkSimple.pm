@@ -546,7 +546,7 @@ or other general cleanup.
 
 =item C<$self-E<gt>run_dequeue()>
 
-This hook only gets called in conjuction with the check_for_dequeue
+This hook only gets called in conjunction with the check_for_dequeue
 setting.
 
 =item C<$self-E<gt>idle_loop_hook()>

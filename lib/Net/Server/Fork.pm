@@ -311,7 +311,7 @@ This hook occurs in the child after the accept and fork.
 
 =item C<$self-E<gt>run_dequeue()>
 
-This hook only gets called in conjuction with the check_for_dequeue
+This hook only gets called in conjunction with the check_for_dequeue
 setting.
 
 =back

@@ -951,7 +951,7 @@ request is closed.
 
 Defaults to undef.  If true, this represents the location of where
 the access log should be written to.  If a special value of STDERR
-is passed, the access log entry will be writting to the same location
+is passed, the access log entry will be writing to the same location
 as the ERROR log.
 
 =item access_log_format
