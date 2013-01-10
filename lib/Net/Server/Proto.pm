@@ -82,11 +82,19 @@ sub parse_info {
         $server->fatal($@ || "Could not find valid addresses for [$info->{'host'}]:$info->{'port'} with ipv set to '*'") if ! @rows;
         foreach my $row (@rows) {
             my ($host, $port, $ipv, $warn) = @$row;
-            $server->log(2, "Resolved [$info->{'host'}]:$info->{'port'} to [$host]:$port, IPv$ipv")
-                if $host ne $info->{'host'} || $port ne $info->{'port'};
-            $server->log(2, $warn) if $warn;
-            push @_info, {host => $host, port => $port, ipv => $ipv, proto => $info->{'proto'}};
+            push @_info, {host => $host, port => $port, ipv => $ipv, proto => $info->{'proto'}, $warn ? (warn => $warn) : ()};
             $requires_ipv6++ if $ipv ne '4' && $proto ne 'ssl'; # we need to know if Proto::TCP needs to reparent as a child of IO::Socket::INET6
+        }
+        if (@rows > 1 && $rows[0]->[1] == 0) {
+            $server->log(2, "Determining auto-assigned port (0) for host $info->{'host'} (prebind)");
+            my $sock = $class->object($_info[-1], $server);
+            $sock->connect($server);
+            @$_{qw(port orig_port)} = ($sock->NS_port, 0) for @_info;
+        }
+        foreach my $_info (@_info) {
+            $server->log(2, "Resolved [$info->{'host'}]:$info->{'port'} to [$_info->{'host'}]:$_info->{'port'}, IPv$_info->{'ipv'}")
+                if $_info->{'host'} ne $info->{'host'} || $_info->{'port'} ne $info->{'port'};
+            $server->log(2, delete $_info->{'warn'}) if $_info->{'warn'};
         }
     } elsif ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
         push @_info, {%$info, ipv => '6'};
