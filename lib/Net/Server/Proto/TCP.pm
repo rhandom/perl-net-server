@@ -113,7 +113,7 @@ sub accept {
     if (defined $client) {
         $client->NS_port($sock->NS_port);
     }
-    return $client;
+    return wantarray ? ($client, $peername) : $client;
 }
 
 sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropriately for Multipex
