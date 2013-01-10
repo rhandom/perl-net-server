@@ -51,7 +51,7 @@ my ($pem_fh, $pem_filename) =
 print $pem_fh $pem;
 $pem_fh->close;
 
-use_ok qw(Net::Server::Proto::SSLEAY) or exit;
+use_ok qw(Net::Server::Proto::SSL) or exit;
 require Net::Server;
 @Net::Server::Test::ISA = qw(Net::Server);
 
