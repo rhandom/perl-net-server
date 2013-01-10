@@ -328,7 +328,7 @@ sub process_headers {
     my ($req, @lines) = split /\r?\n/, $headers;
     die "Missing request\n" if ! defined $req;
 
-    if ($req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+HTTP/1\.[01]\s*$ }ix) {
+    if (!defined($req) || $req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+HTTP/1\.[01]\s*$ }ix) {
         die "Invalid request\n";
     }
     $ENV{'REQUEST_METHOD'} = uc $1;
