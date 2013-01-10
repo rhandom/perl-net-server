@@ -1428,6 +1428,15 @@ during run_dequeue.  It runs just after the fork and after signals
 have been cleaned up.  If it is a dequeue process, the string
 'dequeue' will be passed as an argument.
 
+If your child processes will be needing random numbers, this
+hook is a good location to initialize srand (forked processes
+maintain the same random seed unless changed).
+
+    sub child_init_hook {
+        # from perldoc -f srand
+        srand(time ^ $$ ^ unpack "%L*", `ps axww | gzip -f`);
+    }
+
 =item C<$self-E<gt>child_finish_hook()>
 
 Similar to the child_init_hook, but ran when the forked process is
