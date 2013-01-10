@@ -250,7 +250,9 @@ is($prop->{'group'}, 'confgroup', "Right group \"$prop->{'group'}\"");
 
 ###----------------------------------------------------------------###
 
-if (!eval { require Log::Log4perl; require File::Temp }) {
+if (!$ENV{'TEST_LOG4PERL'}) {
+  SKIP: { skip("TEST_LOG4PERL not set - skipping Log::Log4perl tests", 7) };
+} elsif (!eval { require Log::Log4perl; require File::Temp }) {
   SKIP: { skip("Log::Log4perl not installed: $@", 7) };
 } else {
 
