@@ -187,6 +187,8 @@ sub new {
     return $self;
 }
 
+sub log { shift->{net_server}->log(@_) }
+
 # This subroutine is only used by the listen callback object.
 sub mux_connection {
     my ($self, $mux, $fh) = @_;
