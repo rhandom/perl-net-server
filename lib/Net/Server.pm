@@ -674,15 +674,25 @@ sub done {
     return $self->{'server'}->{'done'};
 }
 
+sub child_init_hook {}
+sub child_finish_hook {}
 
 sub run_dequeue { # fork off a child process to handle dequeuing
     my $self = shift;
     my $pid  = fork;
     $self->fatal("Bad fork [$!]") if ! defined $pid;
     if (!$pid) { # child
+        $SIG{'INT'} = $SIG{'TERM'} = $SIG{'QUIT'} = $SIG{'HUP'} = sub {
+            $self->child_finish_hook('dequeue');
+            exit;
+        };
+        $SIG{'PIPE'} = $SIG{'TTIN'} = $SIG{'TTOU'} = 'DEFAULT';
+        $self->child_init_hook('dequeue');
         $self->dequeue();
+        $self->child_finish_hook('dequeue');
         exit;
     }
+    $self->log(4, "Running dequeue child $pid");
 
     $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue'
         if $self->{'server'}->{'children'};
@@ -714,7 +724,7 @@ sub server_close {
 
     $self->pre_server_close_hook;
 
-    $self->log(2,$self->log_time . " Server closing!");
+    $self->log(2, $self->log_time . " Server closing!");
 
     if ($prop->{'kind_quit'} && $prop->{'children'}) {
         $self->log(3, "Attempting a slow shutdown");
@@ -728,7 +738,7 @@ sub server_close {
         }
     }
 
-    if (defined($prop->{'_HUP'}) && $prop->{'leave_children_open_on_hup'}) {
+    if ($prop->{'_HUP'} && $prop->{'leave_children_open_on_hup'}) {
         $self->hup_children;
 
     } else {
@@ -743,12 +753,12 @@ sub server_close {
     }
     if (defined($prop->{'pid_file'})
         && -e $prop->{'pid_file'}
-        && !defined($prop->{'_HUP'})
+        && !$prop->{'_HUP'}
         && defined($prop->{'pid_file_unlink'})) {
         unlink($prop->{'pid_file'}) || $self->log(1, "Couldn't unlink \"$prop->{'pid_file'}\" [$!]");
     }
 
-    if (defined $prop->{'_HUP'}) {
+    if ($prop->{'_HUP'}) {
         $self->restart_close_hook();
         $self->hup_server; # execs at the end
     }
@@ -790,10 +800,10 @@ sub close_parent {
 sub close_children {
     my $self = shift;
     my $prop = $self->{'server'};
-
     return unless $prop->{'children'} && scalar keys %{ $prop->{'children'} };
 
     foreach my $pid (keys %{ $prop->{'children'} }) {
+        $self->log(4, "Kill TERM pid $pid");
         if (kill(15, $pid) || ! kill(0, $pid)) { # if it is killable, kill it
             $self->delete_child($pid);
         }
@@ -808,12 +818,14 @@ sub is_prefork { 0 }
 sub hup_children {
     my $self = shift;
     my $prop = $self->{'server'};
-
     return unless defined $prop->{'children'} && scalar keys %{ $prop->{'children'} };
     return if ! $self->is_prefork;
     $self->log(2, "Sending children hup signal");
 
-    kill(1, $_) for keys %{ $prop->{'children'} };
+    for my $pid (keys %{ $prop->{'children'} }) {
+        $self->log(4, "Kill HUP pid $pid");
+        kill(1, $pid) or $self->log(2, "Failed to kill pid $pid: $!");
+    }
 }
 
 sub post_child_cleanup_hook {}
@@ -823,6 +835,8 @@ sub post_child_cleanup_hook {}
 sub sig_hup {
     my $self = shift;
     my $prop = $self->{'server'};
+
+    $self->log(2, "Received a SIG HUP");
 
     my $i  = 0;
     my @fd;
@@ -856,7 +870,7 @@ sub sig_hup {
 
 sub hup_server {
     my $self = shift;
-    $self->log(0, $self->log_time()." HUP'ing server");
+    $self->log(0, $self->log_time()." Re-exec server during HUP");
     delete @ENV{$self->hup_delete_env_keys};
     exec @{ $self->commandline };
 }
