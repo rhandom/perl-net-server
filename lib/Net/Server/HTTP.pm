@@ -26,6 +26,8 @@ use IO::Handle ();
 use re 'taint'; # most of our regular expressions setting ENV should not be clearing taint
 use POSIX ();
 use Time::HiRes qw(time);
+my $has_xs_parser;
+BEGIN {$has_xs_parser = $ENV{'USE_XS_PARSER'} && eval { require HTTP::Parser::XS } };
 
 sub net_server_type { __PACKAGE__ }
 
@@ -45,7 +47,7 @@ sub max_header_size { shift->{'server'}->{'max_header_size'} }
 
 sub default_port { 80 }
 
-sub default_server_type { 'Fork' }
+sub default_server_type { 'PreFork' }
 
 sub post_configure {
     my $self = shift;
@@ -323,42 +325,51 @@ sub process_headers {
     $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto =~ /SSL/;
 
     my ($ok, $headers) = $client->read_until($self->max_header_size, qr{\n\r?\n});
+    my ($req, $len, @parsed);
     die "Could not parse http headers successfully\n" if $ok != 1;
+    if ($has_xs_parser) {
+        $len = HTTP::Parser::XS::parse_http_request($headers, \%ENV);
+        die "Corrupt request" if $len == -1;
+        die "Incomplete request" if $len == -2;
+        $req = "$ENV{'REQUEST_METHOD'} $ENV{'REQUEST_URI'} $ENV{'SERVER_PROTOCOL'}";
+    } else {
+        ($req, my @lines) = split /\r?\n/, $headers;
+        die "Missing request\n" if ! defined $req;
 
-    my ($req, @lines) = split /\r?\n/, $headers;
-    die "Missing request\n" if ! defined $req;
+        if (!defined($req) || $req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+(HTTP/1\.[01])\s*$ }ix) {
+            die "Invalid request\n";
+        }
+        $ENV{'REQUEST_METHOD'}  = uc $1;
+        $ENV{'REQUEST_URI'}     = $2;
+        $ENV{'SERVER_PROTOCOL'} = $3;
+        $ENV{'QUERY_STRING'}    = $1 if $ENV{'REQUEST_URI'} =~ m{ \?(.*)$ }x;
+        $ENV{'PATH_INFO'}       = $1 if $ENV{'REQUEST_URI'} =~ m{^([^\?]+)};
 
-    if (!defined($req) || $req !~ m{ ^\s*(GET|POST|PUT|DELETE|PUSH|HEAD|OPTIONS)\s+(.+)\s+HTTP/1\.[01]\s*$ }ix) {
-        die "Invalid request\n";
+        foreach my $l (@lines) {
+            my ($key, $val) = split /\s*:\s*/, $l, 2;
+            push @parsed, [$key, $val];
+            $key = uc($key);
+            $key = 'COOKIE' if $key eq 'COOKIES';
+            $key =~ y/-/_/;
+            $key =~ s/^\s+//;
+            $key = "HTTP_$key" if $key !~ /^CONTENT_(?:LENGTH|TYPE)$/;
+            $val =~ s/\s+$//;
+            if (exists $ENV{$key}) {
+                $ENV{$key} .= ", $val";
+            } else {
+                $ENV{$key} = $val;
+            }
+        }
+        $len = length $headers;
     }
-    $ENV{'REQUEST_METHOD'} = uc $1;
-    $ENV{'REQUEST_URI'}    = $2;
-    $ENV{'QUERY_STRING'}   = $1 if $ENV{'REQUEST_URI'} =~ m{ \?(.*)$ }x;
-    $ENV{'PATH_INFO'}      = $1 if $ENV{'REQUEST_URI'} =~ m{^([^\?]+)};
-    $ENV{'SCRIPT_NAME'}    = $self->script_name($ENV{'PATH_INFO'}) || '';
+    $ENV{'SCRIPT_NAME'} = $self->script_name($ENV{'PATH_INFO'}) || '';
+
     my $type = $Net::Server::HTTP::ISA[0];
     $type = $Net::Server::MultiType::ISA[0] if $type eq 'Net::Server::MultiType';
     $ENV{'NET_SERVER_TYPE'} = $type;
     $ENV{'NET_SERVER_SOFTWARE'} = $self->server_revision;
 
-    my @parsed;
-    foreach my $l (@lines) {
-        my ($key, $val) = split /\s*:\s*/, $l, 2;
-        push @parsed, [$key, $val];
-        $key = uc($key);
-        $key = 'COOKIE' if $key eq 'COOKIES';
-        $key =~ y/-/_/;
-        $key =~ s/^\s+//;
-        $key = "HTTP_$key" if $key !~ /^CONTENT_(?:LENGTH|TYPE)$/;
-        $val =~ s/\s+$//;
-        if (exists $ENV{$key}) {
-            $ENV{$key} .= ", $val";
-        } else {
-            $ENV{$key} = $val;
-        }
-    }
-
-    $self->_init_http_request_info($req, \@parsed, length($headers));
+    $self->_init_http_request_info($req, \@parsed, $len);
 }
 
 sub http_request_info { shift->{'request_info'} }
