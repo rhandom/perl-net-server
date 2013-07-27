@@ -146,7 +146,7 @@ sub post_configure {
         }
     }
 
-    if (! $prop->{'_is_inet'}) { # completetly daemonize by closing STDIN, STDOUT (should be done before fork)
+    if (! $prop->{'_is_inet'}) { # completely daemonize by closing STDIN, STDOUT (should be done before fork)
         if ($prop->{'setsid'} || length($prop->{'log_file'})) {
             open(STDIN,  '<', '/dev/null') || die "Cannot read /dev/null  [$!]";
             open(STDOUT, '>', '/dev/null') || die "Cannot write /dev/null [$!]";

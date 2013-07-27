@@ -36,7 +36,7 @@ our @EXPORT_OK = qw(check_pid_file    create_pid_file   unlink_pid_file
 
 ###----------------------------------------------------------------###
 
-### check for existance of pid_file
+### check for existence of pid_file
 ### if the file exists, check for a running process
 sub check_pid_file ($) {
     my $pid_file = shift;
@@ -313,7 +313,7 @@ Determine if the process is running as root.  Returns 1 or undef.
 
 =item check_pid_file
 
-Arguments are pid_file (full path to pid_file).  Checks for existance
+Arguments are pid_file (full path to pid_file).  Checks for existence
 of pid_file.  If file exists, open it and determine if the process
 that created it is still running.  This is done first by checking for
 a /proc file system and second using a "ps" command (BSD syntax).  (If

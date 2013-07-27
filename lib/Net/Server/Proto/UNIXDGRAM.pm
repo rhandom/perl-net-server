@@ -29,7 +29,7 @@ my @udp_args = qw(
     udp_recv_len
     udp_recv_flags
     udp_broadcast
-); # we do broadcast just for cacheing parallelism with UDP.pm
+); # we do broadcast just for caching parallelism with UDP.pm
 
 sub NS_proto { 'UNIXDGRAM' }
 sub NS_recv_len   { my $sock = shift; ${*$sock}{'NS_recv_len'}   = shift if @_; return ${*$sock}{'NS_recv_len'}   }
@@ -92,11 +92,11 @@ Protocol module for Net::Server.  This module implements the UNIX
 SOCK_DGRAM socket type.  See L<Net::Server::Proto>.
 
 Any sockets created during startup will be chown'ed to the user and
-group specified in the starup arguments.
+group specified in the startup arguments.
 
 =head1 PARAMETERS
 
-The following paramaters may be specified in addition to normal
+The following parameters may be specified in addition to normal
 command line parameters for a Net::Server.  See L<Net::Server> for
 more information on reading arguments.
 

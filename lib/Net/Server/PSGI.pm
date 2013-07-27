@@ -201,7 +201,7 @@ rudimentary, then Net::Server::PSGI may be good for you.
 Net::Server::PSGI takes Net::Server::HTTP one level farther.  It
 begins with base type MultiType defaulting to Net::Server::Fork.  It
 is easy to change it to any of the other Net::Server flavors by
-passing server_type => $other_flavor in the server configurtation.
+passing server_type => $other_flavor in the server configuration.
 The port has also been defaulted to port 80 - but could easily be
 changed to another through the server configuration.  You can also
 very easily add ssl by including, proto=>"ssl" and provide a

@@ -415,7 +415,7 @@ a bare hostname, or a hostname with IPv* specifications.
 
 In addition to being able to specify IPV as a separate parameter, ipv may
 also be passed as a part of the host, as part of the port, as part of the protocol
-or may be specified via $ENV{'IPV'}.  The order of precidence is as follows:
+or may be specified via $ENV{'IPV'}.  The order of precedence is as follows:
 
      1) Explicit IPv4 or IPv6 address - wins
      2) ipv specified in port

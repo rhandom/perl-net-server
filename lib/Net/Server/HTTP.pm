@@ -653,7 +653,7 @@ requested feature and is a standard and simple protocol.
 Net::Server::HTTP begins with base type MultiType defaulting to
 Net::Server::Fork.  It is easy to change it to any of the other
 Net::Server flavors by passing server_type => $other_flavor in the
-server configurtation.  The port has also been defaulted to port 80 -
+server configuration.  The port has also been defaulted to port 80 -
 but could easily be changed to another through the server
 configuration.  You can also very easily add ssl by including,
 proto=>"ssl" and provide a SSL_cert_file and SSL_key_file.
@@ -738,7 +738,7 @@ Calls send_status with 500 and the argument passed to send_500.
 =item c<log_http_request>
 
 Called at the end of post_process_request.  The default method looks
-for the default access_log_format and checks if logging was initilized
+for the default access_log_format and checks if logging was initialized
 during _init_access_log.  If both of these exist, the http_request_info
 is formatted using http_log_format and the result is logged.
 
