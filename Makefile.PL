@@ -13,6 +13,11 @@ my %args =
      Socket       => 0,
      POSIX        => 0,
    },
+   META_MERGE    => {
+     resources    => {
+       repository  =>  'https://github.com/rhandom/perl-net-server',
+     },
+   },
 
    dist          => {
      DIST_DEFAULT => 'all tardist',
