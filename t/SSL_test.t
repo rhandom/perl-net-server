@@ -76,6 +76,9 @@ my $ok = eval {
         my $remote = IO::Socket::SSL->new(
             PeerAddr => $env->{'hostname'},
             PeerPort => $env->{'ports'}->[0],
+            # Would use SSL_VERIFY_NONE but that means you have to do a 'use'
+            # on IO::Socket::SSL which is trying to be avoided here
+            SSL_verify_mode => Net::SSLeay::VERIFY_NONE(),
         ) || die "Couldn't open child to sock: $!";
 
         my $line = <$remote>;
