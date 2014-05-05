@@ -96,7 +96,9 @@ sub find_psgi_handler { shift->app || \&psgi_echo_handler }
 sub app {
     my $self = shift;
     $self->{'server'}->{'app'} = shift if @_;
-    return $self->{'server'}->{'app'};
+    my $app = $self->{'server'}->{'app'};
+    $app = $self->{'server'}->{'app'} = do { require CGI::Compile; CGI::Compile->compile($app) } if ! ref $app;
+    return $app;
 }
 
 sub print_psgi_headers {
