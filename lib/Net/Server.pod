@@ -1808,6 +1808,10 @@ Improve test suite to fully cover code (using Devel::Cover).  Anybody
 that wanted to send me patches to the t/*.t tests that improved
 coverage would earn a big thank you.
 
+=head1 CODE REPOSITORY
+
+https://github.com/rhandom/perl-net-server
+
 =head1 AUTHOR
 
     Paul Seamons <paul at seamons.com>
