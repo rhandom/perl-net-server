@@ -73,9 +73,13 @@ my $ok = eval {
     if ($pid) {
         $env->{'block_until_ready_to_test'}->();
 
+        my $mode = eval { IO::Socket::SSL_VERIFY_NONE() };
+        $mode = 0 if ! defined $mode;
+
         my $remote = IO::Socket::SSL->new(
             PeerAddr => $env->{'hostname'},
             PeerPort => $env->{'ports'}->[0],
+            SSL_verify_mode => $mode,
         ) || die "Couldn't open child to sock: $!";
 
         my $line = <$remote>;
