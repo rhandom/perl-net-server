@@ -1,0 +1,10 @@
+tgz
+blib
+MYMETA.json
+MYMETA.yml
+META.yml
+Makefile
+README
+pm_to_blib
+*.spec
+*.ppd
