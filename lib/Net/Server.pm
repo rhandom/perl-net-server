@@ -2,8 +2,6 @@
 #
 #  Net::Server - Extensible Perl internet server
 #
-#  $Id$
-#
 #  Copyright (C) 2001-2014
 #
 #    Paul Seamons
