@@ -97,7 +97,10 @@ sub app {
     my $self = shift;
     $self->{'server'}->{'app'} = shift if @_;
     my $app = $self->{'server'}->{'app'};
-    $app = $self->{'server'}->{'app'} = do { require CGI::Compile; CGI::Compile->compile($app) } if ! ref $app;
+    if (!ref($app) && $app) {
+        $app = $self->{'server'}->{'app'} = eval { require CGI::Compile; CGI::Compile->compile($app) }
+            || die "Failed to compile app with CGI::Compile";
+    }
     return $app;
 }
 
