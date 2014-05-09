@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2013
+#  Copyright (C) 2001-2014
 #
 #    Paul Seamons
 #    paul@seamons.com
@@ -32,7 +32,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.007';
+our $VERSION = '2.008';
 
 sub new {
     my $class = shift || die "Missing class";
