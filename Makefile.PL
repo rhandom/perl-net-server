@@ -12,6 +12,7 @@ my %args =
      'IO::Socket' => 0,
      Socket       => 0,
      POSIX        => 0,
+     'Time::HiRes' => 0,
    },
 
    dist          => {
