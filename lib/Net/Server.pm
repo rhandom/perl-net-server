@@ -1,6 +1,7 @@
 # -*- perl -*-
 #
-#  Net::Server - Extensible Perl internet server
+#  Net::Server
+#    ABSTRACT: Extensible Perl internet server
 #
 #  Copyright (C) 2001-2014
 #
