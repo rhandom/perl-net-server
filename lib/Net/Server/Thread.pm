@@ -133,7 +133,7 @@ sub accept {
 sub run_client_connection {
     my $self = shift;
 
-    $SIG{'INT'} = $SIG{'TERM'} = $SIG{'QUIT'} = sub { threads->exit };
+    $SIG{'INT'} = $SIG{'TERM'} = $SIG{'QUIT'} = sub { threads->exit(0) };
     $SIG{'HUP'} = $SIG{'CHLD'} = 'DEFAULT';
     $SIG{'PIPE'} = 'IGNORE';
 
