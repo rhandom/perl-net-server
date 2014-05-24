@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+2.008  May 12 2014
+        - Long awaited patch for the IO::Socket::SSL default verify mode bug
+        - Add Time::HiRes as a dep
+        - Update to new github hosted repository with all legacy code imported
+        - Beginnings of change to dzil based releases
+        - There are several dozen outstanding bugs that will be addressed in the next release
+
 2.007  Jan 09 2013
         - Update run_dequeue to clear out signals after fork.
         - Add serialize none for PreFork and PreForkSimple servers that at not multi-port.
