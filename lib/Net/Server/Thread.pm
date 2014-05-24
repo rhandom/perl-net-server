@@ -72,7 +72,7 @@ sub loop {
 
         $self->pre_thread_hook;
 
-        threads->new({context => 'void'}, 'run_client_connection', $self)->detach;
+        threads->new(sub { $self->run_client_connection })->detach;
 
         # parent
         delete($prop->{'client'}) if !$prop->{'udp_true'};
