@@ -17,26 +17,12 @@ sub accept {
     return $self->SUPER::accept(@_);
 }
 
-
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
-    my $ppid = $$;
-    my $pid = fork;
-    die "Trouble forking: $!" if ! defined $pid;
-
-    ### parent does the client
-    if ($pid) {
-        $env->{'block_until_ready_to_test'}->();
-
-        my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
-        my $line = <$remote>;
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
-        print $remote "exit\n";
-        return 1;
 
     ### child does the server
-    } else {
+    threads->create(sub {
         eval {
             alarm $env->{'timeout'};
             close STDERR;
@@ -49,12 +35,21 @@ my $ok = eval {
             );
         } || do {
             diag("Trouble running server: $@");
-            kill(9, $ppid) && ok(0, "Failed during run of server");
+            ok(0, "Failed during run of server");
+            exit;
         };
-        exit;
-    }
+        threads->exit(0);
+    })->detach;
+
+    # parent is the client
+    $env->{'block_until_ready_to_test'}->();
+
+    my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
+    my $line = <$remote>;
+    die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+    print $remote "exit\n";
     alarm(0);
+    return 1;
 };
 alarm(0);
 ok($ok, "Got the correct output from the server") || diag("Error: $@");
-
