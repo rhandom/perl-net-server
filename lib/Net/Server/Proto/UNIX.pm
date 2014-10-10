@@ -98,6 +98,26 @@ sub show {
     return "Ref = \"".ref($sock). "\" (".$sock->hup_string.")\n";
 }
 
+###----------------------------------------------------------------###
+
+sub read_until { # only sips the data - but it allows for compatibility with SSLEAY
+    my ($client, $bytes, $end_qr) = @_;
+    die "One of bytes or end_qr should be defined for UNIX read_until\n" if !defined($bytes) && !defined($end_qr);
+    my $content = '';
+    my $ok = 0;
+    while (1) {
+        $client->read($content, 1, length($content));
+        if (defined($bytes) && length($content) >= $bytes) {
+            $ok = 2;
+            last;
+        } elsif (defined($end_qr) && $content =~ $end_qr) {
+            $ok = 1;
+            last;
+        }
+    }
+    return wantarray ? ($ok, $content) : $content;
+}
+
 1;
 
 __END__
