@@ -2,7 +2,7 @@
 
 package Net::Server::Test;
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp ();
 use English qw($UID $GID);
 use FindBin qw($Bin);
 use lib $Bin;
@@ -22,7 +22,7 @@ sub accept {
     return shift->SUPER::accept(@_);
 }
 
-my $socket_file = tmpnam; # must do before fork
+my $socket_file = File::Temp::tmpnam();
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
