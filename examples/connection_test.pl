@@ -34,7 +34,7 @@ use strict;
 use warnings;
 use base qw(Net::Server);
 use IO::Socket ();
-use POSIX qw(tmpnam);
+use File::Temp ();
 use Socket qw(SOCK_DGRAM SOCK_STREAM);
 
 sub post_bind_hook {
@@ -44,7 +44,7 @@ sub post_bind_hook {
   }
 }
 
-my $socket_file  = tmpnam();
+my $socket_file  = File::Temp::tmpnam();
 $socket_file =~ s|/[^/]+$|/mysocket.file|;
 my $socket_file2 = $socket_file ."2";
 my $udp_port    = 20204;
