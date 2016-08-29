@@ -338,6 +338,8 @@ sub run_dequeue {
     $self->{'server'}->{'tally'}->{'dequeue'}++;
 }
 
+sub cleanup_dead_child_hook { return; }
+
 sub coordinate_children {
     my $self = shift;
     my $prop = $self->{'server'};
@@ -406,7 +408,10 @@ sub coordinate_children {
     if ($time - $prop->{'last_checked_for_dead'} > $prop->{'check_for_dead'}) {
         $prop->{'last_checked_for_dead'} = $time;
         foreach my $pid (keys %{ $prop->{'children'} }) {
-            kill(0, $pid) || $self->delete_child($pid);
+            if( ! kill(0, $pid) ) {
+              $self->cleanup_dead_child_hook( $prop->{'children'}->{$pid} );
+              $self->delete_child($pid);
+            }
         }
     }
 
@@ -659,6 +664,12 @@ This hook is called in every pass through the main process wait loop,
 every C<check_for_waiting> seconds.  The first argument is a reference
 to an array of file descriptors that can be read at the moment.
 
+=item C<$self-E<gt>cleanup_dead_child_hook( $child )>
+
+This hook is called when a dead child is detected.
+A child is considered dead when the pid does no longer exist.
+This hook could be used to cleanup possible temporary files
+or locks left over by a dead child.
 =back
 
 =head1 HOT DEPLOY
