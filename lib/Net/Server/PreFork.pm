@@ -512,7 +512,7 @@ You really should also see L<Net::Server::PreForkSimple>.
     serialize           (flock|semaphore
                          |pipe|none)            undef
     # serialize defaults to flock on multi_port or on Solaris
-    lock_file           "filename"              File::Temp::tempfile or POSIX::tmpnam
+    lock_file           "filename"              File::Temp->new
 
     check_for_dead      \d+                     30
     check_for_waiting   \d+                     10
