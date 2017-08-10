@@ -1035,6 +1035,8 @@ sub _read_conf {
 
 sub other_child_died_hook {}
 
+sub delete_child_hook {}
+
 sub delete_child {
     my ($self, $pid) = @_;
     my $prop = $self->{'server'};
@@ -1048,6 +1050,8 @@ sub delete_child {
             $prop->{'children'}->{$pid}->{'sock'}->close;
         }
     }
+    
+    $self->delete_child_hook($pid);   # user customizable hook
 
     delete $prop->{'children'}->{$pid};
 }
