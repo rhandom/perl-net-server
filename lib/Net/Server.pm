@@ -530,7 +530,6 @@ sub get_client_info {
             ($prop->{'peerport'}, $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket::inet_ntoa($addr);
         } else {
-            warn "Right here\n";
             ($prop->{'peerport'}, $addr) = Socket6::sockaddr_in6($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket6->can('inet_ntop')
                                 ? Socket6::inet_ntop($client->sockdomain, $addr)
@@ -1036,6 +1035,8 @@ sub _read_conf {
 
 sub other_child_died_hook {}
 
+sub delete_child_hook {}
+
 sub delete_child {
     my ($self, $pid) = @_;
     my $prop = $self->{'server'};
@@ -1049,6 +1050,8 @@ sub delete_child {
             $prop->{'children'}->{$pid}->{'sock'}->close;
         }
     }
+    
+    $self->delete_child_hook($pid);   # user customizable hook
 
     delete $prop->{'children'}->{$pid};
 }
