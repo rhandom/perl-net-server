@@ -3,13 +3,11 @@
 #  Net::Server
 #    ABSTRACT: Extensible Perl internet server
 #
-#  Copyright (C) 2001-2014
+#  Copyright (C) 2001-2017
 #
-#    Paul Seamons
-#    paul@seamons.com
-#    http://seamons.com/
+#    Paul Seamons <paul@seamons.com>
 #
-#    Rob Brown bbb@cpan,org
+#    Rob Brown <bbb@cpan,org>
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
@@ -31,7 +29,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.008';
+our $VERSION = '2.009';
 
 sub new {
     my $class = shift || die "Missing class";
