@@ -36,12 +36,12 @@ our @EXPORT_OK = qw(check_pid_file    create_pid_file   unlink_pid_file
 ### if the file exists, check for a running process
 sub check_pid_file ($) {
     my $pid_file = shift;
-    return 1 if ! -e $pid_file;
+    return 1 if ! -e $pid_file or ! -s $pid_file && -M _ > 0.01;
 
-    open my $fh, '<', $pid_file or die "Couldn't open existant pid_file \"$pid_file\" [$!]\n";
-    my $current_pid = <$fh>;
+    open my $fh, '<', $pid_file or die "$pid_file: Couldn't open existant pid_file [$!]\n";
+    my $current_pid = <$fh> || "";
     close $fh;
-    $current_pid = ($current_pid =~ /^(\d{1,10})/) ? $1 : die "Couldn't find pid in existing pid_file";
+    $current_pid = ($current_pid =~ /^(\d{1,10})/) ? $1 : die "$pid_file: Couldn't find pid in existant pid_file";
 
     my $exists;
     if ($$ == $current_pid) {
