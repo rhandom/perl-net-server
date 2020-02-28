@@ -282,8 +282,26 @@ sub read_until {
             if ($client->SSLeay_check_error('SSLeay read_until read')) {
                 last OUTER;
             }
-            die "SSLeay read_until: $!\n" if ! defined($buf) && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS};
-            last if ! defined($buf);
+            if (! defined($buf))
+            {
+                if ($!{EAGAIN} or $!{EINTR} or $!{ENOBUFS})
+                {
+                    # Preserved from Net/Server/Proto/SSLEAY's version
+                    last;
+                }
+                elsif ( ($return_value == Net::SSLeay::ERROR_WANT_READ())
+                        or ($return_value == Net::SSLeay::ERROR_WANT_WRITE())
+                      )
+                {
+                    # Treat these renegotiation errors like EAGAIN - select will handle it and the next SSL_read will resolve it.
+                    last;
+                }
+                else
+                {
+                    die "SSLeay read_until: $!\n";
+                }
+            }
+            
             if (!length($buf)) {
                 last OUTER if !length($buf) && $n_empty++;
             }
