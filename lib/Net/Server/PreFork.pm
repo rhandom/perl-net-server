@@ -282,8 +282,19 @@ sub run_parent {
         ## getline or <$fh> but this is controlled output
         ## where everything that comes through came from us.
         my @fh = $prop->{'child_select'}->can_read($prop->{'check_for_waiting'});
-        if (check_sigs()) {
-            last if $prop->{'_HUP'};
+
+        if (check_sigs() && $prop->{'_HUP'}) {
+            ### Remove all reaped childer before possible re-exec.
+            ## If we do not do it, 'reaped_children' will be lost and if there will be
+            ## new process with same PID, it it will be treated as valid child.
+            register_sig(
+                ### reset all signal handlers to DEFAULT to guarantee
+                ## $reaper will not get called
+                map { $_ => 'DEFAULT' } qw( PIPE INT TERM QUIT HUP CHLD TTIN TTOU )
+            );
+            check_sigs();
+            $self->coordinate_reaped_children();
+            last;
         }
 
         $self->idle_loop_hook(\@fh);
@@ -336,17 +347,25 @@ sub run_dequeue {
 
 sub cleanup_dead_child_hook { return; }
 
+sub coordinate_reaped_children {
+    my $self = shift;
+    my $prop = $self->{'server'};
+
+    # deleted SIG{'CHLD'} reaped children
+    foreach my $pid (keys %{ $self->{'reaped_children'} }) {
+        # delete each pid one by one to avoid another race
+        my $exit = delete $self->{'reaped_children'}->{$pid};
+        next if ! $prop->{'children'}->{$pid};
+        $self->delete_child($pid, $exit);
+    }
+}
+
 sub coordinate_children {
     my $self = shift;
     my $prop = $self->{'server'};
     my $time = time();
 
-    # deleted SIG{'CHLD'} reaped children
-    foreach my $pid (keys %{ $self->{'reaped_children'} }) {
-        my $exit = delete $self->{'reaped_children'}->{$pid}; # delete each pid one by one to avoid another race
-        next if ! $prop->{'children'}->{$pid};
-        $self->delete_child($pid, $exit);
-    }
+    $self->coordinate_reaped_children();
 
     # re-tally the possible types (only twice a minute)
     # this might not be even necessary but is a nice sanity check
