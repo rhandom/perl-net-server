@@ -372,6 +372,7 @@ sub print {
     my $buf    = @_ == 1 ? $_[0] : join('', @_);
     my $ssl    = $client->SSLeay;
     while (length $buf) {
+        return 0 if ($client->eof());
         vec(my $vec = '', $client->fileno, 1) = 1;
         select(undef, $vec, undef, undef);
 
