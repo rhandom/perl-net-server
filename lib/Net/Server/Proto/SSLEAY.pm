@@ -278,30 +278,21 @@ sub read_until {
             # 16384 is the maximum amount read() can return
             my $n = 16384;
             $n -= ($bytes - length($content)) if $non_greedy && ($bytes - length($content)) < $n;
-            my $buf = Net::SSLeay::read($ssl, 16384); # read the most we can - continue reading until the buffer won't read any more
+            my ($buf, $rv) = Net::SSLeay::read($ssl, 16384); # read the most we can - continue reading until the buffer won't read any more
             if ($client->SSLeay_check_error('SSLeay read_until read')) {
                 last OUTER;
             }
-            if (! defined($buf))
-            {
-                if ($!{EAGAIN} or $!{EINTR} or $!{ENOBUFS})
-                {
-                    # Preserved from Net/Server/Proto/SSLEAY's version
-                    last;
-                }
-                elsif ( ($return_value == Net::SSLeay::ERROR_WANT_READ())
-                        or ($return_value == Net::SSLeay::ERROR_WANT_WRITE())
-                      )
-                {
-                    # Treat these renegotiation errors like EAGAIN - select will handle it and the next SSL_read will resolve it.
-                    last;
-                }
-                else
-                {
-                    die "SSLeay read_until: $!\n";
-                }
+
+            if (! defined($buf)) {
+                # Preserved from Net/Server/Proto/SSLEAY's version
+                last if $!{'EAGAIN'} || $!{'EINTR'} || $!{'ENOBUFS'};
+
+                # Treat these renegotiation errors like EAGAIN - select will handle it and the next SSL_read will resolve it.
+                last if $rv && ($rv == Net::SSLeay::ERROR_WANT_READ() || $rv == Net::SSLeay::ERROR_WANT_WRITE());
+
+                die "SSLeay read_until: $!\n";
             }
-            
+
             if (!length($buf)) {
                 last OUTER if !length($buf) && $n_empty++;
             }
