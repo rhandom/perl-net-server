@@ -88,11 +88,11 @@ Protocol module for Net::Server.  This module implements the UNIX
 SOCK_DGRAM socket type.  See L<Net::Server::Proto>.
 
 Any sockets created during startup will be chown'ed to the user and
-group specified in the starup arguments.
+group specified in the startup arguments.
 
 =head1 PARAMETERS
 
-The following paramaters may be specified in addition to normal
+The following parameters may be specified in addition to normal
 command line parameters for a Net::Server.  See L<Net::Server> for
 more information on reading arguments.
 

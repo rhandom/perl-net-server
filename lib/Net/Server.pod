@@ -194,7 +194,7 @@ Once started, the Net::Server will take care of binding to port and
 waiting for connections.  Once a connection is received, the
 Net::Server will accept on the socket and will store the result (the
 client connection) in $self-E<gt>{server}-E<gt>{client}.  This
-property is a Socket blessed into the the IO::Socket classes.  UDP
+property is a Socket blessed into the IO::Socket classes.  UDP
 servers are slightly different in that they will perform a B<recv>
 instead of an B<accept>.
 
@@ -374,7 +374,7 @@ been parsed.  The post_configure_hook is a good place to do your
 validation.
 
 Some emails have asked why we use this "template" method.  The idea is
-that you are creating the the data structure to store the values in,
+that you are creating the data structure to store the values in,
 and you are also creating a way to get the values into the data
 structure.  The template is the way to get the values to the servers
 data structure.  One of the possibilities (that probably isn't used
@@ -633,7 +633,7 @@ if the C<port> argument omits a host specification.  See
 L<Net::Server::Proto>. See L<IO::Socket>.  Configuration passed to new
 or run may be either a scalar containing a single host or an arrayref
 of hosts - if the hosts array is shorter than the ports array, the
-last host entry will be used to augment the hosts arrary to the size
+last host entry will be used to augment the hosts array to the size
 of the ports array.
 
 If an IPv4 address is passed, an IPv4 socket will be created.  If an
@@ -664,7 +664,7 @@ specification can be passed as part of the hostname.
     host => '*/IPv*',     # same (any IPv6 or IPv4)
 
     ipv  => 4,
-    host => '*',          # any local IPv4 interfaces interfaces
+    host => '*',          # any local IPv4 interfaces
 
 
 =item proto
@@ -677,7 +677,7 @@ extending the Net::Server::Proto class may be used).  Configuration
 passed to new or run may be either a scalar containing a single proto
 or an arrayref of protos - if the protos array is shorter than the
 ports array, the last proto entry will be used to augment the protos
-arrary to the size of the ports array.
+array to the size of the ports array.
 
 Additionally the proto may also contain the ipv specification.
 
@@ -845,13 +845,13 @@ server is still running as root.  Defaults to undef.
 
 =item user
 
-Userid or username to become after the bind process has occured.
+Userid or username to become after the bind process has occurred.
 Defaults to "nobody."  If you would like the server to run as root,
 you will have to specify C<user> equal to "root".
 
 =item group
 
-Groupid or groupname to become after the bind process has occured.
+Groupid or groupname to become after the bind process has occurred.
 Defaults to "nobody."  If you would like the server to run as root,
 you will have to specify C<group> equal to "root".
 
@@ -894,7 +894,7 @@ property that is tied to the already open STDIN and STDOUT.
 
 Boolean.  Default undef (not set).  If set, the parent will not
 attempt to close child processes if the parent receives a SIG HUP.
-The parent will rebind the the open port and begin tracking a fresh
+The parent will rebind the open port and begin tracking a fresh
 set of children.
 
 Children of a Fork server will exit after their current request.
@@ -1158,12 +1158,12 @@ the server.
 
 =item C<$self-E<gt>bind>
 
-This method actually binds to the inialized sockets (or rebinds if the
+This method actually binds to the initialized sockets (or rebinds if the
 server has been HUPed).
 
 =item C<$self-E<gt>post_bind>
 
-During this method priveleges are dropped.  The INT, TERM, and QUIT
+During this method privileges are dropped.  The INT, TERM, and QUIT
 signals are set to run server_close.  Sig PIPE is set to IGNORE.  Sig
 CHLD is set to sig_chld.  And sig HUP is set to call sig_hup.
 
@@ -1323,11 +1323,11 @@ the process will still be running as the user who started the server.
 =item C<$self-E<gt>pre_loop_hook()>
 
 This hook occurs after chroot, change of user, and change of group has
-occured.  It allows for preparation before looping begins.
+occurred.  It allows for preparation before looping begins.
 
 =item C<$self-E<gt>can_read_hook()>
 
-This hook occurs after a socket becomes readible on an
+This hook occurs after a socket becomes readable on an
 accept_multi_port request (accept_multi_port is used if there are
 multiple bound ports to accept on, or if the "multi_port"
 configuration parameter is set to true).  This hook is intended to
@@ -1337,7 +1337,7 @@ post_bind_hook.  No internal support is added for processing these
 handles or adding them to the IO::Socket.  Care must be used in how
 much occurs during the can_read_hook as a long response time will
 result in the server being susceptible to DOS attacks.  A return value
-of true indicates that the Server should not pass the readible handle
+of true indicates that the Server should not pass the readable handle
 on to the post_accept and process_request phases.
 
 It is generally suggested that other avenues be pursued for sending
@@ -1470,7 +1470,7 @@ Should return a hashref.
 Called when log_file is set to 'Sys::Syslog' and an error occurs while
 writing to the syslog.  It is passed two arguments, the value of $@,
 and an arrayref containing the arguments that were passed to the log
-method when the error occured.
+method when the error occurred.
 
 =item C<$self-E<gt>log>
 
@@ -1657,7 +1657,7 @@ parent/child communication on PreFork.pm.
 
 Thanks to Carl Lewis for suggesting "-" in user names.
 
-Thanks to Slaven Rezic for suggesing Reuse => 1 in Proto::UDP.
+Thanks to Slaven Rezic for suggesting Reuse => 1 in Proto::UDP.
 
 Thanks to Tim Watt for adding udp_broadcast to Proto::UDP.
 
@@ -1697,7 +1697,7 @@ lock_file once during parent call.  This patch should be portable on
 systems supporting flock.  Rob also suggested not closing STDIN/STDOUT
 but instead reopening them to /dev/null to prevent spurious warnings.
 Also suggested short circuit in post_accept if in UDP.  Also for
-cleaning up some of the child managment code of PreFork.
+cleaning up some of the child management code of PreFork.
 
 Thanks to Mark Martinec for suggesting additional log messages for
 failure during accept.
@@ -1717,7 +1717,7 @@ And for additional fixes later.
 Thanks to Steven Lembark for pointing out that no_client_stdout wasn't
 working with the Multiplex server.
 
-Thanks to Peter Beckman for suggesting allowing Sys::SysLog keyworks
+Thanks to Peter Beckman for suggesting allowing Sys::SysLog keywords
 be passed through the ->log method and for suggesting we allow more
 types of characters through in syslog_ident.  Also to Peter Beckman
 for pointing out that a poorly setup localhost will cause tests to
@@ -1782,7 +1782,7 @@ Thanks to Mark Martinec for much of the initial work towards getting
 IPv6 going.
 
 Thanks to the munin developers and Nicolai Langfeldt for hosting the
-development verion of Net::Server for so long and for fixes to the
+development version of Net::Server for so long and for fixes to the
 allow_deny checking for IPv6 addresses.
 
 Thanks to Tatsuhiko Miyagawa for feedback, and for suggesting adding

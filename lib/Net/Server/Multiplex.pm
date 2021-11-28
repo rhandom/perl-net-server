@@ -311,7 +311,7 @@ convenient inet style STDIN/STDOUT handling, logging features,
 deamonization and pid tracking, and restartability -SIGHUP) and some
 nice features of IO::Multiplex (automatic buffered IO and
 per-file-handle objects) and combines them for an easy-to-use
-interace.
+interface.
 
 See examples/samplechat.pl distributed with Net::Server for a simple
 chat server that uses several of these features.

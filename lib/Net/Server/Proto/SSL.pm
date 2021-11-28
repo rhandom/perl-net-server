@@ -236,7 +236,7 @@ Net::Server::Proto::SSL - Net::Server SSL protocol.
 
 =head1 SYNOPSIS
 
-Until this release, it was preferrable to use the Net::Server::Proto::SSLEAY
+Until this release, it was preferable to use the Net::Server::Proto::SSLEAY
 module.  Recent versions include code that overcomes original limitations.
 
 See L<Net::Server::Proto>.
@@ -300,7 +300,7 @@ Net::SSLeay.  See L<Net::Server::Proto>.
 If you know that your server will only need IPv4 (which is the default
 for Net::Server), you can load IO::Socket::SSL in inet4 mode which
 will prevent it from using Socket6 and IO::Socket::INET6 since they
-would represent additional and unsued overhead.
+would represent additional and unused overhead.
 
     use IO::Socket::SSL qw(inet4);
     use base qw(Net::Server::Fork);
