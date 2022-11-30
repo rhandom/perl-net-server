@@ -311,6 +311,7 @@ sub read_until {
 sub read {
     my ($client, $buf, $size, $offset) = @_;
     my ($ok, $read) = $client->read_until($size, undef, 1);
+    defined($_[1]) or $_[1] = '';
     substr($_[1], $offset || 0, defined($buf) ? length($buf) : 0, $read);
     return length $read;
 }
