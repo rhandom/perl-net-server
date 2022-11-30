@@ -37,6 +37,12 @@ sub allow_deny_hook {
     }
 }
 
+sub process_request {
+    my ($self, $client) = @_;
+    print $client "NS_port: ".$client->NS_port."\n";
+    return $self->SUPER::process_request($client);
+}
+
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
@@ -52,6 +58,8 @@ my $ok = eval {
         my $remote = IO::Socket::UNIX->new(Peer => $socket_file);
         die "No socket returned [$!]" if ! defined $remote;
         my $line = <$remote>;
+        warn "# unix port - $line";
+        $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         print $remote "quite\n";
 
@@ -61,6 +69,8 @@ my $ok = eval {
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp') || die "Couldn't open to sock: $!";
 
+        $line = <$remote>;
+        warn "# tcp port - $line";
         $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
         print $remote "exit\n";
