@@ -752,6 +752,9 @@ sub server_close {
         && defined($prop->{'pid_file_unlink'})) {
         unlink($prop->{'pid_file'}) || $self->log(1, "Couldn't unlink \"$prop->{'pid_file'}\" [$!]");
     }
+    if (defined($prop->{'sem'})) {
+        $prop->{'sem'}->remove();
+    }
 
     if ($prop->{'_HUP'}) {
         $self->restart_close_hook();

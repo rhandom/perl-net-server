@@ -1796,6 +1796,10 @@ Thanks to Miko O'Sullivan for fixes to HTTP to correct tainting issues
 and passing initial log fixes, and for patches to fix CLOSE on tied stdout
 and various other HTTP issues.
 
+Thanks to Emanuele <targeta> for a small patch releasing semaphores.
+
+Thanks to Rob <hookbot> for daemonization fixes with zero pid file.
+
 =head1 SEE ALSO
 
 Please see also
