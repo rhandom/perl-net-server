@@ -529,7 +529,7 @@ See L<Net::Server::Proto>.
 
 This module has reliably been used in situations receiving millions of
 hits on a single box per day.  If anybody has any successes or ideas
-for improvment under SSLEAY, please email <paul@seamons.com>.
+for improvement under SSLEAY, please email <paul@seamons.com>.
 
 Protocol module for Net::Server.  This module implements a secure
 socket layer over tcp (also known as SSL).  See L<Net::Server::Proto>.

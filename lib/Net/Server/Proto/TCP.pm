@@ -184,7 +184,7 @@ See L<Net::Server> for more information on reading arguments.
 =item C<object>
 
 Returns an object with parameters suitable for eventual creation of
-a IO::Socket::INET object listining on UDP.
+a IO::Socket::INET object listening on UDP.
 
 =item C<log_connect>
 

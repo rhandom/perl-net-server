@@ -117,7 +117,7 @@ See L<Net::Server::Proto>.
 
 =head1 PARAMETERS
 
-The following paramaters may be specified in addition to
+The following parameters may be specified in addition to
 normal command line parameters for a Net::Server.  See
 L<Net::Server> for more information on reading arguments.
 
@@ -155,7 +155,7 @@ Default is undef.
 =item C<object>
 
 Returns an object with parameters suitable for eventual creation of
-a IO::Socket::INET object listining on UDP.
+a IO::Socket::INET object listening on UDP.
 
 =item C<connect>
 
