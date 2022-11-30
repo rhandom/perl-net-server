@@ -43,6 +43,7 @@ my @ssl_args = qw(
     SSL_max_getline_length
     SSL_error_callback
     SSL_verify_callback
+    SSL_version
 );
 
 sub NS_proto { 'SSL' }
