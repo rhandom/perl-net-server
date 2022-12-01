@@ -743,7 +743,8 @@ For versions 2.000 through 2.004, the previous default of IPv4 was
 used.  We have attempted to make it easy to set IPv4, IPv6, or IPv*.
 If you do not want or need IPv6, simply set ipv to 4, pass IPv4 along
 in the port specification, set $ENV{'IPV'}=4; before running the
-server, or uninstall IO::Socket::IP and/or IO::Socket::INET6.
+server, set $ENV{'NO_IPV6'}, or uninstall IO::Socket::IP and/or
+IO::Socket::INET6.
 
 On my local box the following command results in the following output:
 
@@ -1508,6 +1509,12 @@ maintain the same random seed unless changed).
 =item C<$self-E<gt>pre_fork_hook()>
 
 Similar to the child_init_hook, but occurs just before the fork.
+
+=item C<$self-E<gt>register_child($pid, $type)>
+
+Called by parent process when a child has been forked.  Type
+will be one of dequeue, fork, prefork, or preforksimple depending
+on where the child was created.
 
 =item C<$self-E<gt>child_finish_hook()>
 

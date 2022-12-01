@@ -707,6 +707,7 @@ sub done {
 }
 
 sub pre_fork_hook {}
+sub register_child {}
 sub child_init_hook {}
 sub child_finish_hook {}
 
@@ -730,6 +731,7 @@ sub run_dequeue { # fork off a child process to handle dequeuing
 
     $self->{'server'}->{'children'}->{$pid}->{'status'} = 'dequeue'
         if $self->{'server'}->{'children'};
+    $self->register_child($pid, 'dequeue');
 }
 
 sub default_port { 20203 }

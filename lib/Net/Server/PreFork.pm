@@ -174,7 +174,8 @@ sub run_n_children {
             }
 
             $prop->{'children'}->{$pid}->{'status'} = 'waiting';
-            $prop->{'tally'}->{'waiting'} ++;
+            $prop->{'tally'}->{'waiting'}++;
+            $self->register_child($pid, 'prefork');
 
         } else { # child
             if ($prop->{'child_communication'}) {

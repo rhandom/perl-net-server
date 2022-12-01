@@ -12,6 +12,7 @@ Revision history for Perl extension Net::Server.
         - Allow space in config file values
         - Retro-actively acknowlege that 2.008 changed default Net::Server::HTTP type to PreFork (and update docs)
         - Fix Location bounce with other status set
+        - Finally add register_child method called if a child process is started.
 
 2.010  Mar 22 2021
         - Add SSL_verify_callback

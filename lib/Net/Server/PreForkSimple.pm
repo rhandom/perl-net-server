@@ -146,6 +146,7 @@ sub run_n_children {
 
         if ($pid) {
             $prop->{'children'}->{$pid}->{'status'} = 'processing';
+            $self->register_child($pid, 'preforksimple');
         } else {
             $self->run_child;
         }
