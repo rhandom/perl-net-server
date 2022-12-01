@@ -522,7 +522,7 @@ sub get_client_info {
     my $client = shift || $prop->{'client'};
 
     if ($client->NS_proto =~ /^UNIX/) {
-        delete @$prop{qw(sockaddr sockport peeraddr peerport peerhost)};
+        delete @$prop{qw(sockaddr sockport peeraddr peerport peerhost peerhost_rev)};
         $self->log(3, $self->log_time." CONNECT ".$client->NS_proto." Socket: \"".$client->NS_port."\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
         return;
     }
@@ -553,14 +553,13 @@ sub get_client_info {
         @{ $prop }{qw(peeraddr peerhost peerport)} = ('0.0.0.0', 'inet.test', 0); # commandline
     }
 
+    delete @$prop{qw(peerhost peerhost_rev)};
     if ($addr && $prop->{'reverse_lookups'}) {
-        if ($INC{'Socket6.pm'} && Socket6->can('getnameinfo')) {
-            my @res = Socket6::getnameinfo($addr, 0);
-            if (@res > 1) {
-                $prop->{'peerhost'} = $res[0];
-            } elsif ($prop->{'peeraddr'} =~ /^(?:::ffff:)?(\d+(?:\.\d+){3})$/) {
-                $prop->{'peerhost'} = gethostbyaddr(Socket::inet_aton($1), AF_INET);
-            }
+        if ($client->can('peerhostname')) {
+            $prop->{'peerhost'} = $client->peerhostname;
+        } elsif ($INC{'Socket6.pm'} && Socket6->can('getnameinfo')) {
+            my @res = Socket6::getnameinfo($client->peername, 0);
+            $prop->{'peerhost'} = $res[0] if @res > 1;
         } else {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
         }
@@ -587,7 +586,7 @@ sub allow_deny {
 
     # work around Net::CIDR::cidrlookup() croaking,
     # if first parameter is an IPv4 address in IPv6 notation.
-    my $peeraddr = ($prop->{'peeraddr'} =~ /^\s*::ffff:([0-9.]+\s*)$/) ? $1 : $prop->{'peeraddr'};
+    my $peeraddr = ($prop->{'peeraddr'} =~ /^\s*::ffff:(\d+(?:\.\d+){3})$/) ? $1 : $prop->{'peeraddr'};
 
     if ($prop->{'double_reverse_lookups'}) {
         return 0 if ! $self->double_reverse_lookup($peeraddr, $prop->{'peerhost'}, $prop->{'peerhost_rev'}, $prop->{'peeraddr'})

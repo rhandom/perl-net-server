@@ -3,16 +3,18 @@ Revision history for Perl extension Net::Server.
 2.011  Dec 01 2022
         - Default to IO::Socket::IP with continued fallback to IO::Socket::INET6
         - Add double_reverse_lookups configuration and code
+        - Cleanup hostname lookup under both IO::Socket::IP and IO::Socket::INET6
         - Change SSL to use IO::Socket::SSL SSL_startHandshake
         - Fix semaphore release
         - Update various POD issues
+        - Finally add register_child method called if a child process is started.
         - Bugfix Net::Server::PSGI
         - Allow groups to be separated by ,
         - Allow . in usernames and groups
         - Allow space in config file values
         - Retro-actively acknowlege that 2.008 changed default Net::Server::HTTP type to PreFork (and update docs)
         - Fix Location bounce with other status set
-        - Finally add register_child method called if a child process is started.
+        - Return status 400 under request_denied_hook in Net::Server::HTTP
 
 2.010  Mar 22 2021
         - Add SSL_verify_callback

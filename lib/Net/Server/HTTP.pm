@@ -262,24 +262,21 @@ our %status_msg = (
     401 => 'Unauthorized',
     403 => 'Forbidden',
     404 => 'Not Found',
+    418 => "I'm a teapot",
     500 => 'Internal Server Error',
     501 => 'Not Implemented',
     503 => 'Service Unavailable',
 );
 
 sub send_status {
-    my ($self, $status, $msg, $body) = @_;
+    my ($self, $status, $msg, $body, $gen_body) = @_;
 
     my ($version, $headers);
     if (ref($status) eq 'HASH') {
         ($version, $status, $msg, $headers) = @$status{qw(version status msg headers)};
     }
     $version ||= '1.0';
-    $msg     ||= $status_msg{$status} || '-';
 
-    my $request_info = $self->{'request_info'};
-
-    my $out = "HTTP/$version $status $msg\015\012";
     my @hdrs = @{ $self->http_base_headers };
     push @hdrs, @$headers if $headers;
     foreach my $hdr (@hdrs) {
@@ -293,7 +290,16 @@ sub send_status {
             }
         }
     }
+    $status ||= 500;
+    $msg    ||= $status_msg{$status} || '-';
+    if (! $body && $gen_body) {
+        my $_msg = ($msg eq '-') ? "Status $status" : $msg;
+        $gen_body = [] if ref $gen_body ne 'ARRAY';
+        for ($_msg, @$gen_body) { s/</&lt;/g; s/>/&lt;/g; s/&/&alt;/g }
+        $body = "<html>\n<body>\n<h1>$_msg</h1>".join("\n", map {"<p>$_</p>"} @$gen_body)."</body>\n</html>\n";
+    }
 
+    my $out = "HTTP/$version $status $msg\015\012";
     my $no_body;
     if (($status == 204 || $status == 304 || ($status >= 100 && $status <= 199))
         && ! $self->{'server'}->{'allow_body_on_all_statuses'}) {
@@ -304,6 +310,7 @@ sub send_status {
         push @hdrs, $ct = ['Content-type', $self->default_content_type] if ! $ct;
     }
 
+    my $request_info = $self->{'request_info'};
     foreach my $hdr (@hdrs) {
         $out .= "$hdr->[0]: $hdr->[1]\015\012";
         push @{ $request_info->{'response_headers'} }, $hdr;
@@ -311,10 +318,8 @@ sub send_status {
     $out .= "\015\012";
 
     $self->{'server'}->{'client'}->print($out);
-    $request_info->{'http_version'} = '1.0';
-    $request_info->{'response_status'} = $status;
-    $request_info->{'response_header_size'} += length $out;
-    $request_info->{'headers_sent'} = 1;
+    @$request_info{qw(http_version response_status response_header_size headers_sent)}
+        = ($version, $status, length($out), 1);
 
     if ($no_body) {
         # no content-type and or body
@@ -324,10 +329,8 @@ sub send_status {
     }
 }
 
-sub send_500 {
-    my ($self, $err) = @_;
-    $self->send_status(500, 'Internal Server Error', "<h1>Internal Server Error</h1>\n<p>$err</p>\n");
-}
+sub send_400 { my ($self, @err) = @_;  $self->send_status(400, undef, undef, \@err) }
+sub send_500 { my ($self, @err) = @_;  $self->send_status(500, undef, undef, \@err) }
 
 ###----------------------------------------------------------------###
 
@@ -373,6 +376,11 @@ sub process_request {
     }
 }
 
+sub request_denied_hook {
+    my ($self, $client) = @_;
+    $self->send_400();
+}
+
 sub script_name { shift->{'script_name'} || '' }
 
 sub process_headers {
@@ -383,6 +391,7 @@ sub process_headers {
     $ENV{'REMOTE_ADDR'} = $self->{'server'}->{'peeraddr'};
     $ENV{'SERVER_PORT'} = $self->{'server'}->{'sockport'};
     $ENV{'SERVER_ADDR'} = $self->{'server'}->{'sockaddr'};
+    $ENV{$_} =~ s/^::ffff:(?=\d+(?:\.\d+){3}$)// for qw(REMOTE_ADDR SERVER_ADDR);
     $ENV{'HTTPS'} = 'on' if $self->{'server'}->{'client'}->NS_proto =~ /SSL/;
 
     my ($ok, $headers) = $client->read_until($self->max_header_size, qr{\n\r?\n});
@@ -787,6 +796,12 @@ the environment and sets up request alarms and handles dying failures.
 It calls process_http_request once the request is ready and headers
 have been parsed.
 
+=item C<request_denied_hook>
+
+This method has been overridden to call send_400.  This is
+new behavior.  To get the previous behavior (where the client
+was closed without any indication), simply provide
+
 =item C<process_headers>
 
 Used to read in the incoming headers and set the ENV.
@@ -803,7 +818,17 @@ This information will be used for logging later on.
 
 =item C<send_status>
 
-Takes an HTTP status and a message.  Sends out the correct headers.
+Takes an HTTP status, an optional message, optional body, and
+optional generate_body flag.  Sends out the correct headers.
+
+    $self->send_status(500);
+    $self->send_status(500, 'Internal Server Error');
+    $self->send_status(500, 'Internal Server Error', "<h1>Internal Server Error</h1><p>Msg</p>");
+    $self->send_status(500, undef, undef, ['Msg']);
+
+=item C<send_400>
+
+Calls send_status with 400 and the passed arguments as generate_body.
 
 =item C<send_500>
 

@@ -1318,6 +1318,16 @@ directly to and read directly from the client socket.
 This method looks up information about the client connection such as
 ip address, socket type, and hostname (as needed).
 
+Sets the following in $self->{'server'} (note that these names
+do not necessarily correspond to the names of the IO::Socket:: libraries):
+
+    sockaddr     - Human IP address that was connected to
+    sockport     - Local port that was connected to
+    peeraddr     - Human IP address of the remote source (either IPv6 or IPv4)
+    peerport     - Source port of the connection
+    peerhost     - IP Address resolved to hostname (if possible)
+    peerhost_rev - Hashref of ips of the reverse lookup of the peerhost - only set if double_reverse_lookups
+
 =item C<$self-E<gt>allow_deny>
 
 This method uses the rules defined in the allow and deny configuration
