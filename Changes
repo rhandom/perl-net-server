@@ -2,6 +2,7 @@ Revision history for Perl extension Net::Server.
 
 2.011  Dec 01 2022
         - Default to IO::Socket::IP with continued fallback to IO::Socket::INET6
+        - Add double_reverse_lookups configuration and code
         - Change SSL to use IO::Socket::SSL SSL_startHandshake
         - Fix semaphore release
         - Update various POD issues

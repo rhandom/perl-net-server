@@ -439,6 +439,8 @@ base class.)
     ipv               (4|6|*)                  *
     proto             (tcp|udp|unix)           "tcp"
     listen            \d+                      SOMAXCONN
+    ipv6_package      (IO::Socket::INET6       IO::Socket::IP
+                       |IO::Socket::IP)
 
     ## syslog parameters (if log_file eq Sys::Syslog)
     syslog_logsock    (native|unix|inet|udp
@@ -447,7 +449,8 @@ base class.)
     syslog_logopt     (cons|ndelay|nowait|pid) pid
     syslog_facility   \w+                      daemon
 
-    reverse_lookups   1                        undef
+    reverse_lookups   (1|double|double-debug)  undef
+    double_reverse_lookups  (1|debug|autofail) undef
     allow             /regex/                  none
     deny              /regex/                  none
     cidr_allow        CIDR                     none
@@ -819,11 +822,64 @@ Socket6::AF_INET6 or Socket::AF_UNSPEC, and it is short.
 
 See L<IO::Socket>.  Not used with udp protocol (or UNIX SOCK_DGRAM).
 
+=item ipv6_package
+
+Net::Server::Proto will try to determine the appropriate socket
+class to use if a v6 socket is needed.  It will default to
+trying IO::Socket::IP first, and then IO::Socket::INET6.  Specifying
+this package allows for a specific package to be used (note that
+IO::Socket::SSL used by Proto::SSL does its own ipv6 socket package
+determination).
+
 =item reverse_lookups
 
 Specify whether to lookup the hostname of the connected IP.
 Information is cached in server object under C<peerhost> property.
 Default is to not use reverse_lookups (undef).
+
+Can be set to the values "double", "double-detail", "double-autofail",
+or "double-debug" to set double_reverse_lookups.
+
+=item double_reverse_lookups
+
+If set, also sets reverse_lookups.
+
+Same as setting reverse_lookups to "double".  Looks up the IPs
+that the hostname resolves to to make sure the connection ip is one
+of those ips.
+
+Sets peerhost_rev as a hashref of ip addresses the name resolved to
+during get_client_info.
+
+If double_reverse_lookups is set, the double_reverse_lookup method
+is called during the allow_deny method.  The
+double_reverse_lookup method is passed:
+
+    addr  - the IPv4 or IPv6 address
+    host  - the hostname the addr resolved to
+    addrs - the hashref of ip addresses the host resolved to
+    orig  - the original unfiltered addr
+
+Makes allow_deny return false if there is no hostname, no reverse ips,
+or if one of the ip addrs does not match the connection ip addr.
+Sends a log level 3 message.
+
+Can set double_reverse_lookups to one of the following to adjust logging:
+
+    detail   - add addrs to the failure messages
+    autofail - fail on every connection and log
+    debug    - log address information (but not fail) for successful connections
+
+The following one liners can help with debugging:
+
+    net-server HTTP --reverse_lookups=double-debug --log_level=3
+    # curl localhost:8080 in other window
+
+    2022/11/30-22:16:45 CONNECT TCP Peer: "[::ffff:127.0.0.1]:44766" (localhost)  Local: "[::ffff:127.0.0.1]:8080"
+    2022/11/30-22:16:45 Double reverse debug:  addr: 127.0.0.1,  host: localhost,  addrs: (127.0.0.1),  orig_addr: ::ffff:127.0.0.1
+
+The double_reverse_lookup is called before running any allow/deny
+rules.
 
 =item allow/deny
 
@@ -1096,6 +1152,9 @@ represents the program flow:
 
     $self->post_client_connection_hook;
 
+The allow_deny method calls $self->double_reverse_lookup if
+double_reverse_lookups are enabled.
+
 The process then loops and waits for the next connection.  For a more
 in depth discussion, please read the code.
 
@@ -1252,6 +1311,13 @@ ip address, socket type, and hostname (as needed).
 
 This method uses the rules defined in the allow and deny configuration
 parameters to determine if the ip address should be accepted.
+
+=item C<$self-E<gt>double_reverse_lookup>
+
+Called if the double_reverse_lookups value is set or reverse_lookups
+is set to "double".  Uses peerhost_rev hashref ips to verify that the
+connection ip is valid for the hostname.  See the
+double_reverse_lookups configuration.
 
 =item C<$self-E<gt>process_request>
 

@@ -180,6 +180,10 @@ sub post_configure {
 
     # make sure that allow and deny look like array refs
     $prop->{$_} = [] for grep {! ref $prop->{$_}} qw(allow deny cidr_allow cidr_deny);
+
+    $prop->{'reverse_lookups'} ||= 1 if $prop->{'double_reverse_lookups'};
+    $prop->{'double_reverse_lookups'} = $1 || $prop->{'double_reverse_lookups'} || 1
+        if $prop->{'reverse_lookups'} && $prop->{'reverse_lookups'} =~ /^(?:double|2)(.*)$/i;
 }
 
 sub initialize_logging {
@@ -541,18 +545,25 @@ sub get_client_info {
         @{ $prop }{qw(peeraddr peerhost peerport)} = ('0.0.0.0', 'inet.test', 0); # commandline
     }
 
-    if ($addr && defined $prop->{'reverse_lookups'}) {
+    if ($addr && $prop->{'reverse_lookups'}) {
         if ($INC{'Socket6.pm'} && Socket6->can('getnameinfo')) {
             my @res = Socket6::getnameinfo($addr, 0);
-            $prop->{'peerhost'} = $res[0] if @res > 1;
-        }else{
+            if (@res > 1) {
+                $prop->{'peerhost'} = $res[0];
+            } elsif ($prop->{'peeraddr'} =~ /^(?:::ffff:)?(\d+(?:\.\d+){3})$/) {
+                $prop->{'peerhost'} = gethostbyaddr(Socket::inet_aton($1), AF_INET);
+            }
+        } else {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
+        }
+        if ($prop->{'peerhost'} && $prop->{'double_reverse_lookups'}) {
+            $prop->{'peerhost_rev'} = {map {$_->[0] => 1} Net::Server::Proto->get_addr_info($prop->{'peerhost'})};
         }
     }
 
     $self->log(3, $self->log_time
                ." CONNECT ".$client->NS_proto
-               ." Peer: \"[$prop->{'peeraddr'}]:$prop->{'peerport'}\""
+               ." Peer: \"[$prop->{'peeraddr'}]:$prop->{'peerport'}\"".($prop->{'peerhost'} ? " ($prop->{'peerhost'}) " : '')
                ." Local: \"[$prop->{'sockaddr'}]:$prop->{'sockport'}\"") if $prop->{'log_level'} && 3 <= $prop->{'log_level'};
 }
 
@@ -566,15 +577,19 @@ sub allow_deny {
     # unix sockets are immune to this check
     return 1 if $sock && $sock->NS_proto =~ /^UNIX/;
 
+    # work around Net::CIDR::cidrlookup() croaking,
+    # if first parameter is an IPv4 address in IPv6 notation.
+    my $peeraddr = ($prop->{'peeraddr'} =~ /^\s*::ffff:([0-9.]+\s*)$/) ? $1 : $prop->{'peeraddr'};
+
+    if ($prop->{'double_reverse_lookups'}) {
+        return 0 if ! $self->double_reverse_lookup($peeraddr, $prop->{'peerhost'}, $prop->{'peerhost_rev'}, $prop->{'peeraddr'})
+    }
+
     # if no allow or deny parameters are set, allow all
     return 1 if ! @{ $prop->{'allow'} }
              && ! @{ $prop->{'deny'} }
              && ! @{ $prop->{'cidr_allow'} }
              && ! @{ $prop->{'cidr_deny'} };
-
-    # work around Net::CIDR::cidrlookup() croaking,
-    # if first parameter is an IPv4 address in IPv6 notation.
-    my $peeraddr = ($prop->{'peeraddr'} =~ /^\s*::ffff:([0-9.]+\s*)$/) ? $1 : $prop->{'peeraddr'};
 
     # if the addr or host matches a deny, reject it immediately
     foreach (@{ $prop->{'deny'} }) {
@@ -599,6 +614,30 @@ sub allow_deny {
     }
 
     return 0;
+}
+
+sub double_reverse_lookup {
+    my ($self, $addr, $host, $rev_addrs, $orig_addr) = @_;
+    my $cfg = $self->{'server'}->{'double_reverse_lookups'} || '';
+    if (! $host) {
+        $self->log(3, $self->log_time ." Double reverse missing host from addr $addr");
+        return 0;
+    } elsif (! $rev_addrs) {
+        $self->log(3, $self->log_time ." Double reverse missing reverse addrs from host $host ($addr)");
+        return 0;
+    }
+    my $extra = ($orig_addr && $orig_addr ne $addr) ? ",  orig_addr: $orig_addr" : '';
+    if (! $rev_addrs->{$addr} && ! $rev_addrs->{$orig_addr}) {
+        $self->log(3, $self->log_time ." Double reverse did not match:  addr: $addr,  host: $host"
+            .($cfg =~ /detail/i ? ",  addrs: (".join(' ', sort keys %$rev_addrs).")$extra" : ''));
+        return 0;
+    } elsif ($cfg =~ /autofail/i) {
+        $self->log(3, $self->log_time ." Double reverse autofail:  addr: $addr,  host: $host,  addrs: (".join(' ', sort keys %$rev_addrs).")$extra");
+        return 0;
+    } elsif ($cfg =~ /debug/) {
+        $self->log(3, $self->log_time ." Double reverse debug:  addr: $addr,  host: $host,  addrs: (".join(' ', sort keys %$rev_addrs).")$extra");
+    }
+    return 1;
 }
 
 sub allow_deny_hook { 1 } # false to deny request
@@ -960,7 +999,7 @@ sub options {
     foreach (qw(conf_file
                 user group chroot log_level
                 log_file pid_file background setsid
-                listen reverse_lookups
+                listen ipv6_package reverse_lookups double_reverse_lookups
                 no_close_by_child
                 no_client_stdout tie_client_stdout tied_stdout_callback tied_stdin_callback
                 leave_children_open_on_hup
