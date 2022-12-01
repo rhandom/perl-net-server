@@ -7,8 +7,7 @@ use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok note skip);
 my $env = prepare_test({n_tests => 5, start_port => 20200, n_ports => 1}); # runs three of its own tests
 
-if (! eval { require File::Temp }
-    || ! eval { require IO::Socket::SSL }
+if (! eval { require IO::Socket::SSL }
    ) {
   SKIP: { skip("Cannot load IO::Socket::SSL libraries to test Socket SSL server: $@", 2); };
     exit;
@@ -66,11 +65,6 @@ YftRX/a/t18CpitrzViVgQ+l
 -----END PRIVATE KEY-----
 PEM
 
-my ($pem_fh, $pem_filename) =
-  File::Temp::tempfile(SUFFIX => '.pem', UNLINK => 1);
-print $pem_fh $pem;
-$pem_fh->close;
-
 use_ok qw(Net::Server::Proto::SSL) or exit;
 require Net::Server;
 @Net::Server::Test::ISA = qw(Net::Server);
@@ -120,8 +114,8 @@ my $ok = eval {
                 port  => $env->{'ports'}->[0],
                 proto => 'ssl',
                 ipv   => '*', # $env->{'ipv'}, # IO::Socket::SSL always tries INET6 if it is available so we should listen on 6 if it is available
-                SSL_cert_file => $pem_filename,
-                SSL_key_file  => $pem_filename,
+                SSL_cert_file => "$Bin/self_signed.crt",
+                SSL_key_file  => "$Bin/self_signed.key",
                 background => 0,
                 setsid => 0,
                 );
