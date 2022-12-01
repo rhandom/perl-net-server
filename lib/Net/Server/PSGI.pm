@@ -51,7 +51,7 @@ sub process_request {
         $self->process_headers;
 
         alarm($self->timeout_idle);
-        my $env = \%ENV;
+        my $env = { %ENV };
         $env->{'psgi.version'}      = [1, 0];
         $env->{'psgi.url_scheme'}   = ($ENV{'HTTPS'} && $ENV{'HTTPS'} eq 'on') ? 'https' : 'http';
         $env->{'psgi.input'}        = $self->{'server'}->{'client'};

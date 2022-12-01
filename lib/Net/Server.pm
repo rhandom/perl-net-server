@@ -195,7 +195,15 @@ sub initialize_logging {
     }
 
     # pluggable logging
-    if ($prop->{'log_file'} =~ /^([a-zA-Z]\w*(?:::[a-zA-Z]\w*)*)$/) {
+    if (my $code = $prop->{'log_function'}) {
+        if (ref $code ne 'CODE') {
+            require Scalar::Util;
+            die "Passed log_function $code was not a valid method of server, or was not a code object\n" if ! $self->can($code);
+            my $copy = $self;
+            $prop->{'log_function'} = sub { $copy->$code(@_) };
+            Scalar::Util::weaken($copy);
+        }
+    } elsif ($prop->{'log_file'} =~ /^([a-zA-Z]\w*(?:::[a-zA-Z]\w*)*)$/) {
         my $pkg  = "Net::Server::Log::$prop->{'log_file'}";
         (my $file = "$pkg.pm") =~ s|::|/|g;
         if (eval { require $file }) {
@@ -1000,7 +1008,7 @@ sub options {
 
     foreach (qw(conf_file
                 user group chroot log_level
-                log_file pid_file background setsid
+                log_file log_function pid_file background setsid
                 listen ipv6_package reverse_lookups double_reverse_lookups
                 no_close_by_child
                 no_client_stdout tie_client_stdout tied_stdout_callback tied_stdin_callback

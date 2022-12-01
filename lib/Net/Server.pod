@@ -433,6 +433,7 @@ base class.)
     log_level         0-4                      2
     log_file          (filename|Sys::Syslog
                        |Log::Log4perl)         undef
+    log_function                               undef
 
     port              \d+                      20203
     host              "host"                   "*"
@@ -546,6 +547,15 @@ L<Net::Server::Log::Log::Log4per>.
 If a C<log_file> is given or if C<setsid> is set, STDIN and STDOUT
 will automatically be opened to /dev/null and STDERR will be opened to
 STDOUT.  This will prevent any output from ending up at the terminal.
+
+=item log_function
+
+Can take a coderef or method name to call when a log event occurs.
+Will be passed the level of the log message and the log message.
+
+Note that functions depending upon stdout will not function
+during process_request in situations where the tie_stdout is set
+(such as during Net::Server::HTTP).
 
 =item pid_file
 

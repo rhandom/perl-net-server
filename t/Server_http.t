@@ -33,7 +33,7 @@ my $ok = eval {
 
         my $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
 
-        print $remote "GET / HTTP/1.0\nFoo: bar\n\n";
+        print $remote "GET / HTTP/1.0\nFoo: bar\nUser-Agent: perl-socket/1.0\nReferer: file:///Server_http.t\n\n";
 
         ### sample a line
         my @lines = <$remote>;
@@ -45,7 +45,8 @@ my $ok = eval {
     } else {
         eval {
             alarm $env->{'timeout'};
-            close STDERR;
+            open(my $fh, ">&=", STDOUT) or die "Could not clone STDOUT: $!";
+
             Net::Server::Test->run(
                 port => $env->{'ports'}->[0],
                 host => $env->{'hostname'},
@@ -53,6 +54,15 @@ my $ok = eval {
                 server_type => 'Single',
                 background => 0,
                 setsid => 0,
+                log_function => sub {
+                    my ($level, $msg) = @_;
+                    note "LOG:$level: $msg"
+                        if $ENV{'DEBUG_LOG'};
+                },
+                access_log_function => sub {
+                    select $fh;
+                    note "ACCESS: $_[0]";
+                },
             );
         } || do {
             note("Trouble running server: $@");

@@ -32,7 +32,8 @@ sub options {
     my $ref  = $self->SUPER::options(@_);
     my $prop = $self->{'server'};
     $ref->{$_} = \$prop->{$_} for qw(timeout_header timeout_idle server_revision max_header_size
-                                     access_log_format access_log_file enable_dispatch);
+                                     access_log_format access_log_file access_log_function enable_dispatch
+                                     default_content_type allow_body_on_all_statuses);
     return $ref;
 }
 
@@ -86,10 +87,17 @@ sub _init_access_log {
     my $self = shift;
     my $prop = $self->{'server'};
     my $log = $prop->{'access_log_file'};
-    return if ! $log || $log eq '/dev/null';
+    return if (! $log || $log eq '/dev/null') && ! $prop->{'access_log_function'};
     return if ! $prop->{'access_log_format'};
     $prop->{'access_log_format'} =~ s/\\([\\\"nt])/$1 eq 'n' ? "\n" : $1 eq 't' ? "\t" : $1/eg;
-    if ($log eq 'STDOUT' || $log eq '/dev/stdout') {
+    if (my $code = $prop->{'access_log_function'}) {
+        if (ref $code ne 'CODE') {
+            die "Passed access_log_function $code was not a valid method of server, or was not a code object\n" if ! $self->can($code);
+            my $copy = $self;
+            $prop->{'access_log_function'} = sub { $copy->$code(@_) };
+            weaken $copy;
+        }
+    } elsif ($log eq 'STDOUT' || $log eq '/dev/stdout') {
         open my $fh, '>&', \*STDOUT or die "Could not dup STDOUT: $!";
         $fh->autoflush(1);
         $prop->{'access_log_function'} = sub { print $fh @_,"\n" };
@@ -143,44 +151,38 @@ sub _tie_client_stdout {
 
         die "All headers must only be sent via print ($method)\n" if $method ne 'print';
 
-        my $headers = ${*$client}{'headers'} ||= {unparsed => '', parsed => ''};
-        $headers->{'unparsed'} .= join('', @_);
-        while ($headers->{'unparsed'} =~ s/^(.*?)\015?\012//) {
+        my $headers = ${*$client}{'headers'} ||= {buffer => '', status => undef, msg => undef, headers => []};
+        $headers->{'buffer'} .= join('', @_);
+        while ($headers->{'buffer'} =~ s/^(.*?)\015?\012//) {
             my $line = $1;
 
-            if (!$headers->{'parsed'} && $line =~ m{^HTTP/(1.[01]) \s+ (\d+) (?: | \s+ .+)$ }x) {
-                $headers->{'status'} = [];
-                $headers->{'parsed'} .= "$line\015\012";
-                $prop->{'request_info'}->{'http_version'} = $1;
-                $prop->{'request_info'}->{'response_status'} = $2;
+            if ($line =~ m{^HTTP/(1.[01]) \s+ (\d+) (?: | \s+ (.+?)) \s* $ }x) {
+                die "Found HTTP/ line after other headers were sent\n" if @{ $headers->{'headers'} };
+                @$headers{qw(version status msg)} = ($1, $2, $3);
             }
             elsif (! length $line) {
-                my $s = $headers->{'status'} || die "Premature end of script headers\n";
+                if (! $headers->{'status'} && ! @{ $headers->{'headers'} }) {
+                    die "Premature end of script headers\n";
+                }
                 delete ${*$client}{'headers'};
-                $copy->send_status(@$s) if @$s;
-                $client->print($headers->{'parsed'}."\015\012");
-                $request_info->{'headers_sent'} = 1;
-                $request_info->{'response_header_size'} += length($headers->{'parsed'})+2;
-                $request_info->{'response_size'} = length($headers->{'unparsed'});
-                return $client->print($headers->{'unparsed'});
+                $copy->send_status($headers);
+                if (my $n = length $headers->{'buffer'}) {
+                    $request_info->{'response_size'} = $n;
+                    $client->print($headers->{'buffer'});
+                }
+                return;
             } elsif ($line !~ s/^(\w+(?:-(?:\w+))*):\s*//) {
                 my $invalid = ($line =~ /(.{0,120})/) ? "$1..." : '';
                 $invalid =~ s/</&lt;/g;
                 die "Premature end of script headers: $invalid<br>\n";
             } else {
-                my $key = "\u\L$1";
-                $key =~ y/_/-/;
+                my $key = $1;
                 push @{ $request_info->{'response_headers'} }, [$key, $line];
-                if ($key eq 'Status' && $line =~ /^(\d+) (?:|\s+(.+?))$/ix) {
-                    $headers->{'status'} = [$1, $2 || '-'];
+                if (lc($key) eq 'status' && $line =~ /^(\d+) (?:|\s+(.+?))$/ix) {
+                    @$headers{qw(status msg)} = ($1, $2) if ! $headers->{'status'};
+                    # not sure if it should also still be setting a header
                 }
-                elsif ($key eq 'Location') {
-                    $headers->{'status'} ||= [302, 'bouncing'];
-                }
-                elsif ($key eq 'Content-type') {
-                    $headers->{'status'} ||= [200, 'OK'];
-                }
-                $headers->{'parsed'} .= "$key: $line\015\012";
+                push @{ $headers->{'headers'} }, [$key, $line];
             }
         }
     };
@@ -246,27 +248,77 @@ sub http_base_headers {
     ];
 }
 
+sub default_content_type { shift->{'server'}->{'default_content_type'} || 'text/html' }
+
+our %status_msg = (
+    200 => 'OK',
+    201 => 'Created',
+    202 => 'Accepted',
+    204 => 'No Content',
+    301 => 'Moved Permanently',
+    302 => 'Found',
+    304 => 'Not Modified',
+    400 => 'Bad Request',
+    401 => 'Unauthorized',
+    403 => 'Forbidden',
+    404 => 'Not Found',
+    500 => 'Internal Server Error',
+    501 => 'Not Implemented',
+    503 => 'Service Unavailable',
+);
+
 sub send_status {
     my ($self, $status, $msg, $body) = @_;
-    $msg ||= ($status == 200) ? 'OK' : '-';
+
+    my ($version, $headers);
+    if (ref($status) eq 'HASH') {
+        ($version, $status, $msg, $headers) = @$status{qw(version status msg headers)};
+    }
+    $version ||= '1.0';
+    $msg     ||= $status_msg{$status} || '-';
+
     my $request_info = $self->{'request_info'};
 
-    my $out = "HTTP/1.0 $status $msg\015\012";
-    foreach my $row (@{ $self->http_base_headers }) {
-        $out .= "$row->[0]: $row->[1]\015\012";
-        push @{ $request_info->{'response_headers'} }, $row;
+    my $out = "HTTP/$version $status $msg\015\012";
+    my @hdrs = @{ $self->http_base_headers };
+    push @hdrs, @$headers if $headers;
+    foreach my $hdr (@hdrs) {
+        $hdr->[0] =~ y/_/-/;
+        $hdr->[0] = ucfirst lc $hdr->[0];
+        if (! $status) {
+            if ($hdr->[0] eq 'Content-type') {
+                $status = 200;
+            } elsif ($hdr->[0] eq 'Location') {
+                $status = 302;
+            }
+        }
     }
+
+    my $no_body;
+    if (($status == 204 || $status == 304 || ($status >= 100 && $status <= 199))
+        && ! $self->{'server'}->{'allow_body_on_all_statuses'}) {
+        # no content-type and or body
+        $no_body = 1;
+    } else {
+        my $ct = (grep { lc($_->[0]) eq 'content-type' } @hdrs)[0];
+        push @hdrs, $ct = ['Content-type', $self->default_content_type] if ! $ct;
+    }
+
+    foreach my $hdr (@hdrs) {
+        $out .= "$hdr->[0]: $hdr->[1]\015\012";
+        push @{ $request_info->{'response_headers'} }, $hdr;
+    }
+    $out .= "\015\012";
+
     $self->{'server'}->{'client'}->print($out);
     $request_info->{'http_version'} = '1.0';
     $request_info->{'response_status'} = $status;
     $request_info->{'response_header_size'} += length $out;
+    $request_info->{'headers_sent'} = 1;
 
-    if ($body) {
-        push @{ $request_info->{'response_headers'} }, ['Content-type', 'text/html'];
-        $out = "Content-type: text/html\015\012\015\012";
-        $request_info->{'response_header_size'} += length $out;
-        $self->{'server'}->{'client'}->print($out);
-        $request_info->{'headers_sent'} = 1;
+    if ($no_body) {
+        # no content-type and or body
+    } elsif (defined($body) && length($body)) {
         $self->{'server'}->{'client'}->print($body);
         $request_info->{'response_size'} += length $body;
     }
@@ -274,8 +326,7 @@ sub send_status {
 
 sub send_500 {
     my ($self, $err) = @_;
-    $self->send_status(500, 'Internal Server Error',
-                       "<h1>Internal Server Error</h1><p>$err</p>");
+    $self->send_status(500, 'Internal Server Error', "<h1>Internal Server Error</h1>\n<p>$err</p>\n");
 }
 
 ###----------------------------------------------------------------###
@@ -357,7 +408,7 @@ sub process_headers {
 
         foreach my $l (@lines) {
             my ($key, $val) = split /\s*:\s*/, $l, 2;
-            push @parsed, [$key, $val];
+            push @parsed, ["\u\L$key", $val];
             $key = uc($key);
             $key = 'COOKIE' if $key eq 'COOKIES';
             $key =~ y/-/_/;
@@ -532,6 +583,7 @@ sub http_log_cookie {
 }
 sub http_log_header_in {
     my ($self, $info, $var) = @_;
+    $var = "\u\L$var";
     return join ', ', map {$_->[1]} grep {$_->[0] eq $var} @{ $info->{'request_headers'} || [] };
 }
 sub http_log_note {
@@ -540,6 +592,7 @@ sub http_log_note {
 }
 sub http_log_header_out {
     my ($self, $info, $var) = @_;
+    $var = "\u\L$var";
     return join ', ', map {$_->[1]} grep {$_->[0] eq $var} @{ $info->{'response_headers'} || [] };
 }
 sub http_log_pid { $_[1]->{'pid'} || $$ } # we do not support tid yet
@@ -977,6 +1030,16 @@ the same location as the ERROR log.  If a special value of STDOUT or
 F</dev/stdout> is passed, the access log entry will be written to
 standard out.
 
+=item access_log_function
+
+Can take a coderef or method name to call when an log_http_request
+method is called.  Will be passed the formatted log access log
+message.
+
+Note that functions depending upon stdout will not function
+during Net::Server::HTTP process_request because stdout is always
+tied for the client (and not restored after running).
+
 =item access_log_format
 
 Should be a valid apache log format that will be passed to http_log_format.  See
@@ -1056,6 +1119,17 @@ module.
       '/foo' => sub { ... },
       '/bar' => '/path/to/some.cgi',
     ]);
+
+=item default_content_type
+
+Default is text/html.  Set on any responses that have not
+yet passed a content-type
+
+=item allow_body_on_all_statuses
+
+By default content-type and printing a body are not allowed on 204,
+304, or 1xx statuses.  Set this flag to automatically send a
+content-type on those statuses as well.
 
 =back
 
