@@ -829,7 +829,7 @@ sub close_parent {
     my $self = shift;
     my $prop = $self->{'server'};
     die "Missing parent pid (ppid)" if ! $prop->{'ppid'};
-    kill 2, $prop->{'ppid'};
+    kill 'INT', $prop->{'ppid'};
 }
 
 ### SIG INT the children
@@ -841,7 +841,7 @@ sub close_children {
 
     foreach my $pid (keys %{ $prop->{'children'} }) {
         $self->log(4, "Kill TERM pid $pid");
-        if (kill(15, $pid) || ! kill(0, $pid)) { # if it is killable, kill it
+        if (kill('TERM', $pid) || ! kill(0, $pid)) { # if it is killable, kill it
             $self->delete_child($pid);
         }
     }
@@ -861,7 +861,7 @@ sub hup_children {
 
     for my $pid (keys %{ $prop->{'children'} }) {
         $self->log(4, "Kill HUP pid $pid");
-        kill(1, $pid) or $self->log(2, "Failed to kill pid $pid: $!");
+        kill('HUP', $pid) or $self->log(2, "Failed to kill pid $pid: $!");
     }
 }
 
@@ -1065,7 +1065,9 @@ sub _read_conf {
         warn "Couldn't open conf \"$file\" [$!]\n";
     };
     while (defined(my $line = <$fh>)) {
-        push @args, $1, $2 if $line =~ m/^\s* ((?:--)?\w+) (?:\s*[=:]\s*|\s+) (\S+)/x;
+        $line = $1 if $line =~ /(.*?)(?<!\\)#/; # trim comments from line
+        $line =~ s/\\#/#/g;
+        push @args, $1, $2 if $line =~ m/^\s*((?:--)?\w+)(?:\s*[=:]\s*|\s+)(.+)/;
     }
     close $fh;
     return \@args;
@@ -1090,7 +1092,7 @@ sub delete_child {
             $prop->{'children'}->{$pid}->{'sock'}->close;
         }
     }
-    
+
     $self->delete_child_hook($pid);   # user customizable hook
 
     delete $prop->{'children'}->{$pid};

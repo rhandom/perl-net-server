@@ -7,6 +7,11 @@ Revision history for Perl extension Net::Server.
         - Fix semaphore release
         - Update various POD issues
         - Bugfix Net::Server::PSGI
+        - Allow groups to be separated by ,
+        - Allow . in usernames and groups
+        - Allow space in config file values
+        - Retro-actively acknowlege that 2.008 changed default Net::Server::HTTP type to PreFork (and update docs)
+        - Fix Location bounce with other status set
 
 2.010  Mar 22 2021
         - Add SSL_verify_callback

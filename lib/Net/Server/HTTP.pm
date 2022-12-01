@@ -175,7 +175,7 @@ sub _tie_client_stdout {
                     $headers->{'status'} = [$1, $2 || '-'];
                 }
                 elsif ($key eq 'Location') {
-                    $headers->{'status'} = [302, 'bouncing'];
+                    $headers->{'status'} ||= [302, 'bouncing'];
                 }
                 elsif ($key eq 'Content-type') {
                     $headers->{'status'} ||= [200, 'OK'];
@@ -672,7 +672,7 @@ the other Net::Server flavors, handling HTTP requests is an often
 requested feature and is a standard and simple protocol.
 
 Net::Server::HTTP begins with base type MultiType defaulting to
-Net::Server::Fork.  It is easy to change it to any of the other
+Net::Server::PreFork.  It is easy to change it to any of the other
 Net::Server flavors by passing server_type => $other_flavor in the
 server configuration.  The port has also been defaulted to port 80 -
 but could easily be changed to another through the server
