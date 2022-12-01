@@ -740,7 +740,7 @@ For versions 2.000 through 2.004, the previous default of IPv4 was
 used.  We have attempted to make it easy to set IPv4, IPv6, or IPv*.
 If you do not want or need IPv6, simply set ipv to 4, pass IPv4 along
 in the port specification, set $ENV{'IPV'}=4; before running the
-server, or uninstall IO::Socket::INET6.
+server, or uninstall IO::Socket::IP and/or IO::Socket::INET6.
 
 On my local box the following command results in the following output:
 

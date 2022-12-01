@@ -2,7 +2,7 @@
 #
 #  Net::Server::Daemonize - Daemonization utilities.
 #
-#  Copyright (C) 2001-2017
+#  Copyright (C) 2001-2022
 #
 #    Jeremy Howard
 #    j+daemonize@howard.fm

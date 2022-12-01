@@ -4,7 +4,7 @@ package Net::Server::Test;
 use strict;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok use_ok diag);
+use NetServerTest qw(prepare_test ok use_ok note);
 my $env = prepare_test({n_tests => 5, start_port => 20200, n_ports => 1, threads => 1}); # runs four of its own tests
 
 use_ok('Net::Server::Thread');
@@ -34,7 +34,7 @@ my $ok = eval {
                 setsid => 0,
             );
         } || do {
-            diag("Trouble running server: $@");
+            note("Trouble running server: $@");
             ok(0, "Failed during run of server");
             exit;
         };
@@ -52,4 +52,4 @@ my $ok = eval {
     return 1;
 };
 alarm(0);
-ok($ok, "Got the correct output from the server") || diag("Error: $@");
+ok($ok, "Got the correct output from the server") || note("Error: $@");

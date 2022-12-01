@@ -2,7 +2,7 @@
 #
 #  Net::Server::Proto::UNIX - Net::Server Protocol module
 #
-#  Copyright (C) 2001-2017
+#  Copyright (C) 2001-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #

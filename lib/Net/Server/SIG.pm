@@ -2,7 +2,7 @@
 #
 #  Net::Server::SIG - Safer signals
 #
-#  Copyright (C) 2001-2017
+#  Copyright (C) 2001-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #

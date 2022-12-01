@@ -2,7 +2,7 @@
 #
 #  Net::Server::HTTP - Extensible Perl HTTP base server
 #
-#  Copyright (C) 2010-2017
+#  Copyright (C) 2010-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #

@@ -3,7 +3,7 @@
 #  Net::Server
 #    ABSTRACT: Extensible Perl internet server
 #
-#  Copyright (C) 2001-2017
+#  Copyright (C) 2001-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #
@@ -29,7 +29,7 @@ use Net::Server::Proto ();
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.010';
+our $VERSION = '2.011';
 
 sub new {
     my $class = shift || die "Missing class";
@@ -844,7 +844,7 @@ sub sig_hup {
 
         # hold on to the socket copy until exec;
         # just temporary: any socket domain will do,
-        # forked process will decide to use IO::Socket::INET6 if necessary
+        # forked process will decide to use IO::Socket::IP or IO::Socket::INET6 if necessary
         $prop->{'_HUP'}->[$i] = IO::Socket::INET->new;
         $prop->{'_HUP'}->[$i]->fdopen($fd, 'w') || $self->fatal("Cannot open to file descriptor [$!]");
 

@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+2.011  Dec 01 2022
+        - Default to IO::Socket::IP with continued fallback to IO::Socket::INET6
+        - Change SSL to use IO::Socket::SSL SSL_startHandshake
+        - Fix semaphore release
+        - Update various POD issues
+        - Bugfix Net::Server::PSGI
+
 2.010  Mar 22 2021
         - Add SSL_verify_callback
         - Fix SSLEAY connect spinloop

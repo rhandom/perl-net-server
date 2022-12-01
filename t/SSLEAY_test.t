@@ -4,7 +4,7 @@ package Net::Server::Test;
 use strict;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok use_ok diag skip);
+use NetServerTest qw(prepare_test ok use_ok note skip);
 my $env = prepare_test({n_tests => 4, start_port => 20200, n_ports => 2}); # runs three of its own tests
 
 if (! eval { require File::Temp }
@@ -14,7 +14,7 @@ if (! eval { require File::Temp }
     exit;
 }
 if (! eval { require Net::Server::Proto::SSLEAY }) {
-    diag "Cannot load SSLEAY library on this platform: $@";
+    note "Cannot load SSLEAY library on this platform: $@";
   SKIP: { skip("Skipping tests on this platform", 1); };
     exit;
 }
@@ -133,10 +133,10 @@ my $ok = eval {
         Net::SSLeay::connect($ssl);
         my $line = Net::SSLeay::read($ssl);
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
-        diag $line;
+        note $line;
         Net::SSLeay::write($ssl, "quit\n");
         my $line2 = Net::SSLeay::read($ssl);
-        diag $line2;
+        note $line2;
 
 
         $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
@@ -171,7 +171,7 @@ my $ok = eval {
                 SSL_key_file  => $pem_filename,
                 );
         } || do {
-            diag("Trouble running server: $@");
+            note("Trouble running server: $@");
             kill(9, $ppid) && ok(0, "Failed during run of server");
         };
         exit;
@@ -179,4 +179,4 @@ my $ok = eval {
     alarm(0);
 };
 alarm(0);
-ok($ok, "Got the correct output from the server") || diag("Error: $@");
+ok($ok, "Got the correct output from the server") || note("Error: $@");

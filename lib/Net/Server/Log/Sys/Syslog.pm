@@ -2,7 +2,7 @@
 #
 #  Net::Server::Log::Sys::Syslog - Net::Server Logging module
 #
-#  Copyright (C) 2012-2017
+#  Copyright (C) 2012-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #

@@ -2,7 +2,7 @@
 #
 #  Net::Server::PSGI - Extensible Perl HTTP PSGI base server
 #
-#  Copyright (C) 2011-2017
+#  Copyright (C) 2011-2022
 #
 #    Paul Seamons <paul@seamons.com>
 #
@@ -17,6 +17,7 @@ package Net::Server::PSGI;
 
 use strict;
 use base qw(Net::Server::HTTP);
+use Scalar::Util qw(blessed);
 
 sub net_server_type { __PACKAGE__ }
 
