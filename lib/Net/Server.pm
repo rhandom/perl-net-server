@@ -342,8 +342,8 @@ sub post_bind { # secure the process and background it
     if (! defined $prop->{'group'}) {
         $self->log(1, "Group Not Defined.  Defaulting to EGID '$)'");
         $prop->{'group'} = $);
-    } elsif ($prop->{'group'} =~ /^([\w-]+(?: [\w-]+)*)$/) {
-        $prop->{'group'} = eval { get_gid($1) };
+    } elsif ($prop->{'group'} =~ /^([\w.-]+(?:[ ,][\w.-]+)*)$/) {
+            $prop->{'group'} = eval { get_gid($1) };
         $self->fatal(my $e = $@) if $@;
     } else {
         $self->fatal("Invalid group \"$prop->{'group'}\"");
@@ -352,7 +352,7 @@ sub post_bind { # secure the process and background it
     if (! defined $prop->{'user'}) {
         $self->log(1, "User Not Defined.  Defaulting to EUID '$>'");
         $prop->{'user'} = $>;
-    } elsif ($prop->{'user'} =~ /^([\w-]+)$/) {
+    } elsif ($prop->{'user'} =~ /^([\w.-]+)$/) {
         $prop->{'user'} = eval { get_uid($1) };
         $self->fatal(my $e = $@) if $@;
     } else {
