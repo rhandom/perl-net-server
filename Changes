@@ -1,5 +1,10 @@
 Revision history for Perl extension Net::Server.
 
+2.012  Dec 02 2022
+        - More code/documentation typo fixes
+        - Add /simple routes to HTTP and PSGI echo handlers for doing static request samples.
+        - Fix PSGI header handling that was broken in 2.011
+
 2.011  Dec 01 2022
         - Default to IO::Socket::IP with continued fallback to IO::Socket::INET6
         - Add double_reverse_lookups configuration and code

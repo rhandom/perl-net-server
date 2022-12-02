@@ -496,6 +496,10 @@ sub process_http_request {
 sub http_echo {
     my $self = shift;
     print "Content-type: text/html\n\n";
+    if ($ENV{'PATH_INFO'} && $ENV{'PATH_INFO'} eq '/simple') {
+        print "Simple";
+        return;
+    }
     print "<form method=post action=/bam><input type=text name=foo><input type=submit></form>\n";
     if (eval { require Data::Dumper }) {
         local $Data::Dumper::Sortkeys = 1;
