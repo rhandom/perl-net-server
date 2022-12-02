@@ -143,7 +143,7 @@ sub post_configure {
         }
     }
 
-    if (! $prop->{'_is_inet'}) { # completetly daemonize by closing STDIN, STDOUT (should be done before fork)
+    if (! $prop->{'_is_inet'}) { # completetely daemonize by closing STDIN, STDOUT (should be done before fork)
         if ($prop->{'setsid'} || length($prop->{'log_file'})) {
             open(STDIN,  '<', '/dev/null') || die "Cannot read /dev/null  [$!]";
             open(STDOUT, '>', '/dev/null') || die "Cannot write /dev/null [$!]";
@@ -756,7 +756,7 @@ sub server_close {
     ### if this is a child process, signal the parent and close
     ### normally the child shouldn't, but if they do...
     ### otherwise the parent continues with the shutdown
-    ### this is safe for non standard forked child processes
+    ### this is safe for nonstandard forked child processes
     ### as they will not have server_close as a handler
     if (defined($prop->{'ppid'})
         && $prop->{'ppid'} != $$

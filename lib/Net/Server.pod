@@ -1800,7 +1800,7 @@ failure during accept.
 Thanks to Bill Nesbitt and Carlos Velasco for pointing out double
 decrement bug in PreFork.pm (rt #21271)
 
-Thanks to John W. Krahn for pointing out glaring precended with
+Thanks to John W. Krahn for pointing out glaring precedence with
 non-parened open and ||.
 
 Thanks to Ricardo Signes for pointing out setuid bug for perl 5.6.1

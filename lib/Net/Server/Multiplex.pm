@@ -158,7 +158,7 @@ our @ISA = qw(Net::Server::Multiplex);
 sub init {
     my $package  = shift;
     my $net_server= shift;
-    # On-the-fly runtime molymorphism hack
+    # On-the-fly runtime polymorphism hack
     # to ISA the same type of thing passed.
     @ISA = (ref $net_server);
     my $self     = bless {

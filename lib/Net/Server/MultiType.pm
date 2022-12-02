@@ -67,7 +67,7 @@ sub run {
             @{"${pkg}::ISA"} = ($_pkg);
         }
 
-        # cludgy - doesn't allow multiple Net::Server::MultiType servers within same process
+        # kludgy - doesn't allow multiple Net::Server::MultiType servers within same process
         # but it is probably better than modifying our child's class for it
         @Net::Server::MultiType::ISA = ($pkg);
         last;

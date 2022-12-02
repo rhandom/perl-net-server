@@ -25,7 +25,7 @@ my @udp_args = qw(
     udp_recv_len
     udp_recv_flags
     udp_broadcast
-); # we do broadcast just for cacheing parallelism with UDP.pm
+); # we do broadcast just for caching parallelism with UDP.pm
 
 sub NS_proto { 'UNIXDGRAM' }
 sub NS_recv_len   { my $sock = shift; ${*$sock}{'NS_recv_len'}   = shift if @_; return ${*$sock}{'NS_recv_len'}   }
