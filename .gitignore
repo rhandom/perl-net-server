@@ -2,7 +2,7 @@ tgz
 blib
 MYMETA.json
 MYMETA.yml
-META.yml
+MANIFEST.bak
 Makefile
 Makefile.old
 pm_to_blib
