@@ -883,6 +883,7 @@ sub sig_hup {
     my $prop = $self->{'server'};
 
     $self->log(2, "Received a SIG HUP");
+    $SIG{'HUP'} = 'IGNORE';
 
     my $i  = 0;
     my @fd;
