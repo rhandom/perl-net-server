@@ -179,7 +179,7 @@ Revision history for Perl extension Net::Server.
         - Check setuid better after POSIX setuid (Ricardo Signes) (rt #21262)
         - Update Syslog options parsing (Carlos Velasco) (rt #21265)
         - Allow no_client_stdout to work with Multiplex (Steven Lembark)
-        - Allow Sys::SysLog keyworks be passed through the ->log method (Peter Beckman)
+        - Allow Sys::SysLog keywords to be passed through the ->log method (Peter Beckman)
         - Allow more characters through in syslog_ident (Peter Beckman)
         - Fix Fork server bug which had post_accept_hook called twice (Curtis Wilbar)
         - Added pre_fork_hook to Fork server to handle removed duplicate post_accept_hook call.
@@ -390,7 +390,7 @@ Revision history for Perl extension Net::Server.
 0.75  Aug 23 10:49
         - Both Net::Server::Fork and Net::Server::PreFork are
                 using safe signals via Net::Server::SIG.
-        - Net::Server::PreFork has new child managment model.
+        - Net::Server::PreFork has new child management model.
                 NOTE: spare_servers is no longer used.  It
                 has been replaced by min_spare_servers and
                 max_spare_servers.  This is a major change.
@@ -602,7 +602,7 @@ Revision history for Perl extension Net::Server.
         - Clarified some of the pod
 
 0.46  Mar 05 07:37 2001
-	- secure removal of pid_file - only happens on success -
+        - secure removal of pid_file - only happens on success -
                 possibly should only happen after process has become
                 another user
         - secure removal of lock_file - only happens if we generated it
@@ -611,17 +611,17 @@ Revision history for Perl extension Net::Server.
         - added simple httpd example script
 
 0.45  Mar 02 00:44 2001
-	- clean up make process.
+        - clean up make process.
         - change version to hard coded number.
         - improve testing scripts
 
 0.44  Mar 01 00:55 2001
-	- partitioned properties in single hashref value.
+        - partitioned properties in single hashref value.
         - changed versioning system to use cvs revision.
         - general clean up and add documentation.
 
 0.43  Feb 28 01:08 2001
-	- this revision and last add bulk of documentation.
+        - this revision and last add bulk of documentation.
         -various clean ups
 
 0.4.1  Feb 26 17:48 2001

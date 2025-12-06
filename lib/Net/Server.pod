@@ -720,7 +720,7 @@ to 6 (only 6 - not * or 4) will result in an error.
 
     localhost:20203:IPv4  # will use IPv4
 
-    127.0.0.1:20203       # will use IPv4 (IPv4 style address
+    127.0.0.1:20203       # will use IPv4 (IPv4 style address)
 
     localhost:20203:IPv4:IPv6 # will bind to both v4 and v6 - fails otherwise
 

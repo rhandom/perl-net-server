@@ -37,7 +37,7 @@ sub parse_info {
                     if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (sock_stream|sock_dgram) \b }{}x; # legacy /some/path|sock_dgram
         $ipv   = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv*
         $ipv  .= $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ IPv([*\d]+) }{}xi; # allow for 80|IPv4|IPv6 stacked
-        $proto = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (tcp|udp|ssl|ssleay|unix|unixdgram|\w+(?: ::\w+)+) $ }{}xi # allow for 80/tcp or 200/udb or 90/Net::Server::Proto::TCP
+        $proto = $1 if $port =~ s{ (?<=[\w*\]]) [,|\s:/]+ (tcp|udp|ssl|ssleay|unix|unixdgram|\w+(?: ::\w+)+) $ }{}xi # allow for 80/tcp or 200/udp or 90/Net::Server::Proto::TCP
                     || $port =~ s{ / (\w+) $ }{}x; # legacy 80/MyTcp support
         $host  = $1 if $port =~ s{ ^ (.*?)      [,|\s:]+  (?= \w+ $) }{}x; # allow localhost:80
         $info->{'port'} = $port;
@@ -203,7 +203,7 @@ sub ipv6_package {
     return $ipv6_package if $ipv6_package;
 
     eval { require Socket6 }
-        or $server->fatal("Port configuration using IPv6 could not be started becauses of Socket6 library issues: $@");
+        or $server->fatal("Port configuration using IPv6 could not be started because of Socket6 library issues: $@");
 
     my $pkg = $server->{'server'}->{'ipv6_package'};
     if ($pkg) {
@@ -220,7 +220,7 @@ sub ipv6_package {
         if (eval { require IO::Socket::INET6 }) {
             $pkg = 'IO::Socket::INET6';
         } else {
-            $server->fatal("Port ocnfiguration using IPv6 could not be started.  Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@")
+            $server->fatal("Port configuration using IPv6 could not be started.  Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@")
         }
     }
     return $ipv6_package = $pkg;
