@@ -826,8 +826,8 @@ addresses, e.g. "::FFFF:127.0.0.1" .
 
 The ipv parameter was chosen because it does not conflict with any
 other existing usage, it is very similar to ipv4 or ipv6, it allows
-for user code to not need to know about Socket::AF_INET or
-Socket6::AF_INET6 or Socket::AF_UNSPEC, and it is short.
+for user code to not need to know about AF_INET or AF_INET6 or
+AF_UNSPEC, and it is short.
 
 =item listen
 

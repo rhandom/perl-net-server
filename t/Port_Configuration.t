@@ -91,7 +91,7 @@ if (!eval {
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 25;
+      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 25;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
@@ -307,7 +307,7 @@ if (!eval { require Net::SSLeay; 1 }) {
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 3;
+      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 3;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
@@ -340,7 +340,7 @@ if (!eval { require IO::Socket::SSL }) {
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 1;
+      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 1;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
@@ -356,15 +356,14 @@ if (!eval { require IO::Socket::SSL }) {
 # ipv6
 
 if (!eval {
-    require Socket6;
     my $pkg = eval { require IO::Socket::IP } ? 'IO::Socket::IP' : eval { require IO::Socket::INET6 } ? 'IO::Socket::INET6' : die "Could not load IO::Socket::IP or IO::Socket::INET6: $@";
-    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
-    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
-    $pkg->new->configure({LocalAddr => 'localhost', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die;
+    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
+    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
+    $pkg->new->configure({LocalAddr => 'localhost', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load Socket6 libraries - skipping IPv6 proto tests ($err)", 13;
+      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 13;
     };
 
 } else {

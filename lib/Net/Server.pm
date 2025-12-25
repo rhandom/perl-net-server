@@ -21,11 +21,20 @@
 package Net::Server;
 
 use strict;
-use Socket qw(AF_INET AF_UNIX SOCK_DGRAM SOCK_STREAM);
+use Socket ();
 use IO::Socket ();
 use IO::Select ();
 use POSIX ();
-use Net::Server::Proto ();
+use Net::Server::Proto qw[
+    AF_INET
+    AF_INET6
+    AF_UNIX
+    SOCK_DGRAM
+    SOCK_STREAM
+    sockaddr_family
+    sockaddr_in
+    inet_ntoa
+];
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
@@ -527,6 +536,8 @@ sub get_client_info {
         return;
     }
 
+    eval { Socket::sockaddr_family($client->peername) == AF_INET6 } and !eval { Net::Server::Proto->ipv6_package($prop) } and $self->fatal("No IPv6 support for non-AF_INET sockdomain $@");
+
     if (my $sockname = $client->sockname) {
         $prop->{'sockaddr'} = $client->sockhost;
         $prop->{'sockport'} = $client->sockport;
@@ -540,10 +551,8 @@ sub get_client_info {
             ($prop->{'peerport'}, $addr) = Socket::sockaddr_in($prop->{'udp_peer'});
             $prop->{'peeraddr'} = Socket::inet_ntoa($addr);
         } else {
-            ($prop->{'peerport'}, $addr) = Socket6::sockaddr_in6($prop->{'udp_peer'});
-            $prop->{'peeraddr'} = Socket6->can('inet_ntop')
-                                ? Socket6::inet_ntop($client->sockdomain, $addr)
-                                : Socket::inet_ntoa($addr);
+            ($prop->{'peerport'}, $addr) = Net::Server::Proto::sockaddr_in6($prop->{'udp_peer'});
+            $prop->{'peeraddr'} = Net::Server::Proto::inet_ntop($client->sockdomain, $addr);
         }
     } elsif ($prop->{'peername'} = $client->peername) {
         $addr               = $client->peeraddr;
@@ -557,8 +566,7 @@ sub get_client_info {
     if ($addr && $prop->{'reverse_lookups'}) {
         if ($client->can('peerhostname')) {
             $prop->{'peerhost'} = $client->peerhostname;
-        } elsif ($INC{'Socket6.pm'} && Socket6->can('getnameinfo')) {
-            my @res = Socket6::getnameinfo($client->peername, 0);
+        } elsif (my @res = Net::Server::Proto::getnameinfo($client->peername, 0)) {
             $prop->{'peerhost'} = $res[0] if @res > 1;
         } else {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);

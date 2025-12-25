@@ -19,10 +19,63 @@ package Net::Server::Proto;
 
 use strict;
 use warnings;
-use Socket ();
+use Socket qw(AF_INET AF_UNIX AF_UNSPEC SOCK_DGRAM SOCK_STREAM sockaddr_in sockaddr_family inet_ntoa inet_aton);
+use base qw(Exporter);
+
+# Compatible interface to access Socket or Socket6 constants and routines
+our @EXPORT_OK = qw[
+    AF_INET
+    AF_INET6
+    AF_UNIX
+    AF_UNSPEC
+    AI_PASSIVE
+    NI_NUMERICHOST
+    NI_NUMERICSERV
+    SOCK_DGRAM
+    SOCK_STREAM
+    sockaddr_in
+    sockaddr_in6
+    sockaddr_family
+    inet_ntop
+    inet_ntoa
+    inet_aton
+    getaddrinfo
+    getnameinfo
+];
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
+
+BEGIN {
+    # Load just in time once explicitly invoked.
+    my $imported = {};
+    my $s = sub {
+        my @c = caller 1;
+        (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
+        die "$fullname: IPv6 not ready yet at $c[1] line $c[2]\n" if !eval { __PACKAGE__->ipv6_package({}) };
+        die "$fullname: Failed to import" if exists $imported->{$fullname};
+        $imported->{$fullname} = undef;
+        my @res = ();
+        foreach my $pkg ($ipv6_package,"Socket","Socket6") {
+            no strict 'refs';
+            no warnings 'redefine';
+            if ($pkg and eval { @res = &{"$pkg\::$basename"}(@_); 1; }) {
+                $imported->{$fullname} = $pkg->can($basename);
+                eval { *{ $fullname } = $imported->{$fullname} } or warn "$fullname: On-The-Fly replacement failed: $@";
+                return @res < 2 && !wantarray ? $res[0] : @res;
+            }
+        }
+        die "$fullname: Failed to locate definition";
+    };
+    sub AF_INET6 { $s->(@_) }
+    sub AI_PASSIVE { $s->(@_) }
+    sub NI_NUMERICHOST { $s->(@_) }
+    sub NI_NUMERICSERV { $s->(@_) }
+    sub sockaddr_in6 { $s->(@_) }
+    sub inet_ntop { $s->(@_) }
+    sub getaddrinfo { $s->(@_) }
+    sub getnameinfo { $s->(@_) }
+}
 
 sub parse_info {
     my ($class, $port, $host, $proto, $ipv, $server) = @_;
@@ -115,18 +168,18 @@ sub get_addr_info {
     my @info;
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = Socket::inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
-        push @info, [Socket::inet_ntoa($addr), $port, 4]
-    } elsif (!$ENV{'NO_IPV6'} && eval { require Socket6 } && (eval { require IO::Socket::IP } || eval { require IO::Socket::INET6 })) {
+        push @info, [Socket::inet_ntoa($addr), $port, 4];
+    } elsif (!$ENV{'NO_IPV6'} and $class->ipv6_package({}) ) {
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
-        my $socktype = lc($proto) eq 'udp' ? Socket::SOCK_DGRAM() : Socket::SOCK_STREAM();
-        my @res = Socket6::getaddrinfo($host eq '*' ? '' : $host, $port, Socket::AF_UNSPEC(), $socktype, $proto_id, Socket6::AI_PASSIVE());
+        my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
+        my @res = getaddrinfo($host eq '*' ? '' : $host, $port, AF_UNSPEC, $socktype, $proto_id, AI_PASSIVE);
         die "Unresolveable [$host]:$port: $res[0]\n" if @res < 5;
         while (@res >= 5) {
             my ($afam, $socktype, $proto, $saddr, $canonname) = splice @res, 0, 5;
-            my @res2 = Socket6::getnameinfo($saddr, Socket6::NI_NUMERICHOST() | Socket6::NI_NUMERICSERV());
+            my @res2 = getnameinfo($saddr, NI_NUMERICHOST | NI_NUMERICSERV);
             die "getnameinfo failed on [$host]:$port: $res2[0]\n" if @res2 < 2;
-            my ($ip, $port) = @res2;
-            my $ipv = ($afam == Socket6::AF_INET6()) ? 6 : ($afam == Socket::AF_INET()) ? 4 : '*';
+            my ($ip, $port) = @res2[-2,-1];
+            my $ipv = ($afam == AF_INET6) ? 6 : ($afam == AF_INET) ? 4 : '*';
             push @info, [$ip, $port, $ipv];
         }
         my %ipv6mapped = map {$_->[0] eq '::' ? ('0.0.0.0' => $_) : $_->[0] =~ /^::ffff:(\d+(?:\.\d+){3})$/ ? ($1 => $_) : ()} @info;
@@ -136,7 +189,7 @@ sub get_addr_info {
             for my $i4 (@info) {
                 my $i6 = $ipv6mapped{$i4->[0]} || next;
                 if ($host eq '*' && $i6->[0] eq '::' && !length($only)
-                    && !eval{IO::Socket::INET6->new->configure({LocalAddr => '', LocalPort => 0, Listen => 1, ReuseAddr => 1, Domain => Socket6::AF_INET6()}) or die $!}) {
+                    && !eval{IO::Socket::INET6->new->configure({LocalAddr => '', LocalPort => 0, Listen => 1, ReuseAddr => 1, Domain => AF_INET6}) or die $!}) {
                     $i4->[3] = "Host [*] resolved to IPv6 address [::] but IO::Socket::INET6->new fails: $@";
                     $i6->[0] = '';
                 } else {
@@ -201,9 +254,7 @@ sub requires_ipv6 { $requires_ipv6 ? 1 : undef }
 sub ipv6_package {
     my ($class, $server) = @_;
     return $ipv6_package if $ipv6_package;
-
-    eval { require Socket6 }
-        or $server->fatal("Port configuration using IPv6 could not be started because of Socket6 library issues: $@");
+    return undef if $ENV{'NO_IPV6'};
 
     my $pkg = $server->{'server'}->{'ipv6_package'};
     if ($pkg) {
@@ -220,7 +271,7 @@ sub ipv6_package {
         if (eval { require IO::Socket::INET6 }) {
             $pkg = 'IO::Socket::INET6';
         } else {
-            $server->fatal("Port configuration using IPv6 could not be started.  Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@")
+            die "Port configuration using IPv6 could not be started.  Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@"
         }
     }
     return $ipv6_package = $pkg;

@@ -84,7 +84,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse => 1, # may not be needed on UDP
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        ($isa_v6 ? (Domain => ($ipv eq '6') ? Socket6::AF_INET6() : ($ipv eq '4') ? Socket::AF_INET() : Socket::AF_UNSPEC()) : ()),
+        ($isa_v6 ? (Domain => ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC()) : ()),
         ($sock->NS_broadcast ? (Broadcast => 1) : ()),
     }) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
 
