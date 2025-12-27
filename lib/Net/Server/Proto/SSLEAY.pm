@@ -29,7 +29,7 @@ BEGIN {
         or warn "Module Net::SSLeay is required for SSLeay.";
     for my $sub (qw(load_error_strings SSLeay_add_ssl_algorithms ENGINE_load_builtin_engines ENGINE_register_all_complete randomize)) {
         my $subref = Net::SSLeay->can($sub);
-        $subref->() if defined $subref;
+        $subref->() if $subref;
     }
     eval { [Fcntl::F_GETFL(), Fcntl::F_SETFL(), Fcntl::O_NONBLOCK()] } || die "Could not access Fcntl constant while loading ".__PACKAGE__.": $@";
 }
@@ -299,8 +299,7 @@ sub read_until {
 
             if (!length($buf)) {
                 last OUTER if !length($buf) && $n_empty++;
-            }
-            else {
+            } else {
                 $content .= $buf;
                 if ($non_greedy && length($content) == $bytes) {
                     $ok = 3;
