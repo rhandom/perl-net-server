@@ -29,7 +29,7 @@ my %WriteMakefileArgs = (
     "Time::HiRes" => 0
   },
   "TEST_REQUIRES" => {},
-  "VERSION" => "2.014",
+  "VERSION_FROM" => "lib/Net/Server.pm",
   "test" => {
     "TESTS" => "t/*.t"
   },
