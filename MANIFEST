@@ -35,10 +35,6 @@ LICENSE
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
-META.json
-META.yml
-MYMETA.json
-MYMETA.yml
 README
 t/NetServerTest.pm
 t/Options.t
