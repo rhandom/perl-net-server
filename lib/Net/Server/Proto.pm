@@ -58,7 +58,7 @@ BEGIN {
         my @res = ();
         foreach my $pkg ($ipv6_package,"Socket","Socket6") {
             no strict 'refs';
-            no warnings 'redefine';
+            no warnings qw(redefine prototype);
             if ($pkg and eval { @res = &{"$pkg\::$basename"}(@_); 1; }) {
                 $imported->{$fullname} = $pkg->can($basename);
                 eval { *{ $fullname } = $imported->{$fullname} } or warn "$fullname: On-The-Fly replacement failed: $@";
