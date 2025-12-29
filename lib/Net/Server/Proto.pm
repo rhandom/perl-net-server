@@ -19,62 +19,66 @@ package Net::Server::Proto;
 
 use strict;
 use warnings;
-use Socket qw(AF_INET AF_UNIX AF_UNSPEC SOCK_DGRAM SOCK_STREAM sockaddr_in sockaddr_family inet_ntoa inet_aton);
-use base qw(Exporter);
+use Socket ();
+use Exporter 'import';
 
-# Compatible interface to access Socket or Socket6 constants and routines
-our @EXPORT_OK = qw[
-    AF_INET
-    AF_INET6
-    AF_UNIX
-    AF_UNSPEC
-    AI_PASSIVE
-    NI_NUMERICHOST
-    NI_NUMERICSERV
-    SOCK_DGRAM
-    SOCK_STREAM
-    sockaddr_in
-    sockaddr_in6
-    sockaddr_family
-    inet_ntop
-    inet_ntoa
-    inet_aton
-    getaddrinfo
-    getnameinfo
-];
+our @EXPORT;
+our @EXPORT_OK;
+BEGIN {
+    # Compatibility interface to access Socket or Socket6 constants and routines
+    @EXPORT_OK = qw[
+        AF_INET
+        AF_INET6
+        AF_UNIX
+        AF_UNSPEC
+        AI_PASSIVE
+        NI_NUMERICHOST
+        NI_NUMERICSERV
+        SOCK_DGRAM
+        SOCK_STREAM
+        sockaddr_in
+        sockaddr_in6
+        sockaddr_family
+        inet_ntop
+        inet_ntoa
+        inet_aton
+        getaddrinfo
+        getnameinfo
+    ];
+}
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
 
 BEGIN {
     # Load just in time once explicitly invoked.
-    my $imported = {};
+    my $sub = {};
     my $s = sub {
         my @c = caller 1;
         (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
-        die "$fullname: IPv6 not ready yet at $c[1] line $c[2]\n" if !eval { __PACKAGE__->ipv6_package({}) };
-        die "$fullname: Failed to import" if exists $imported->{$fullname};
-        $imported->{$fullname} = undef;
+        # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
+        $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
         my @res = ();
+        no strict 'refs';
         foreach my $pkg ($ipv6_package,"Socket","Socket6") {
-            no strict 'refs';
-            no warnings qw(redefine prototype);
-            if ($pkg and eval { @res = &{"$pkg\::$basename"}(@_); 1; }) {
-                $imported->{$fullname} = $pkg->can($basename);
-                eval { *{ $fullname } = $imported->{$fullname} } or warn "$fullname: On-The-Fly replacement failed: $@";
-                return @res < 2 && !wantarray ? $res[0] : @res;
-            }
+            # Some symbols, such as NI_NUMERICHOST, will not exist until explicitly called via AUTOLOAD
+            last if $pkg and eval { @res = &{"$pkg\::$basename"}(@_); $sub->{$fullname} = $pkg->can($basename); };
         }
-        die "$fullname: Failed to locate definition";
+        if (my $code = $sub->{$fullname}) {
+            no warnings qw(redefine prototype);
+            eval { *{ $fullname } = $code } or warn "$fullname: On-The-Fly replacement failed: $@";
+            return @res < 2 && !$c[5] ? $res[0] : @res;
+        }
+        if ($ipv6_package) {
+            $sub->{$fullname} = undef;
+            die "$fullname: Failed to locate true symbol even using $ipv6_package at $c[1] line $c[2]\n";
+        } else {
+            warn "WARNING: Cheater pre-loading IPv6 attempt since non-Socket.pm $fullname called too early at $c[1] line $c[2]\n";
+            __PACKAGE__->ipv6_package({}) and $ipv6_package and return &{$basename}(@_);
+        }
+        die "$fullname: Failed symbol detection without IPv6 support at $c[1] line $c[2]\n";
     };
-    sub AF_INET6 { $s->(@_) }
-    sub AI_PASSIVE { $s->(@_) }
-    sub NI_NUMERICHOST { $s->(@_) }
-    sub NI_NUMERICSERV { $s->(@_) }
-    sub sockaddr_in6 { $s->(@_) }
-    sub inet_ntop { $s->(@_) }
-    sub getaddrinfo { $s->(@_) }
-    sub getnameinfo { $s->(@_) }
+    foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &{$func}; }
 }
 
 sub parse_info {
