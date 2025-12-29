@@ -20,7 +20,7 @@ package Net::Server::Proto;
 use strict;
 use warnings;
 use Socket ();
-use Exporter 'import';
+use Exporter qw(import);
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
@@ -30,17 +30,23 @@ sub IPV6_V6ONLY () {26} # XXX: Do we really need to hard-code this? Not availabl
 our @EXPORT;
 our @EXPORT_OK;
 BEGIN {
-    # Compatibility interface to access Socket or Socket6 constants and routines
+    # If the underlying constant or routine really isn't available in Socket nor Socket6,
+    # then it die at run-time instead of crashing at compile-time.
+    # Then it can be caught with eval.
     @EXPORT_OK = qw[
         AF_INET
         AF_INET6
         AF_UNIX
         AF_UNSPEC
         AI_PASSIVE
+        INADDR_ANY
         NI_NUMERICHOST
         NI_NUMERICSERV
         SOCK_DGRAM
         SOCK_STREAM
+        SOMAXCONN
+        SOL_SOCKET
+        SO_TYPE
         IPPROTO_IPV6
         IPV6_V6ONLY
         sockaddr_in
@@ -173,8 +179,8 @@ sub get_addr_info {
 
     my @info;
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
-        my $addr = Socket::inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
-        push @info, [Socket::inet_ntoa($addr), $port, 4];
+        my $addr = inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
+        push @info, [inet_ntoa($addr), $port, 4];
     } elsif (!$ENV{'NO_IPV6'} and $class->ipv6_package({}) ) {
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
@@ -210,12 +216,12 @@ sub get_addr_info {
     } else {
         my @addr;
         if ($host eq '*') {
-            push @addr, Socket::INADDR_ANY();
+            push @addr, INADDR_ANY;
         } else {
             (undef, undef, undef, undef, @addr) = gethostbyname($host);
             die "Unresolveable host [$host]:$port via IPv4 gethostbyname\n" if !@addr;
         }
-        push @info, [Socket::inet_ntoa($_), $port, 4] for @addr
+        push @info, [inet_ntoa($_), $port, 4] for @addr
     }
 
     return @info;

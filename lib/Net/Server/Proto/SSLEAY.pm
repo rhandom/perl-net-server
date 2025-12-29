@@ -22,7 +22,7 @@ use warnings;
 use IO::Socket::INET;
 use Fcntl ();
 use Errno ();
-use Socket ();
+use Socket qw(SOMAXCONN);
 
 BEGIN {
     eval { require Net::SSLeay; 1 }
@@ -76,7 +76,7 @@ sub object {
         $sock->NS_ipv( $info->{'ipv'} );
         $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                         : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : Socket::SOMAXCONN());
+                        : SOMAXCONN);
         ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
 
         for my $key (@ssl_args) {

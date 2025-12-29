@@ -9,6 +9,7 @@ Port_Configuration.t - Test different ways of specifying the port
 package FooServer;
 
 use strict;
+use Net::Server::Proto qw(SOMAXCONN);
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok note skip);
@@ -107,7 +108,7 @@ if (!eval {
             NS_port => Net::Server::default_port(),
             NS_ipv  => '4',
             NS_proto => 'TCP',
-            NS_listen => eval { Socket::SOMAXCONN() },
+            NS_listen => SOMAXCONN,
         }],
     });
 
@@ -263,7 +264,7 @@ if (!eval { require IO::Socket::UNIX }) {
 
     p_c([port => '/foo/bar|unix', udp_recv_len => 500], {
         bind => [{host => '*', port => '/foo/bar', proto => 'unix', ipv => '*'}],
-        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_ipv => '*', NS_listen => Socket::SOMAXCONN(), NS_unix_type => 'SOCK_STREAM', NS_unix_path => '/foo/bar'}],
+        sock => [{NS_host => '*', NS_port => '/foo/bar', NS_proto => 'UNIX', NS_ipv => '*', NS_listen => SOMAXCONN, NS_unix_type => 'SOCK_STREAM', NS_unix_path => '/foo/bar'}],
     });
 
     p_c([port => '/foo/bar|unixdgram', udp_recv_len => 500], {
@@ -314,7 +315,7 @@ if (!eval { require Net::SSLeay; 1 }) {
 
     p_c([proto => 'ssleay'], {
         bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssleay', ipv => 4}],
-        sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSLEAY', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
+        sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSLEAY', NS_ipv => 4, NS_listen => SOMAXCONN, SSL_cert_file => FooServer::SSL_cert_file()}],
     });
 
     %class_m = (); # setting SSL_key_file may dynamically change the package methods
@@ -347,7 +348,7 @@ if (!eval { require IO::Socket::SSL }) {
 
     p_c([proto => 'ssl'], {
         bind => [{host => '*', port => Net::Server::default_port(), proto => 'ssl', ipv => 4}],
-        sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSL', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }, SSL_cert_file => FooServer::SSL_cert_file()}],
+        sock => [{NS_host => '*', NS_port => 20203, NS_proto => 'SSL', NS_ipv => 4, NS_listen => SOMAXCONN, SSL_cert_file => FooServer::SSL_cert_file()}],
     });
 }
 
@@ -372,12 +373,12 @@ if (!eval {
 
     p_c([port => 20201], {
         bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 4}], # still defaults off even with library loaded
-        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 4, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => 20201, ipv => 6], { # explicit request
         bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 6}],
-        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => [{port => 20201, ipv => 6}]], {
@@ -386,17 +387,17 @@ if (!eval {
 
     p_c([port => '[*]:20201:IPv6'], {
         bind => [{host => '*', port => 20201, proto => 'tcp', ipv => 6}],
-        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => '*', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => ['[localhost]:IPv6:20201']], {
         bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
-        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => 20201, host => 'localhost/IPv6'], {
         bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
-        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => 20201, host => 'localhost', proto => 'udp IPv6'], {
@@ -405,8 +406,8 @@ if (!eval {
 
     p_c([port => ['[localhost]:20201:IPv4', 'localhost:20201:IPv6']], {
         bind => [{host => 'localhost', port => 20201, proto => 'tcp', ipv => 4}, {host => 'localhost', port => 20201, proto => 'tcp', ipv => 6}],
-        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 4, NS_listen => eval { Socket::SOMAXCONN() }},
-                 {NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => eval { Socket::SOMAXCONN() }}],
+        sock => [{NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 4, NS_listen => SOMAXCONN },
+                 {NS_host => 'localhost', NS_port => 20201, NS_proto => 'TCP', NS_ipv => 6, NS_listen => SOMAXCONN }],
     });
 
     p_c([port => 'localhost, 20201, IPv6, IPv4'], {

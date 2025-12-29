@@ -19,8 +19,8 @@ package Net::Server::Proto::TCP;
 
 use strict;
 use warnings;
-use IO::Socket::INET;
-use Net::Server::Proto qw(IPPROTO_IPV6 IPV6_V6ONLY);
+use IO::Socket::INET ();
+use Net::Server::Proto qw(IPPROTO_IPV6 IPV6_V6ONLY SOMAXCONN);
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to a v6 compatible class based upon our server configuration
 
@@ -44,7 +44,7 @@ sub object {
         $sock->NS_ipv( $info->{'ipv'} );
         $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                         : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : Socket::SOMAXCONN());
+                        : SOMAXCONN);
         ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
     }
     return wantarray ? @sock : $sock[0];

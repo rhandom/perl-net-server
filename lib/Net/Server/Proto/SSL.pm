@@ -19,6 +19,7 @@ package Net::Server::Proto::SSL;
 
 use strict;
 use warnings;
+use Net::Server::Proto qw(SOMAXCONN);
 
 BEGIN {
     # IO::Socket::SSL will automatically become IO::Socket::IP if it is available.
@@ -68,7 +69,7 @@ sub object {
         $sock->NS_ipv( $info->{'ipv'} );
         $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
                         : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : Socket::SOMAXCONN());
+                        : SOMAXCONN);
         ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
 
         my %seen;
