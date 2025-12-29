@@ -356,10 +356,11 @@ if (!eval { require IO::Socket::SSL }) {
 # ipv6
 
 if (!eval {
+    my $ipv6local = `cat /etc/hosts 2>/dev/null` =~ /^::1.*[\ \t](\S+)/m ? $1 : die "Missing IPv6 loopback hosts entry";
     my $pkg = eval { require IO::Socket::IP } ? 'IO::Socket::IP' : eval { require IO::Socket::INET6 } ? 'IO::Socket::INET6' : die "Could not load IO::Socket::IP or IO::Socket::INET6: $@";
-    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
-    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
-    $pkg->new->configure({LocalAddr => 'localhost', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die;
+    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-NoLocalAddr failed";
+    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-WithAddr failed";
+    $pkg->new->configure({LocalAddr => $ipv6local, LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-LocalHost $ipv6local failed";
 }) {
     chomp(my $err = $@);
   SKIP: {
