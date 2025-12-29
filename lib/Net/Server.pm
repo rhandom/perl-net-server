@@ -536,7 +536,7 @@ sub get_client_info {
         return;
     }
 
-    eval { Socket::sockaddr_family($client->peername) == AF_INET6 } and !eval { Net::Server::Proto->ipv6_package($prop) } and $self->fatal("No IPv6 support for non-AF_INET sockdomain $@");
+    eval { sockaddr_family($client->peername) != AF_INET } and eval { Net::Server::Proto->ipv6_package($prop) } || $self->fatal("No IPv6 support for non-AF_INET sockdomain $@");
 
     if (my $sockname = $client->sockname) {
         $prop->{'sockaddr'} = $client->sockhost;
