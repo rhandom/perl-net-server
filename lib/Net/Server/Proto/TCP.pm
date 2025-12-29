@@ -20,7 +20,7 @@ package Net::Server::Proto::TCP;
 use strict;
 use warnings;
 use IO::Socket::INET;
-use Net::Server::Proto;
+use Net::Server::Proto qw(IPPROTO_IPV6 IPV6_V6ONLY);
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to a v6 compatible class based upon our server configuration
 
@@ -54,9 +54,6 @@ sub log_connect {
     my ($sock, $server) = @_;
     $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with IPv".$sock->NS_ipv);
 }
-
-sub IPPROTO_IPV6 { eval { Socket::IPPROTO_IPV6() } }
-sub IPV6_V6ONLY  { eval { Socket::IPV6_V6ONLY()  } }
 
 sub socket {
     my $sock = shift;

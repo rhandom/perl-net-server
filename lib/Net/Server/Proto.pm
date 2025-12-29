@@ -22,6 +22,11 @@ use warnings;
 use Socket ();
 use Exporter 'import';
 
+my $requires_ipv6 = 0;
+my $ipv6_package;
+
+sub IPV6_V6ONLY () {26} # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor Socket6.pm at all? :-/
+
 our @EXPORT;
 our @EXPORT_OK;
 BEGIN {
@@ -36,6 +41,8 @@ BEGIN {
         NI_NUMERICSERV
         SOCK_DGRAM
         SOCK_STREAM
+        IPPROTO_IPV6
+        IPV6_V6ONLY
         sockaddr_in
         sockaddr_in6
         sockaddr_family
@@ -45,12 +52,7 @@ BEGIN {
         getaddrinfo
         getnameinfo
     ];
-}
 
-my $requires_ipv6 = 0;
-my $ipv6_package;
-
-BEGIN {
     # Load just in time once explicitly invoked.
     my $sub = {};
     my $s = sub {
