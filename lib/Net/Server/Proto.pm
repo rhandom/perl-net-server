@@ -100,6 +100,33 @@ sub safe_name_info {
     return @res<2 ? ($res[0]||"EAI_NONAME") : (@res[-3,-2,-1]); # Create first $err output element, if doesn't exist.
 }
 
+# ($err, @result) = safe_addr_info($host, $service, [$hints])
+# Compatibility routine to always act like Socket::getaddrinfo even if IO::Socket::IP is not available.
+# XXX: Why are there two different versions of getaddrinfo?
+# The old Socket6 accepts a list of optional hints and returns a multiple of 5 output. (@fiver_chunks)=Socket6::getaddrinfo($node,$port,[$family,$socktype,$proto,$flags])
+# The new Socket accepts an optional HASHREF of hints and returns an $err followed by a list of HASHREFs.
+sub safe_addr_info {
+    return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getaddrinfo");
+    my ($host, $port, $h) = @_;
+    $h ||= {};
+    my @res;
+    return @res = ('EAI_BADFLAGS: Usage: safe_addr_info($hostname, $servicename, \%hints)') if "HASH" ne ref $h or @_ < 2 or @_ > 3;
+    eval { @res = getaddrinfo( $host, $port, $h ); die ($res[0] || "EAI_NONAME") if @res < 2; 1 } # Nice new Socket "HASH" method
+    or eval { # Convert Socket6 Old Array "C" method to "HASH" method
+        @res = (''); # Pretend like no error so far
+        my @results = getaddrinfo( $host, $port, $h->{family}||0, $h->{socktype}||0, $h->{protocol}||0, $h->{flags}||0 );
+        while (@results > 4) {
+            my $r = {};
+            (@$r{qw[family socktype protocol addr canonname]}, @results) = @results;
+            push @res, $r;
+        }
+        $res[0] = "EAI_NONAME" if @res < 2;
+        1;
+    }
+    or $res[0] = ($@ || "getaddrinfo: failed $!");
+    return @res;
+};
+
 sub parse_info {
     my ($class, $port, $host, $proto, $ipv, $server) = @_;
 
@@ -195,13 +222,12 @@ sub get_addr_info {
     } elsif (eval { $class->ipv6_package({}) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
-        my @res = getaddrinfo($host eq '*' ? '' : $host, $port, AF_UNSPEC, $socktype, $proto_id, AI_PASSIVE);
-        die "Unresolveable [$host]:$port: $res[0]\n" if @res < 5;
-        while (@res >= 5) {
-            my ($afam, $socktype, $proto, $saddr, $canonname) = splice @res, 0, 5;
-            my ($err, $ip) = safe_name_info($saddr, NI_NUMERICHOST | NI_NUMERICSERV);
+        my @res = safe_addr_info($host eq '*' ? '' : $host, $port, { family=>AF_UNSPEC, socktype=>$socktype, protocol=>$proto_id, flags=>AI_PASSIVE });
+        my $err = shift @res; die "Unresolveable [$host]:$port: $err\n" if $err or (@res < 1 and $err = "getaddrname: $host: FAILURE!");
+        while (my $r = shift @res) {
+            my ($err, $ip) = safe_name_info($r->{addr}, NI_NUMERICHOST | NI_NUMERICSERV);
             die "safe_name_info failed on [$host]:$port [$err]\n" if $err || !$ip;
-            my $ipv = ($afam == AF_INET6) ? 6 : ($afam == AF_INET) ? 4 : '*';
+            my $ipv = ($r->{family} == AF_INET) ? 4 : ($r->{family} == AF_INET6) ? 6 : '*';
             push @info, [$ip, $port, $ipv];
         }
         my %ipv6mapped = map {$_->[0] eq '::' ? ('0.0.0.0' => $_) : $_->[0] =~ /^::ffff:(\d+(?:\.\d+){3})$/ ? ($1 => $_) : ()} @info;
