@@ -541,8 +541,6 @@ sub get_client_info {
         return;
     }
 
-    eval { sockaddr_family($client->peername) != AF_INET } and eval { Net::Server::Proto->ipv6_package($prop) } || $self->fatal("No IPv6 support for non-AF_INET sockdomain $@");
-
     if (my $sockname = $client->sockname) {
         $prop->{'sockaddr'} = $client->sockhost;
         $prop->{'sockport'} = $client->sockport;
@@ -551,18 +549,18 @@ sub get_client_info {
     }
 
     my $addr;
-    if ($prop->{'udp_true'}) {
-        if ($client->sockdomain == AF_INET) {
-            ($prop->{'peerport'}, $addr) = sockaddr_in($prop->{'udp_peer'});
-            $prop->{'peeraddr'} = inet_ntoa($addr);
-        } else {
-            ($prop->{'peerport'}, $addr) = sockaddr_in6($prop->{'udp_peer'});
-            $prop->{'peeraddr'} = inet_ntop($client->sockdomain, $addr);
+    if (my $peer = $prop->{'udp_true'} ? $prop->{'udp_peer'} : eval { $client->peername }) {
+        if (my $family = sockaddr_family( $prop->{'peername'} = $peer )) {
+            if ($family == AF_INET) {
+                ($prop->{'peerport'}, $addr) = sockaddr_in($peer);
+                $prop->{'peeraddr'} = inet_ntoa($addr);
+            } elsif (eval { Net::Server::Proto->ipv6_package($self) }) {
+                ($prop->{'peerport'}, $addr) = sockaddr_in6($peer);
+                $prop->{'peeraddr'} = inet_ntop($client->sockdomain, $addr);
+            } else {
+                $self->fatal("No IPv6 support for non-AF_INET sockdomain $@");
+            }
         }
-    } elsif ($prop->{'peername'} = $client->peername) {
-        $addr               = $client->peeraddr;
-        $prop->{'peeraddr'} = $client->peerhost;
-        $prop->{'peerport'} = $client->peerport;
     } else {
         @{ $prop }{qw(peeraddr peerhost peerport)} = ('0.0.0.0', 'inet.test', 0); # commandline
     }
@@ -571,7 +569,7 @@ sub get_client_info {
     if ($addr && $prop->{'reverse_lookups'}) {
         if ($client->can('peerhostname')) {
             $prop->{'peerhost'} = $client->peerhostname;
-        } elsif (my @res = getnameinfo($client->peername, 0)) {
+        } elsif ($prop->{'peername'} and my @res = getnameinfo($prop->{'peername'}, 0)) {
             $prop->{'peerhost'} = $res[0] if @res > 1;
         } else {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
