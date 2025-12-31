@@ -89,6 +89,17 @@ BEGIN {
     foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &{$func}; }
 }
 
+# ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
+# Compatibility routine to always act like Socket::getnameinfo even if it doesn't exist or if IO::Socket::IP is not available.
+# XXX: Why are there two different versions of getnameinfo?
+# The old Socket6 only allows for a single option $flags after the $sockaddr input. ($host,$sevice)=Socket6::getnameinfo($sockaddr, [$flags])
+# The new Socket also allows for an optional $xflags input and also returns an extra $err as the first element. The old Socket6 version does not have either.
+sub safe_name_info {
+    return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getnameinfo");
+    my @res = getnameinfo @_[0,1]; # Ignore silly NIx_* $xflags in $_[2]
+    return @res<2 ? ($res[0]||"EAI_NONAME") : (@res[-3,-2,-1]); # Create first $err output element, if doesn't exist.
+}
+
 sub parse_info {
     my ($class, $port, $host, $proto, $ipv, $server) = @_;
 
@@ -181,16 +192,15 @@ sub get_addr_info {
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
         push @info, [inet_ntoa($addr), $port, 4];
-    } elsif (!$ENV{'NO_IPV6'} and $class->ipv6_package({}) ) {
+    } elsif (eval { $class->ipv6_package({}) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
         my @res = getaddrinfo($host eq '*' ? '' : $host, $port, AF_UNSPEC, $socktype, $proto_id, AI_PASSIVE);
         die "Unresolveable [$host]:$port: $res[0]\n" if @res < 5;
         while (@res >= 5) {
             my ($afam, $socktype, $proto, $saddr, $canonname) = splice @res, 0, 5;
-            my @res2 = getnameinfo($saddr, NI_NUMERICHOST | NI_NUMERICSERV);
-            die "getnameinfo failed on [$host]:$port: $res2[0]\n" if @res2 < 2;
-            my ($ip, $port) = @res2[-2,-1];
+            my ($err, $ip) = safe_name_info($saddr, NI_NUMERICHOST | NI_NUMERICSERV);
+            die "safe_name_info failed on [$host]:$port [$err]\n" if $err || !$ip;
             my $ipv = ($afam == AF_INET6) ? 6 : ($afam == AF_INET) ? 4 : '*';
             push @info, [$ip, $port, $ipv];
         }
