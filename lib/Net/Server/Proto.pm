@@ -21,11 +21,10 @@ use strict;
 use warnings;
 use Socket ();
 use Exporter qw(import);
+use constant IPV6_V6ONLY => 26; # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor ever with Socket6.pm? :-/
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
-
-sub IPV6_V6ONLY () {26} # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor Socket6.pm at all? :-/
 
 our @EXPORT;
 our @EXPORT_OK;
