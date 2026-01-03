@@ -20,11 +20,20 @@ package Net::Server::Proto;
 use strict;
 use warnings;
 use Socket ();
-use Exporter qw(import);
+use Exporter ();
 use constant IPV6_V6ONLY => 26; # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor ever with Socket6.pm? :-/
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
+my $exported = {};
+
+sub import {
+    my $class = shift;
+    my $callpkg = caller;
+    # Keep track of who imports any fake stub wrappers
+    $exported->{$_}->{$callpkg}=1 foreach @_;
+    return Exporter::export($class, $callpkg, @_);
+}
 
 our @EXPORT;
 our @EXPORT_OK;
@@ -72,8 +81,8 @@ BEGIN {
             last if $pkg and eval { @res = &{"$pkg\::$basename"}(@_); $sub->{$fullname} = $pkg->can($basename); };
         }
         if (my $code = $sub->{$fullname}) {
-            no warnings qw(redefine prototype);
-            eval { *{ $fullname } = $code } or warn "$fullname: On-The-Fly replacement failed: $@";
+            no warnings qw(redefine prototype); # Don't spew when redefining the stub in the packages that imported it (as well as mine) with the REAL routine
+            eval { *{"$_\::$basename"}=$code foreach keys %{$exported->{$basename}}; *$fullname=$code } or warn "$fullname: On-The-Fly replacement failed: $@";
             return @res < 2 && !$c[5] ? $res[0] : @res;
         }
         if ($ipv6_package) {
@@ -83,9 +92,8 @@ BEGIN {
             warn "WARNING: Cheater pre-loading IPv6 attempt since non-Socket.pm $fullname called too early at $c[1] line $c[2]\n";
             __PACKAGE__->ipv6_package({}) and $ipv6_package and return &{$basename}(@_);
         }
-        die "$fullname: Failed symbol detection without IPv6 support at $c[1] line $c[2]\n";
     };
-    foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &{$func}; }
+    foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &$func; }
 }
 
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
