@@ -22,6 +22,8 @@ use warnings;
 use Socket ();
 use Exporter ();
 use constant IPV6_V6ONLY => 26; # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor ever with Socket6.pm? :-/
+use constant NIx_NOHOST => 1; # The getNameInfo Xtended flags are too difficult to obtain on some older systems,
+use constant NIx_NOSERV => 2; # So just hard-code the constant numbers
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
@@ -50,6 +52,8 @@ BEGIN {
         INADDR_ANY
         NI_NUMERICHOST
         NI_NUMERICSERV
+        NIx_NOHOST
+        NIx_NOSERV
         SOCK_DGRAM
         SOCK_STREAM
         SOMAXCONN
@@ -99,12 +103,21 @@ BEGIN {
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
 # Compatibility routine to always act like Socket::getnameinfo even if it doesn't exist or if IO::Socket::IP is not available.
 # XXX: Why are there two different versions of getnameinfo?
-# The old Socket6 only allows for a single option $flags after the $sockaddr input. ($host,$sevice)=Socket6::getnameinfo($sockaddr, [$flags])
-# The new Socket also allows for an optional $xflags input and also returns an extra $err as the first element. The old Socket6 version does not have either.
+# The old Socket6 only allows for a single option $flags after the $sockaddr input and an error might be the first element. ($host,$sevice)=Socket6::getnameinfo($sockaddr, [$flags])
+# The new Socket also allows for an optional $xflags input and always returns its $err as the first element, even on success.
 sub safe_name_info {
     return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getnameinfo");
-    my @res = getnameinfo @_[0,1]; # Ignore silly NIx_* $xflags in $_[2]
-    return @res<2 ? ($res[0]||"EAI_NONAME") : (@res[-3,-2,-1]); # Create first $err output element, if doesn't exist.
+    my ($sockaddr, $flags, $xflags) = @_; $flags ||= 0; $xflags ||= 0;
+    my @res;
+    eval { @res = getnameinfo $sockaddr, $flags, $xflags; 1 } or do { # Force 3-arg input to ensure old version will die: "Usage: Socket6::getnameinfo"
+        @res = getnameinfo @_[0,1]; # Probably old Socket6 version, so hide NIx_* $xflags in $_[2]
+        @res<2 ? ($res[0]||="EAI_NONAME") : do {
+            @res = @res[-3,-2,-1]; $res[0] ||= ""; # Create first $err output element, if doesn't exist.
+            $res[NIx_NOHOST] = undef if $xflags | NIx_NOHOST; # Emulate $xflags
+            $res[NIx_NOSERV] = undef if $xflags | NIx_NOSERV; # so output matches
+        };
+    };
+    return @res;
 }
 
 # ($err, @result) = safe_addr_info($host, $service, [$hints])
