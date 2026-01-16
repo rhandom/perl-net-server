@@ -574,7 +574,7 @@ sub get_client_info {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
         }
         if ($prop->{'peerhost'} && $prop->{'double_reverse_lookups'}) {
-            $prop->{'peerhost_rev'} = {map {$_->[0] => 1} Net::Server::Proto->get_addr_info($prop->{'peerhost'})};
+            $prop->{'peerhost_rev'} = {map {$_->[0] => 1} Net::Server::Proto->get_addr_info($prop->{'peerhost'}, undef, undef, $self)};
         }
     }
 

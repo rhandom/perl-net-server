@@ -208,7 +208,7 @@ sub parse_info {
     $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
     my @_info;
     if (!$ipv || $ipv =~ /[*]/ and eval {CAN_DISABLE_V6ONLY}) {
-        my @rows = eval { $class->get_addr_info(@$info{qw(host port proto)}) };
+        my @rows = eval { $class->get_addr_info(@$info{qw(host port proto)}, $server) };
         $server->fatal($@ || "Could not find valid addresses for [$info->{'host'}]:$info->{'port'} with ipv set to '*'") if ! @rows;
         foreach my $row (@rows) {
             my ($host, $port, $ipv, $warn) = @$row;
@@ -238,10 +238,11 @@ sub parse_info {
 }
 
 sub get_addr_info {
-    my ($class, $host, $port, $proto) = @_;
+    my ($class, $host, $port, $proto, $server) = @_;
     $host  = '*'   if ! defined $host;
     $port  = 0     if ! defined $port;
     $proto = 'tcp' if ! defined $proto;
+    $server = {}   if ! defined $server;
     return ([$host, $port, '*']) if $proto =~ /UNIX/i;
     $port = (getservbyname($port, $proto))[2] or die "Could not determine port number from host [$host]:$_[2]\n" if $port =~ /\D/;
 
@@ -249,7 +250,7 @@ sub get_addr_info {
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
         push @info, [inet_ntoa($addr), $port, 4];
-    } elsif (eval { $class->ipv6_package({}) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
+    } elsif (eval { $class->ipv6_package($server) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
         my @res = safe_addr_info($host eq '*' ? '' : $host, $port, { family=>AF_UNSPEC, socktype=>$socktype, protocol=>$proto_id, flags=>AI_PASSIVE });
@@ -371,7 +372,7 @@ Net::Server::Proto - Net::Server Protocol compatibility layer
         $server_obj,      # Net::Server object
     );
 
-    my @raw_info = Net::Server::Proto->get_addr_info($host, $port, $proto);
+    my @raw_info = Net::Server::Proto->get_addr_info($host, $port, $proto, $server_obj);
     # returns arrayref of resolved ips, ports, and ipv values
 
     my $sock = Net::Server::Proto->object({
