@@ -15,13 +15,8 @@ END {
 
 sub client_connect {
     shift if $_[0] && $_[0] eq __PACKAGE__;
-    if ($env{'ipv'} && $env{'ipv'} ne 4) {
-        return IO::Socket::IP->new(@_)    if eval { require IO::Socket::IP };
-        return IO::Socket::INET6->new(@_) if eval { require IO::Socket::INET6 };
-        die "Could not load IO::Socket::IP or IO::Socket::INET6: $@";
-    } else {
-        return IO::Socket::INET->new(@_);
-    }
+    my $pkg = eval { $env{'ipv'} && $env{'ipv'} =~ /[6*]/ && do { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) } } || "IO::Socket::INET";
+    return $pkg->new(@_);
 }
 
 # most of our tests need forking, a certain number of ports, and some pipes
