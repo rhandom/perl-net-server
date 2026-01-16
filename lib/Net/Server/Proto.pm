@@ -23,10 +23,11 @@ use Socket ();
 use Exporter ();
 use constant IPV6_V6ONLY => 26; # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor ever with Socket6.pm? :-/
 use constant NIx_NOHOST => 1; # The getNameInfo Xtended flags are too difficult to obtain on some older systems,
-use constant NIx_NOSERV => 2; # So just hard-code the constant numbers
+use constant NIx_NOSERV => 2; # So just hard-code the constant numbers.
 
 my $requires_ipv6 = 0;
 my $ipv6_package;
+my $can_disable_v6only;
 my $exported = {};
 
 sub import {
@@ -41,8 +42,8 @@ our @EXPORT;
 our @EXPORT_OK;
 BEGIN {
     # If the underlying constant or routine really isn't available in Socket nor Socket6,
-    # then it die at run-time instead of crashing at compile-time.
-    # Then it can be caught with eval.
+    # then it will not die until run-time instead of crashing at compile-time.
+    # It can still be caught with eval.
     @EXPORT_OK = qw[
         AF_INET
         AF_INET6
@@ -145,7 +146,16 @@ sub safe_addr_info {
     }
     or $res[0] = ($@ || "getaddrinfo: failed $!");
     return @res;
-};
+}
+
+# Capability test function (stolen from IO::Socket::IP in case only IO::Socket::INET6 is available)
+sub CAN_DISABLE_V6ONLY {
+    return $can_disable_v6only if defined $can_disable_v6only;
+    socket my $testsock, AF_INET6, SOCK_STREAM, 0 or die "Cannot socket(PF_INET6) - $!";
+    setsockopt $testsock, IPPROTO_IPV6, IPV6_V6ONLY, 0 and return $can_disable_v6only = 1;
+    $!{EINVAL} || $!{EOPNOTSUPP} and return $can_disable_v6only = 0; # OpenBSD, WindowsXP, etc
+    die "Cannot setsockopt(IPV6_V6ONLY) - $!";
+}
 
 sub parse_info {
     my ($class, $port, $host, $proto, $ipv, $server) = @_;
@@ -197,7 +207,7 @@ sub parse_info {
     $ipv = join '', @$ipv if ref($ipv) eq 'ARRAY';
     $server->fatal("Invalid ipv parameter - must contain 4, 6, or *") if $ipv && $ipv !~ /[46*]/;
     my @_info;
-    if (!$ipv || $ipv =~ /[*]/) {
+    if (!$ipv || $ipv =~ /[*]/ and eval {CAN_DISABLE_V6ONLY}) {
         my @rows = eval { $class->get_addr_info(@$info{qw(host port proto)}) };
         $server->fatal($@ || "Could not find valid addresses for [$info->{'host'}]:$info->{'port'} with ipv set to '*'") if ! @rows;
         foreach my $row (@rows) {
@@ -250,25 +260,23 @@ sub get_addr_info {
             my $ipv = ($r->{family} == AF_INET) ? 4 : ($r->{family} == AF_INET6) ? 6 : '*';
             push @info, [$ip, $port, $ipv];
         }
-        my %ipv6mapped = map {$_->[0] eq '::' ? ('0.0.0.0' => $_) : $_->[0] =~ /^::ffff:(\d+(?:\.\d+){3})$/ ? ($1 => $_) : ()} @info;
-        if ((scalar(keys %ipv6mapped)
-             && grep {$ipv6mapped{$_->[0]}} @info)
-            && not my $only = $class->_bindv6only) {
+        my %ipv6mapped = map {$_->[0] eq '::' ? ('0.0.0.0' => $_) : $_->[0] =~ /^::ffff:(\d+(?:\.\d+){3})$/i ? ($1 => $_) : ()} @info;
+        if (keys %ipv6mapped and grep {$ipv6mapped{$_->[0]}} @info) {
             for my $i4 (@info) {
-                my $i6 = $ipv6mapped{$i4->[0]} || next;
-                if ($host eq '*' && $i6->[0] eq '::' && !length($only)
-                    && !eval{IO::Socket::INET6->new->configure({LocalAddr => '', LocalPort => 0, Listen => 1, ReuseAddr => 1, Domain => AF_INET6}) or die $!}) {
-                    $i4->[3] = "Host [*] resolved to IPv6 address [::] but IO::Socket::INET6->new fails: $@";
+                my $i6 = $ipv6mapped{$i4->[0]} or next;
+                if (!eval{$ipv6_package->new(LocalAddr=>$i6->[0],Type=>$socktype)}) {
+                    $i4->[3] = "Host [$host] resolved to IPv6 address [$i6->[0]] but $ipv6_package->new fails: $@";
                     $i6->[0] = '';
-                } else {
-                    $i6->[3] = "Not including resolved host [$i4->[0]] IPv4 because it ".(length($only) ? 'will' : 'should')." be handled by [$i6->[0]] IPv6";
+                } elsif ($i6->[2] eq '6' and eval {CAN_DISABLE_V6ONLY}) { # If IPv* can bind to both, upgrade '6' to '*', and disable the corresponding '4' entry
+                    $i6->[3] = "Not including resolved host [$i4->[0]] IPv4 because it will be handled by [$i6->[0]] IPv6";
+                    $i6->[2] = '*';
                     $i4->[0] = '';
                 }
             }
             @info = grep {length $_->[0]} @info;
         }
     } elsif ($host =~ /:/) {
-        die "Unresolveable host [$host]:$port - could not load IO::Socket::INET6: $@";
+        die "Unresolveable host [$host]:$port - could not load IPv6: $@";
     } else {
         my @addr;
         if ($host eq '*') {
@@ -281,28 +289,6 @@ sub get_addr_info {
     }
 
     return @info;
-}
-
-sub _bindv6only {
-    my $class = shift;
-    my $val = $class->_sysctl('net.ipv6.bindv6only'); # linux
-    $val = $class->_sysctl('net.inet6.ip6.v6only') if ! length($val); # bsd
-    return $val;
-}
-
-sub _sysctl {
-    my ($class, $key) = @_;
-    (my $file = "/proc/sys/$key") =~ y|.|/|;
-    if (-e $file) {
-        open my $fh, "<", $file or return '';
-        my $val = <$fh> || return '';
-        chomp $val;
-        return $val;
-    } elsif (-x "/sbin/sysctl") {
-        my $val = (split /\s+/, `/sbin/sysctl -n $key 2>/dev/null`)[0];
-        return defined($val) ? $val : '';
-    }
-    return '';
 }
 
 sub object {
@@ -590,10 +576,8 @@ value supplied by the general configuration.
 A socket protocol family PF_INET or PF_INET6 is derived from a specified
 address family of the binding address. A PF_INET socket can only accept
 IPv4 connections. A PF_INET6 socket accepts IPv6 connections, but may also
-accept IPv4 connections, depending on OS and its settings. For example,
-on FreeBSD systems setting a sysctl net.inet6.ip6.v6only to 0 will allow
-IPv4 connections to a PF_INET6 socket.  By default on linux, binding to
-host [::] will accept IPv4 or IPv6 connections.
+accept IPv4 connections if ipv is '*' or 'v4v6'. For example, binding to
+host [::] can accept IPv4 or IPv6 connections.
 
 The Net::Server::Proto::object method returns a list of objects corresponding
 to created sockets. For Unix and INET sockets the list typically contains
