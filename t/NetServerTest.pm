@@ -86,6 +86,7 @@ sub can_fork {
         my $pid = fork;
         die "Trouble while forking" unless defined $pid; # can't fork
         exit unless $pid; # can fork, exit child
+        waitpid $pid, 0; # clear zombie
         1;
     } || 0;
 }
