@@ -59,7 +59,7 @@ sub socket {
     my $sock = shift;
     my $ret  = $sock->SUPER::socket(@_);
     my $ipv  = $sock->NS_ipv;
-    eval { setsockopt $sock, IPPROTO_IPV6, IPV6_V6ONLY, $ipv eq 6?1:0 } or warn "setsockopt(IPV6_V6ONLY) failed: ($!) ($@)" if $ipv =~ /[6*]/;
+    eval { setsockopt $sock, IPPROTO_IPV6, IPV6_V6ONLY, $ipv=~/[4*]/?0:1 } or warn "setsockopt(IPV6_V6ONLY) failed: ($!) ($@)" if $ipv =~ /[6*]/;
     return $ret;
 }
 
