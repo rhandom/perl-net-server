@@ -24,8 +24,7 @@ use base qw(Net::Server);
 use Net::Server::SIG qw(register_sig check_sigs);
 use Socket qw(SO_TYPE SOL_SOCKET SOCK_DGRAM);
 use Carp qw(confess);
-eval { require IO::Multiplex; import IO::Multiplex 1.05; };
-$@ && warn "Module IO::Multiplex is required for Multiplex.";
+eval { require IO::Multiplex; 1 } or warn "Module IO::Multiplex is required for Multiplex.";
 
 our $VERSION = $Net::Server::VERSION;
 
