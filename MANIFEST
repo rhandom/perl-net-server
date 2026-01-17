@@ -36,6 +36,9 @@ Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 README
+t/11_TCP_ipv4.t
+t/12_TCP_ipv6.t
+t/13_TCP_ipvANY.t
 t/NetServerTest.pm
 t/Options.t
 t/Options.t.conf
