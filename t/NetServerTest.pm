@@ -4,7 +4,7 @@ use strict;
 use IO::Socket;
 use Exporter;
 @NetServerTest::ISA = qw(Exporter);
-@NetServerTest::EXPORT_OK = qw(prepare_test client_connect ok is like use_ok skip note diag);
+@NetServerTest::EXPORT_OK = qw(prepare_test client_connect ok is like use_ok skip note diag skip_without_ipv6);
 my %env;
 use constant debug => $ENV{'NS_DEBUG'} ? 1 : 0;
 
@@ -13,9 +13,21 @@ END {
         if ($env{'_ok_N'} || 0) ne ($env{'_ok_n'} || 0) && ($env{'_ok_pid'} || 0) == $$;
 }
 
+sub skip_without_ipv6 {
+    if (!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) }) {
+        my $reason = shift || "IPv6 is not supported";
+        $reason = "SKIP $reason\n$@";
+        $reason =~ s/\s*$/\n/;
+        $reason =~ s/^/# /gm;
+        print "1..0 $reason";
+        exit;
+    }
+}
+
 sub client_connect {
     shift if $_[0] && $_[0] eq __PACKAGE__;
     my $pkg = eval { $env{'ipv'} && $env{'ipv'} =~ /[6*]/ && do { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) } } || "IO::Socket::INET";
+    warn "IPv6 FAILURE! $@" if $@;
     return $pkg->new(@_);
 }
 

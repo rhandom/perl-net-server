@@ -6,7 +6,8 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok use_ok note);
+use NetServerTest qw(prepare_test ok use_ok note skip_without_ipv6);
+skip_without_ipv6;
 my $good = "127.0.0.1"; # Should connect to IPv4
 my $fail = "::1"; # Should not connect to IPv6
 $ENV{NET_SERVER_TEST_HOSTNAME} = $good;
@@ -35,7 +36,7 @@ my $ok = eval {
         $env->{'block_until_ready_to_test'}->();
 
         ### connect to child using IPv4
-        my $remote = NetServerTest::client_connect(
+        my $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $fail,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp');

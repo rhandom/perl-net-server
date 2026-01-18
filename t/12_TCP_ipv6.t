@@ -6,7 +6,8 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use lib $Bin;
-use NetServerTest qw(prepare_test ok use_ok note);
+use NetServerTest qw(prepare_test ok use_ok note skip_without_ipv6);
+skip_without_ipv6;
 my $good = "::1"; # Should connect to IPv6
 my $fail = "127.0.0.1"; # Should not connect to IPv4
 $ENV{NET_SERVER_TEST_HOSTNAME} = $good;
