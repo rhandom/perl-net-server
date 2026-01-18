@@ -319,7 +319,7 @@ sub ipv6_package {
         $pkg = 'IO::Socket::IP';
     } elsif ($INC{'IO/Socket/INET6.pm'}) {
         $pkg = 'IO::Socket::INET6';
-    } elsif (eval { require IO::Socket::IP }) {
+    } elsif (eval { require IO::Socket::IP; IO::Socket::IP->new(LocalAddr=>"::",Listen=>1) or die "IO::Socket::IP ephemeral listen IPv6 failure so IO::Socket::INET6 is required on this platform." }) {
         $pkg = 'IO::Socket::IP';
     } else {
         my $err = $@;
