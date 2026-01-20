@@ -56,7 +56,7 @@ my $ok = eval {
     ### child does the server
     } else {
         eval {
-            close STDERR;
+            open STDERR, ">", "/dev/null";
             local $SIG{ALRM} = sub { die "Timeout" };
             alarm(5);
             Net::Server::Test->run(
