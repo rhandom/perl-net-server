@@ -38,6 +38,7 @@ use Net::Server::Proto qw[
     sockaddr_in6
     inet_ntoa
     inet_ntop
+    safe_name_info
 ];
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
@@ -568,7 +569,7 @@ sub get_client_info {
     if ($addr && $prop->{'reverse_lookups'}) {
         if ($client->can('peerhostname')) {
             $prop->{'peerhost'} = $client->peerhostname;
-        } elsif ($prop->{'peername'} and my @res = Net::Server::Proto::safe_name_info($prop->{'peername'}, 0)) {
+        } elsif ($prop->{'peername'} and my @res = safe_name_info($prop->{'peername'}, 0)) {
             $prop->{'peerhost'} = $res[1] if @res > 1 and !$res[0];
         } else {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);

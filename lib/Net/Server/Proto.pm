@@ -100,6 +100,7 @@ BEGIN {
     };
     foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &$func; }
 }
+foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && defined &{"safe_$1\_$2"}; }
 
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
 # Compatibility routine to always act like Socket::getnameinfo even if it doesn't exist or if IO::Socket::IP is not available.
