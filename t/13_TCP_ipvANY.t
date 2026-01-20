@@ -10,9 +10,6 @@ use NetServerTest qw(prepare_test ok use_ok note skip_without_ipv6);
 skip_without_ipv6;
 my $IPv4 = "127.0.0.1"; # Should connect to IPv4
 my $IPv6 = "::1"; # Should also connect to IPv6
-$ENV{NET_SERVER_TEST_HOSTNAME} = "::";
-$ENV{NET_SERVER_TEST_IPV} = "v4v6";
-$ENV{NET_SERVER_TEST_TIMEOUT} = "9";
 my $env = prepare_test({n_tests => 5, start_port => 20700, n_ports => 1}); # runs three of its own tests
 
 use_ok('Net::Server');
@@ -36,14 +33,14 @@ my $ok = eval {
         $env->{'block_until_ready_to_test'}->();
 
         ### connect to child using IPv4
-        my $remote = NetServerTest::client_connect(
+        my $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $IPv4,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp');
         die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]" if !$remote;
 
         ### connect to child using IPv6
-        $remote = NetServerTest::client_connect(
+        $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $IPv6,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp') || die "Couldn't open sock to [$IPv6] [$env->{'ports'}->[0]]: $!";
@@ -62,7 +59,7 @@ my $ok = eval {
             Net::Server::Test->run(
                 port => "$env->{'ports'}->[0]/tcp",
                 host => "*",
-                ipv  => $env->{'ipv'},
+                ipv  => "*",
                 background => 0,
                 setsid => 0,
             );

@@ -9,11 +9,9 @@ use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok note);
 my $IPv4 = "127.0.0.1"; # Should connect to IPv4
 my $IPv6 = "::1"; # Should not connect to IPv6
-$ENV{NET_SERVER_TEST_HOSTNAME} = "127.0.0.1";
-$ENV{NET_SERVER_TEST_IPV} = "v4v6";
-$ENV{NET_SERVER_TEST_TIMEOUT} = "9";
 $ENV{NO_IPV6} = 1;
-my $env = prepare_test({n_tests => 5, start_port => 20700, n_ports => 1}); # runs three of its own tests
+my $env = prepare_test({n_tests => 6, start_port => 20700, n_ports => 1}); # runs three of its own tests
+ok(!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) }, "NO_IPV6 FAILURE! ipv6_package still detected");
 
 use_ok('Net::Server');
 @Net::Server::Test::ISA = qw(Net::Server);
