@@ -343,17 +343,16 @@ Net::Server::Proto - Net::Server Protocol compatibility layer
 
 =head1 SYNOPSIS
 
-    NOTE: beginning in Net::Server 2.005, the default value for
-          ipv is IPv* meaning that if no host is passed, or
-          a hostname is past, all available socket types will be
+    NOTE: Beginning in Net::Server 2.005, the default value for
+          ipv is IPv* meaning that if no host is passed, or a
+          hostname is passed, all available socket types will be
           bound.  You can force IPv4 only by adding an ipv => 4
           configuration in any of the half dozen ways we let you
           specify it.
 
     NOTE: For IPv6 Net::Server will first try and use the module
-          listed in server config ipv6_package, then
-          $Net::Server::ipv6_package, then IO::Socket::IP, then
-          IO::Socket::INET6 (which is deprecated).
+          listed in server config ipv6_package, then IO::Socket::IP,
+          then IO::Socket::INET6 (which is deprecated).
 
     # Net::Server::Proto and its accompanying modules are not
     # intended to be used outside the scope of Net::Server.
