@@ -130,13 +130,14 @@ sub get_ports {
                 LocalPort => $port,
                 Timeout   => 2,
                 Listen    => 1,
-                ReuseAddr => 1, Reuse => 1,
-            ) || do { warn "Couldn't open server socket on port $port: $!\n" if $env{'trace'}; next };
+                ReuseAddr => 1,
+                Reusei    => 1,
+            ) || do { warn "Couldn't listen on [$env{hostname}] port [$port]: $!\n" if $env{'trace'}; next };
             my $client = client_connect(
                 PeerAddr => $env{'hostname'},
                 PeerPort => $port,
                 Timeout  => 2,
-            ) || do { warn "Couldn't open client socket on port $port: $!\n" if $env{'trace'}; next };
+            ) || do { warn "Couldn't connect to [$env{hostname}] port [$port]: $!\n" if $env{'trace'}; next };
             my $sock = $serv->accept || do { warn "Didn't accept properly on server: $!" if $env{'trace'}; next };
             $sock->autoflush(1);
             print $sock "hi from server\n";
@@ -146,6 +147,7 @@ sub get_ports {
             next if <$client> !~ /^hi from server/;
             $client->close;
             $sock->close;
+            $serv->close;
             push @ports, $port;
             last if @ports == $n;
         }
