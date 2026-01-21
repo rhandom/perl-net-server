@@ -782,9 +782,23 @@ If your system has both IPv4 and IPv6 interfaces but you'd only like
 to bind to IPv6 entries, then you should use a hostname of [::]
 instead of [*].
 
+If the operating system supports Dual-Stack sockets with ipv => "*"
+(default), then both IPv4 and IPv6 will be bound on the same IPv6 port.
 If you receive an IPv4 connection on a bound IPv6 port, the textual
 representation of the peer's IPv4 address will typically be in a
 form of an IPv4-mapped IPv6 addresses, e.g. "::ffff:127.0.0.1" .
+If this behavior is not desired, use ipv => "v4v6" instead of "*",
+or use distinct ports, e.g.,
+
+  port => "20203", ipv =>"IPv4v6", # v4v6
+
+  port => "20203/IPv4/IPv6", # Stacked IP Protocols
+
+  port => ["20203/IPv4","20203/IPv6"], # separate ports
+
+  port => ["*:20203/IPv4","*:20203/IPv6"], # distinct ipv
+
+  port => ["0.0.0.0:20203","[::]:20203"], # explicit listen hosts
 
 The ipv parameter was chosen because it does not conflict with any
 other existing usage, it is very similar to ipv4 or ipv6, it allows
