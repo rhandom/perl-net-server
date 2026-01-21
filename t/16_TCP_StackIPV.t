@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test to ensure IPv* listener binds both IPv4 and IPv6 interfaces.
+# Test to ensure Stacked IPv4/IPv6 listens on both IPv4 and IPv6 interfaces.
 use strict;
 use warnings;
 use FindBin qw($Bin);
@@ -57,9 +57,8 @@ my $ok = eval {
             local $SIG{ALRM} = sub { die "Timeout" };
             alarm(5);
             Net::Server::Test->run(
-                port => "$env->{'ports'}->[0]/tcp",
-                host => "*",
-                ipv  => "*",
+                port => "$env->{'ports'}->[0]/IPv4/IPv6",
+                host  => "*",
                 background => 0,
                 setsid => 0,
             );

@@ -40,6 +40,9 @@ t/11_TCP_ipv4.t
 t/12_TCP_ipv6.t
 t/13_TCP_ipvANY.t
 t/14_TCP_NOv6.t
+t/15_TCP_ipv4v6.t
+t/16_TCP_StackIPV.t
+t/17_TCP_DoublePort.t
 t/NetServerTest.pm
 t/Options.t
 t/Options.t.conf
