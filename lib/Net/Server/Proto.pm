@@ -21,7 +21,6 @@ use strict;
 use warnings;
 use Socket ();
 use Exporter ();
-use constant IPV6_V6ONLY => 26; # XXX: Do we really need to hard-code this? Not available on Socket.pm < 1.97 nor ever with Socket6.pm? :-/
 use constant NIx_NOHOST => 1; # The getNameInfo Xtended flags are too difficult to obtain on some older systems,
 use constant NIx_NOSERV => 2; # So just hard-code the constant numbers.
 
@@ -29,6 +28,21 @@ my $requires_ipv6 = 0;
 my $ipv6_package;
 my $can_disable_v6only;
 my $exported = {};
+
+BEGIN {
+    if (!eval { Socket->import("IPV6_V6ONLY") }) { # Get the actual platform value
+        # XXX: Do we have to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
+        my $IPV6_V6ONLY = $^O eq 'linux' ? 26 : # XXX: Why is Linux different?
+            $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly|MSWin32|solaris|svr4)$/ ? 27 : undef; # XXX: Most common
+        if ($IPV6_V6ONLY) {
+            import constant IPV6_V6ONLY => $IPV6_V6ONLY;
+        } else { # XXX: Scrape it from kernel header files? Last ditch effort ugly hack!
+            my $d = "/tmp/IP6Cache";
+            !eval { require "$d.pl" } and $IPV6_V6ONLY = do { mkdir $d; `h2ph -d $d -a netinet/in.h 2>/dev/null`; eval `grep -rl "sub IPV6_V6ONLY" $d|xargs cat|grep "sub IPV6_V6ONLY";echo "IPV6_V6ONLY()"`} and `rm -rf $d;echo "sub IPV6_V6ONLY{$IPV6_V6ONLY}1">$d.pl`;
+        }
+        die "IPV6_V6ONLY unknown on this platform: $@" unless defined &IPV6_V6ONLY;
+    }
+}
 
 sub import {
     my $class = shift;
