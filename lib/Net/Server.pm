@@ -43,7 +43,7 @@ use Net::Server::Proto qw[
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
                               get_uid get_gid set_uid set_gid);
 
-our $VERSION = '2.015';
+our $VERSION = '2.016';
 
 sub new {
     my $class = shift || die "Missing class";
