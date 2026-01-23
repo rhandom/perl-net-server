@@ -30,17 +30,17 @@ my $can_disable_v6only;
 my $exported = {};
 
 BEGIN {
-    if (!eval { Socket->import("IPV6_V6ONLY") }) { # Get the actual platform value
-        # XXX: Do we have to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
+    if (!eval { import Socket "IPV6_V6ONLY"; IPV6_V6ONLY() }) { # First try the actual platform value
+        my $why = $@; # XXX: Do we need to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
         my $IPV6_V6ONLY = $^O eq 'linux' ? 26 : # XXX: Why is Linux different?
-            $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly|MSWin32|solaris|svr4)$/ ? 27 : undef; # XXX: Most common
+            $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly|MSWin32|solaris|svr4)$/ ? 27 : undef; # XXX: "27" everywhere else?
         if ($IPV6_V6ONLY) {
             import constant IPV6_V6ONLY => $IPV6_V6ONLY;
-        } else { # XXX: Scrape it from kernel header files? Last ditch effort ugly hack!
+        } else { # XXX: Do we need to scrape it from kernel header files? Last ditch effort super ugly string-eval hack!
             my $d = "/tmp/IP6Cache";
             !eval { require "$d.pl" } and $IPV6_V6ONLY = do { mkdir $d; `h2ph -d $d -a netinet/in.h 2>/dev/null`; eval `grep -rl "sub IPV6_V6ONLY" $d|xargs cat|grep "sub IPV6_V6ONLY";echo "IPV6_V6ONLY()"`} and `rm -rf $d;echo "sub IPV6_V6ONLY{$IPV6_V6ONLY}1">$d.pl`;
         }
-        die "IPV6_V6ONLY unknown on this platform: $@" unless defined &IPV6_V6ONLY;
+        die "$why\n$@\n[Socket $Socket::VERSION] Could not determine IPV6_V6ONLY on Unknown Platform [$^O]" unless defined &IPV6_V6ONLY;
     }
 }
 
