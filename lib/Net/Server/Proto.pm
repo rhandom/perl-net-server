@@ -97,13 +97,13 @@ BEGIN {
         my @res = ();
         no strict 'refs';
         foreach my $pkg ($ipv6_package,"Socket","Socket6") {
-            # Some symbols, such as NI_NUMERICHOST, will not exist until explicitly called via AUTOLOAD
-            last if $pkg and eval { @res = &{"$pkg\::$basename"}(@_); $sub->{$fullname} = $pkg->can($basename); };
+            # Some symbols, such as NI_NUMERICHOST, will not exist until explicitly called via AUTOLOAD. Some functions, such as sockaddr_in, behave differently based on wantarray-ness, thus $c[5] is used to preserve context.
+            last if $pkg and eval { @res = $c[5] ? &{"$pkg\::$basename"}(@_) : scalar &{"$pkg\::$basename"}(@_); $sub->{$fullname} = $pkg->can($basename); };
         }
         if (my $code = $sub->{$fullname}) {
             no warnings qw(redefine prototype); # Don't spew when redefining the stub in the packages that imported it (as well as mine) with the REAL routine
             eval { *{"$_\::$basename"}=$code foreach keys %{$exported->{$basename}}; *$fullname=$code } or warn "$fullname: On-The-Fly replacement failed: $@";
-            return @res < 2 && !$c[5] ? $res[0] : @res;
+            return $c[5] ? @res : $res[0];
         }
         if ($ipv6_package) {
             $sub->{$fullname} = undef;
