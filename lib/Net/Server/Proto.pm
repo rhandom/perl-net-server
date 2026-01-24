@@ -89,29 +89,29 @@ BEGIN {
 
     # Load just in time once explicitly invoked.
     my $sub = {};
+    my $tried6 = 0;
     $stub_wrapper = sub {
         my @c = caller 1;
         (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
         # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
         $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
-        my @res = ();
-        no strict 'refs';
-        foreach my $pkg ($ipv6_package,"Socket","Socket6") {
-            # Some symbols, such as NI_NUMERICHOST, will not exist until explicitly called via AUTOLOAD. Some functions, such as sockaddr_in, behave differently based on wantarray-ness, thus $c[5] is used to preserve context.
-            last if $pkg and eval { @res = $c[5] ? &{"$pkg\::$basename"}(@_) : scalar &{"$pkg\::$basename"}(@_); $sub->{$fullname} = $pkg->can($basename); };
+        foreach my $pkg ('Socket','Socket6') {
+            # First one wins
+            last if $sub->{$fullname} = $pkg->can($basename);
         }
         if (my $code = $sub->{$fullname}) {
+            no strict 'refs';
             no warnings qw(redefine prototype); # Don't spew when redefining the stub in the packages that imported it (as well as mine) with the REAL routine
             eval { *{"$_\::$basename"}=$code foreach keys %{$exported->{$basename}}; *$fullname=$code } or warn "$fullname: On-The-Fly replacement failed: $@";
+            my @res = (); # Run REAL routine preserving the same wantarray-ness context as caller
+            eval { @res = $c[5] ? $code->(@_) : scalar $code->(@_); 1 } or do { (my $why=$@) =~ s/\s*at .* line \d.*//s; die "$why at $c[1] line $c[2]\n"; };
             return $c[5] ? @res : $res[0];
         }
-        if ($ipv6_package) {
-            $sub->{$fullname} = undef;
-            die "$fullname: Failed to locate true symbol even using $ipv6_package at $c[1] line $c[2]\n";
-        } else {
-            warn "WARNING: Cheater pre-loading IPv6 attempt since non-Socket.pm $fullname called too early at $c[1] line $c[2]\n";
-            __PACKAGE__->ipv6_package({}) and $ipv6_package and return &{$basename}(@_);
-        }
+        die "$fullname: Failed to locate Socket symbol at $c[1] line $c[2]\n" if $tried6;
+        $tried6 = 1; eval { require Socket6; import Socket6; 1 }; # Legacy systems with crusty old Socket hopefully have Socket6 installed.
+        delete $sub->{$fullname};
+        no strict 'refs';
+        return &$basename(@_); # Recursively call myself one more time if Socket6 hadn't been loaded.
     };
     foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !defined &$func; }
 }
