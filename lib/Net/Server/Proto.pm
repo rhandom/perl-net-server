@@ -124,10 +124,10 @@ foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && defined &{"s
 # The new Socket also allows for an optional $xflags input and always returns its $err as the first element, even on success.
 sub safe_name_info {
     return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getnameinfo");
-    my ($sockaddr, $flags, $xflags) = @_; $flags ||= 0; $xflags ||= 0;
+    my ($sockaddr, $flags, $xflags) = @_; $sockaddr ||= sockaddr_in 0, inet_aton "0.0.0.0"; $flags ||= 0; $xflags ||= 0;
     my @res;
     eval { @res = getnameinfo $sockaddr, $flags, $xflags; 1 } or do { # Force 3-arg input to ensure old version will die: "Usage: Socket6::getnameinfo"
-        @res = getnameinfo @_[0,1]; # Probably old Socket6 version, so hide NIx_* $xflags in $_[2]
+        @res = getnameinfo $sockaddr, $flags; # Probably old Socket6 version, so hide NIx_* $xflags in $_[2]
         @res<2 ? ($res[0]||="EAI_NONAME") : do {
             @res = @res[-3,-2,-1]; $res[0] ||= ""; # Create first $err output element, if doesn't exist.
             $res[NIx_NOHOST] = undef if $xflags | NIx_NOHOST; # Emulate $xflags
@@ -140,24 +140,24 @@ sub safe_name_info {
 # ($err, @result) = safe_addr_info($host, $service, [$hints])
 # Compatibility routine to always act like Socket::getaddrinfo even if IO::Socket::IP is not available.
 # XXX: Why are there two different versions of getaddrinfo?
-# The old Socket6 accepts a list of optional hints and returns a multiple of 5 output. (@fiver_chunks)=Socket6::getaddrinfo($node,$port,[$family,$socktype,$proto,$flags])
+# The old Socket6 accepts a list of optional hints and returns either an $err or a multiple of 5 output. (@fiver_chunks)=Socket6::getaddrinfo($node,$port,[$family,$socktype,$proto,$flags])
 # The new Socket accepts an optional HASHREF of hints and returns an $err followed by a list of HASHREFs.
 sub safe_addr_info {
     return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getaddrinfo");
-    my ($host, $port, $h) = @_;
-    $h ||= {};
+    my ($host, $port, $hints) = @_; $host ||= ""; $port ||= 0;
+    $hints ||= {};
     my @res;
-    return @res = ('EAI_BADFLAGS: Usage: safe_addr_info($hostname, $servicename, \%hints)') if "HASH" ne ref $h or @_ < 2 or @_ > 3;
-    eval { @res = getaddrinfo( $host, $port, $h ); die ($res[0] || "EAI_NONAME") if @res < 2; 1 } # Nice new Socket "HASH" method
+    return @res = ('EAI_BADFLAGS: Usage: safe_addr_info($hostname, $servicename, \%hints)') if "HASH" ne ref $hints or @_ < 2 or @_ > 3;
+    eval { @res = getaddrinfo( $host, $port, $hints ); die ($res[0] || "EAI_NONAME") if @res < 2; 1 } # Nice new Socket "HASH" method
     or eval { # Convert Socket6 Old Array "C" method to "HASH" method
         @res = (''); # Pretend like no error so far
-        my @results = getaddrinfo( $host, $port, $h->{family}||0, $h->{socktype}||0, $h->{protocol}||0, $h->{flags}||0 );
+        my @results = getaddrinfo( $host, $port, map {$hints->{$_}||0} qw[family socktype protocol flags] );
         while (@results > 4) {
             my $r = {};
             (@$r{qw[family socktype protocol addr canonname]}, @results) = @results;
             push @res, $r;
         }
-        $res[0] = "EAI_NONAME" if @res < 2;
+        $res[0] ||= "EAI_NONAME" if @res < 2;
         1;
     }
     or $res[0] = ($@ || "getaddrinfo: failed $!");
