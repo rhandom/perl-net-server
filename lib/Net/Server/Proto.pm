@@ -28,6 +28,7 @@ my $requires_ipv6 = 0;
 my $ipv6_package;
 my $can_disable_v6only;
 my $exported = {};
+my $have6;
 my $stub_wrapper;
 
 BEGIN {
@@ -89,16 +90,17 @@ BEGIN {
 
     # Load just in time once explicitly invoked.
     my $sub = {};
-    my $tried6 = 0;
     $stub_wrapper = sub {
         my @c = caller 1;
         (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
         # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
         $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
-        foreach my $pkg ('Socket','Socket6') {
-            # First one wins
-            last if $sub->{$fullname} = $pkg->can($basename);
-        }
+        # Always try Socket.pm first, then Socket6.pm
+        $sub->{$fullname} = Socket->can($basename) || $have6 && Socket6->can($basename) || eval { # Only try to load Socket6 once
+            die "No Socket6" if defined $have6 && !$have6; $have6||=0; $have6||=do{require Socket6;1}; package _Socket6::_IgnorePollution; # Hide from packaging scripts
+            # XXX: Why do Socket6 routines need "import" in order for "can" to materialize the real coderef? How very rude. But I don't really want to brick over myself, so use a temporary throw-away package just for import to dump it into.
+            Socket6->import($basename); Socket6->can($basename); # Try "can" again after "import"
+        };
         if (my $code = $sub->{$fullname}) {
             no strict 'refs';
             no warnings qw(redefine prototype); # Don't spew when redefining the stub in the packages that imported it (as well as mine) with the REAL routine
@@ -107,11 +109,7 @@ BEGIN {
             eval { @res = $c[5] ? $code->(@_) : scalar $code->(@_); 1 } or do { (my $why=$@) =~ s/\s*at .* line \d.*//s; die "$why at $c[1] line $c[2]\n"; };
             return $c[5] ? @res : $res[0];
         }
-        die "$fullname: Failed to locate Socket symbol at $c[1] line $c[2]\n" if $tried6;
-        $tried6 = 1; eval { require Socket6; import Socket6; 1 }; # Legacy systems with crusty old Socket hopefully have Socket6 installed.
-        delete $sub->{$fullname};
-        no strict 'refs';
-        return &$basename(@_); # Recursively call myself one more time if Socket6 hadn't been loaded.
+        die "$fullname: Failed to locate Socket symbol at $c[1] line $c[2]\n";
     };
     foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !exists &$func; }
 }
