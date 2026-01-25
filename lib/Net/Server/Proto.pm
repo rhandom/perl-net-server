@@ -130,8 +130,8 @@ sub safe_name_info {
         @res = getnameinfo $sockaddr, $flags; # Probably old Socket6 version, so hide NIx_* $xflags in $_[2]
         @res<2 ? ($res[0]||="EAI_NONAME") : do {
             @res = @res[-3,-2,-1]; $res[0] ||= ""; # Create first $err output element, if doesn't exist.
-            $res[NIx_NOHOST] = undef if $xflags | NIx_NOHOST; # Emulate $xflags
-            $res[NIx_NOSERV] = undef if $xflags | NIx_NOSERV; # so output matches
+            $res[NIx_NOHOST] = undef if $xflags & NIx_NOHOST; # Emulate $xflags
+            $res[NIx_NOSERV] = undef if $xflags & NIx_NOSERV; # so output matches
         };
     };
     return @res;
