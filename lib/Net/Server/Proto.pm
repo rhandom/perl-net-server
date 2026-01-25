@@ -113,9 +113,9 @@ BEGIN {
         no strict 'refs';
         return &$basename(@_); # Recursively call myself one more time if Socket6 hadn't been loaded.
     };
-    foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !defined &$func; }
+    foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !exists &$func; }
 }
-foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && defined &{"safe_$1\_$2"}; }
+foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && exists &{"safe_$1\_$2"}; }
 
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
 # Compatibility routine to always act like Socket::getnameinfo even if it doesn't exist or if IO::Socket::IP is not available.
