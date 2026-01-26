@@ -18,6 +18,7 @@
 package Net::Server::SIG;
 
 use strict;
+use Carp qw(croak);
 use vars qw($VERSION @ISA @EXPORT_OK
             %_SIG %_SIG_SUB);
 use Exporter ();
@@ -27,7 +28,7 @@ $VERSION   = '0.03';
 @EXPORT_OK = qw(register_sig unregister_sig check_sigs);
 
 sub register_sig {
-    die 'Usage: register_sig( SIGNAME => \&code_ref )' if @_ % 2;
+    croak 'Usage: register_sig( SIGNAME => \&code_ref )' if @_ % 2;
     if (@_ > 2) {
         register_sig(shift(),shift()) while @_;
         return;
@@ -46,14 +47,14 @@ sub register_sig {
             delete $_SIG_SUB{$sig};
             $SIG{$sig} = 'IGNORE';
         } else {
-            die "Scalar argument limited to \"DEFAULT\" and \"IGNORE\".";
+            croak 'Scalar argument limited to "DEFAULT" and "IGNORE"';
         }
     } elsif ($ref eq 'CODE') {
         $_SIG{$sig} = 0;
         $_SIG_SUB{$sig} = $code_ref;
         $SIG{$sig} = sub{ $Net::Server::SIG::_SIG{$sig} = 1 };
     } else {
-        die "Unsupported sig type -- must be 'DEFAULT' or a code ref.";
+        croak "Unsupported sig type -- must be 'DEFAULT' or a code ref.";
     }
 }
 

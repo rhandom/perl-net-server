@@ -22,6 +22,7 @@ package Net::Server::Daemonize;
 
 use strict;
 use base qw(Exporter);
+use Carp qw(croak);
 use POSIX qw(SIGINT SIG_BLOCK SIG_UNBLOCK);
 
 our $VERSION = "0.06";
@@ -38,10 +39,10 @@ sub check_pid_file ($) {
     my $pid_file = shift;
     return 1 if ! -e $pid_file or ! -s $pid_file && -M _ > 0.01;
 
-    open my $fh, '<', $pid_file or die "$pid_file: Couldn't open existent pid_file [$!]\n";
+    open my $fh, '<', $pid_file or croak "$pid_file: Couldn't open existent pid_file [$!]";
     my $current_pid = <$fh> || "";
     close $fh;
-    $current_pid = ($current_pid =~ /^(\d{1,10})/) ? $1 : die "$pid_file: Couldn't find pid in existent pid_file";
+    $current_pid = ($current_pid =~ /^(\d{1,10})/) ? $1 : croak "$pid_file: Couldn't find pid in existent pid_file";
 
     my $exists;
     if ($$ == $current_pid) {
@@ -52,12 +53,12 @@ sub check_pid_file ($) {
     } elsif (kill 0, $current_pid) {
         $exists = 1;
     }
-    die "Pid_file already exists for running process ($current_pid)... aborting\n"
+    croak "Pid_file already exists for running process ($current_pid)... aborting"
         if $exists;
 
     # remove the pid_file
     warn "Pid_file \"$pid_file\" already exists.  Overwriting!\n";
-    unlink $pid_file || die "Couldn't remove pid_file \"$pid_file\" [$!]\n";
+    unlink $pid_file || croak "Couldn't remove pid_file \"$pid_file\" [$!]";
     return 1;
 }
 
@@ -68,7 +69,7 @@ sub create_pid_file ($) {
 
     check_pid_file($pid_file);
 
-    open my $fh, '>', $pid_file or die "Couldn't open pid file \"$pid_file\" [$!].\n";
+    open my $fh, '>', $pid_file or croak "Couldn't open pid file \"$pid_file\" [$!]";
     print $fh "$$\n";
     close $fh;
 
@@ -82,12 +83,12 @@ sub unlink_pid_file ($) {
     my $pid_file = shift;
     return 1 if ! -e $pid_file; # no pid_file = return success
 
-    open my $fh, '<', $pid_file or die "$pid_file: Couldn't open existent pid_file [$!]\n"; # slight race
+    open my $fh, '<', $pid_file or croak "$pid_file: Couldn't open existent pid_file [$!]"; # slight race
     my $current_pid = <$fh>;
     close $fh;
     chomp $current_pid;
 
-    die "Process $$ doesn't own pid_file \"$pid_file\". Can't remove it.\n"
+    croak "Process $$ doesn't own pid_file \"$pid_file\" so can't remove it"
         if $current_pid ne $$;
 
     unlink($pid_file) || die "$pid_file: Couldn't unlink pid_file [$!]\n";
@@ -105,7 +106,7 @@ sub is_root_user () {
 sub get_uid ($) {
     my $user = shift;
     my $uid  = ($user =~ /^(\d+)$/) ? $1 : getpwnam($user);
-    die "No such user \"$user\"\n" unless defined $uid;
+    croak "No such user \"$user\"" unless defined $uid;
     return $uid;
 }
 
@@ -118,12 +119,12 @@ sub get_gid {
             push @gid, $group;
         }else{
             my $id = getgrnam($group);
-            die "No such group \"$group\"\n" unless defined $id;
+            croak "No such group \"$group\"" unless defined $id;
             push @gid, $id;
         }
     }
 
-    die "No group found in arguments.\n" unless @gid;
+    croak "No group found in arguments" unless @gid;
     return join(" ", $gid[0], @gid);
 }
 
@@ -172,14 +173,14 @@ sub safe_fork () {
 
     # block signal for fork
     my $sigset = POSIX::SigSet->new(SIGINT);
-    POSIX::sigprocmask(SIG_BLOCK, $sigset) or die "Can't block SIGINT for fork: [$!]\n";
+    POSIX::sigprocmask(SIG_BLOCK, $sigset) or croak "Can't block SIGINT for fork: [$!]";
 
     my $pid = fork;
     die "Couldn't fork: [$!]" if ! defined $pid;
 
     $SIG{'INT'} = 'DEFAULT'; # make SIGINT kill us as it did before
 
-    POSIX::sigprocmask(SIG_UNBLOCK, $sigset) or die "Can't unblock SIGINT for fork: [$!]\n";
+    POSIX::sigprocmask(SIG_UNBLOCK, $sigset) or croak "Can't unblock SIGINT for fork: [$!]";
 
     return $pid;
 }
@@ -211,7 +212,7 @@ sub daemonize ($$$) {
     open STDERR, '>&STDOUT'       or die "Can't open STDERR to STDOUT: [$!]\n";
 
     ### does this mean to be chroot ?
-    chdir '/' or die "Can't chdir to \"/\": [$!]";
+    chdir '/' or croak "Can't chdir to \"/\": [$!]";
 
     POSIX::setsid(); # Turn process into session leader, and ensure no controlling terminal
 

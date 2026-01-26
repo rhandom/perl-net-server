@@ -19,6 +19,7 @@ package Net::Server::Proto;
 
 use strict;
 use warnings;
+use Carp qw(croak);
 use Socket ();
 use Exporter ();
 use constant NIx_NOHOST => 1; # The getNameInfo Xtended flags are too difficult to obtain on some older systems,
@@ -50,10 +51,10 @@ sub import {
                 grep {$_ eq $func} @Socket::EXPORT,@Socket::EXPORT_OK # Is exportable by Socket
                 or ($have6 || !defined $have6 && eval { require Socket6; $have6=1} ) && # Or else if Socket6 is available, AND
                 grep {$_ eq $func} @Socket6::EXPORT,@Socket6::EXPORT_OK # Is exportable by Socket6
-                or die "$func is not a valid Socket macro nor defined by ".__PACKAGE__." and cannot be imported";
+                or croak "$func is not a valid Socket macro nor defined by ".__PACKAGE__." and cannot be imported";
                 no strict 'refs'; *$func = sub { return $stub_wrapper->($func,@_) };
             }
-            die "$func is a static method invoked via ".__PACKAGE__."->$func so it cannot be imported" if grep {$_ eq $func} @EXPORT_DENIED;
+            croak "$func is a static method invoked via ".__PACKAGE__."->$func so it cannot be imported" if grep {$_ eq $func} @EXPORT_DENIED;
             push @EXPORT_OK, $func; # Verified routine or stub exists, so it's safe to append to my exportable list
         }
     }
@@ -179,7 +180,7 @@ sub parse_info {
 
     my $info;
     if (ref($port) eq 'HASH') {
-        die "Missing port in hashref passed in port argument.\n" if ! $port->{'port'};
+        croak "Missing port in hashref passed in port argument" if ! $port->{'port'};
         $info = $port;
     } else {
         $info = {};
@@ -261,20 +262,20 @@ sub get_addr_info {
     $proto = 'tcp' if ! defined $proto;
     $server = {}   if ! defined $server;
     return ([$host, $port, '*']) if $proto =~ /UNIX/i;
-    $port = (getservbyname($port, $proto))[2] or die "Could not determine port number from host [$host]:$_[2]\n" if $port =~ /\D/;
+    $port = (getservbyname($port, $proto))[2] or croak "Could not determine port number from host [$host]:$_[2]" if $port =~ /\D/;
 
     my @info;
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
-        my $addr = inet_aton($host) or die "Unresolveable host [$host]:$port: invalid ip\n";
+        my $addr = inet_aton($host) or croak "Unresolveable host [$host]:$port: invalid ip";
         push @info, [inet_ntoa($addr), $port, 4];
     } elsif (eval { $class->ipv6_package($server) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
         my @res = safe_addr_info($host eq '*' ? '' : $host, $port, { family=>AF_UNSPEC, socktype=>$socktype, protocol=>$proto_id, flags=>AI_PASSIVE });
-        my $err = shift @res; die "Unresolveable [$host]:$port: $err\n" if $err or (@res < 1 and $err = "getaddrname: $host: FAILURE!");
+        my $err = shift @res; croak "Unresolveable [$host]:$port: $err" if $err or (@res < 1 and $err = "getaddrname: $host: FAILURE!");
         while (my $r = shift @res) {
             my ($err, $ip) = safe_name_info($r->{addr}, NI_NUMERICHOST | NI_NUMERICSERV);
-            die "safe_name_info failed on [$host]:$port [$err]\n" if $err || !$ip;
+            croak "safe_name_info failed on [$host]:$port [$err]" if $err || !$ip;
             my $ipv = ($r->{family} == AF_INET) ? 4 : ($r->{family} == AF_INET6) ? 6 : '*';
             push @info, [$ip, $port, $ipv];
         }
@@ -294,14 +295,14 @@ sub get_addr_info {
             @info = grep {length $_->[0]} @info;
         }
     } elsif ($host =~ /:/) {
-        die "Unresolveable host [$host]:$port - could not load IPv6: $@";
+        croak "Unresolveable host [$host]:$port - could not load IPv6: $@";
     } else {
         my @addr;
         if ($host eq '*') {
             push @addr, INADDR_ANY;
         } else {
             (undef, undef, undef, undef, @addr) = gethostbyname($host);
-            die "Unresolveable host [$host]:$port via IPv4 gethostbyname\n" if !@addr;
+            croak "Unresolveable host [$host]:$port via IPv4 gethostbyname" if !@addr;
         }
         push @info, [inet_ntoa($_), $port, 4] for @addr
     }
@@ -343,7 +344,7 @@ sub ipv6_package {
         if (eval { require IO::Socket::INET6 }) {
             $pkg = 'IO::Socket::INET6';
         } else {
-            die "Port configuration using IPv6 could not be started.  Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@"
+            croak "Port configuration using IPv6 could not be started. Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@";
         }
     }
     return $ipv6_package = $pkg;
@@ -362,7 +363,7 @@ sub IPV6_V6ONLY () {
         no strict 'refs';no warnings qw(redefine);*{"$_\::$me"}=$bricker foreach keys %{$exported->{$me}},__PACKAGE__;
         return $IPV6_V6ONLY;
     }
-    die "$why\n$@\n[Socket $Socket::VERSION] Could not determine IPV6_V6ONLY on Unknown Platform [$^O]";
+    croak "$why\n$@\n[Socket $Socket::VERSION] Could not determine IPV6_V6ONLY on Unknown Platform [$^O]";
 }
 
 1;

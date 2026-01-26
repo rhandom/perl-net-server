@@ -18,6 +18,7 @@
 package Net::Server::Proto::UNIX;
 
 use strict;
+use Carp qw(croak);
 use base qw(IO::Socket::UNIX);
 use Socket qw(SOCK_STREAM SOCK_DGRAM SOMAXCONN);
 
@@ -112,7 +113,7 @@ sub show {
 
 sub read_until { # only sips the data - but it allows for compatibility with SSLEAY
     my ($client, $bytes, $end_qr) = @_;
-    die "One of bytes or end_qr should be defined for UNIX read_until\n" if !defined($bytes) && !defined($end_qr);
+    croak "read_until: One of bytes or end_qr should be defined" if !defined($bytes) && !defined($end_qr);
     my $content = '';
     my $ok = 0;
     while (1) {

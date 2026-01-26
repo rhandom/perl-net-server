@@ -19,6 +19,7 @@ package Net::Server::Proto::TCP;
 
 use strict;
 use warnings;
+use Carp qw(croak);
 use IO::Socket::INET ();
 use Net::Server::Proto qw(IPPROTO_IPV6 IPV6_V6ONLY SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 
@@ -136,7 +137,7 @@ sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropri
 
 sub read_until { # only sips the data - but it allows for compatibility with SSLEAY
     my ($client, $bytes, $end_qr) = @_;
-    die "One of bytes or end_qr should be defined for TCP read_until\n" if !defined($bytes) && !defined($end_qr);
+    croak "read_until: One of bytes or end_qr should be defined" if !defined($bytes) && !defined($end_qr);
     my $content = '';
     my $ok = 0;
     while (1) {

@@ -18,6 +18,7 @@
 package Net::Server::MultiType;
 
 use strict;
+use Carp qw(croak);
 use base qw(Net::Server);
 
 #sub net_server_type { shift->SUPER::net_server_type }; # not-needed
@@ -61,8 +62,8 @@ sub run {
             my $_pkg = ($type =~ /::/) ? $type : "Net::Server::$type";
             $prop->{'_recursive_multitype'} = $_pkg;
             (my $file = "$_pkg.pm") =~ s{::}{/}g;
-            eval { require $file } or die "Trouble becoming server type $pkg while loading default package $_pkg: $@\n";
-            die "Recursive inheritance - Package $pkg inherits from $_pkg.\n" if $_pkg->isa($pkg);
+            eval { require $file } or croak "Trouble becoming server type $pkg while loading default package $_pkg: $@";
+            croak "Recursive inheritance - Package $pkg inherits from $_pkg" if $_pkg->isa($pkg);
             no strict 'refs';
             @{"${pkg}::ISA"} = ($_pkg);
         }

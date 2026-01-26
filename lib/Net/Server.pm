@@ -21,6 +21,7 @@
 package Net::Server;
 
 use strict;
+use Carp qw(croak);
 use Socket ();
 use IO::Socket ();
 use IO::Select ();
@@ -46,7 +47,7 @@ use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
 our $VERSION = '2.016';
 
 sub new {
-    my $class = shift || die "Missing class";
+    my $class = shift || croak "Missing class";
     my $args  = @_ == 1 ? shift : {@_};
     return bless {server => {%$args}}, $class;
 }
@@ -111,7 +112,7 @@ sub _initialize {
 sub commandline {
     my $self = shift;
     $self->{'server'}->{'commandline'} = ref($_[0]) ? shift : \@_ if @_;
-    return $self->{'server'}->{'commandline'} || die "commandline was not set during initialization";
+    return $self->{'server'}->{'commandline'} || croak "commandline was not set during initialization";
 }
 
 sub _get_commandline {
@@ -212,7 +213,7 @@ sub initialize_logging {
     if (my $code = $prop->{'log_function'}) {
         if (ref $code ne 'CODE') {
             require Scalar::Util;
-            die "Passed log_function $code was not a valid method of server, or was not a code object\n" if ! $self->can($code);
+            croak "Passed log_function $code was not a valid method of server, or was not a code object" if ! $self->can($code);
             my $copy = $self;
             $prop->{'log_function'} = sub { $copy->$code(@_) };
             Scalar::Util::weaken($copy);
@@ -230,10 +231,10 @@ sub initialize_logging {
     }
 
     # regular file based logging
-    die "Unsecure filename \"$prop->{'log_file'}\"" if $prop->{'log_file'} !~ m|^([\:\w\.\-/\\]+)$|;
+    croak "Unsecure filename \"$prop->{'log_file'}\"" if $prop->{'log_file'} !~ m|^([\:\w\.\-/\\]+)$|;
     $prop->{'log_file'} = $1; # open a logging file
     open(_SERVER_LOG, ">>", $prop->{'log_file'})
-        || die "Couldn't open log file \"$prop->{'log_file'}\" [$!].";
+        || croak "Couldn't open log file \"$prop->{'log_file'}\" [$!]";
     _SERVER_LOG->autoflush(1);
     push @{ $prop->{'chown_files'} }, $prop->{'log_file'};
 }
@@ -848,7 +849,7 @@ sub shutdown_sockets {
 sub close_parent {
     my $self = shift;
     my $prop = $self->{'server'};
-    die "Missing parent pid (ppid)" if ! $prop->{'ppid'};
+    croak "Missing parent pid (ppid)" if ! $prop->{'ppid'};
     kill 'INT', $prop->{'ppid'};
 }
 
@@ -1069,7 +1070,7 @@ sub process_args {
                     $previously_set{$key} = defined(${ $template->{$key} }) ? 1 : 0;
                 }
                 next if $previously_set{$key};
-                die "Found multiple values on the configuration item \"$key\" which expects only one value" if ref($val) eq 'ARRAY';
+                croak "Found multiple values on the configuration item \"$key\" which expects only one value" if ref($val) eq 'ARRAY';
                 ${ $template->{$key} } = $val;
             }
         }

@@ -22,6 +22,7 @@ my %WriteMakefileArgs = (
   "LICENSE" => "perl",
   "NAME" => "Net::Server",
   "PREREQ_PM" => {
+    "Carp" => 0,
     "File::Temp" => 0,
     "IO::Socket" => 0,
     "POSIX" => 0,
