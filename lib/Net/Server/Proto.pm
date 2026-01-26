@@ -28,6 +28,7 @@ my $requires_ipv6 = 0;
 my $ipv6_package;
 my $can_disable_v6only;
 my $exported = {};
+my $stub_wrapper;
 
 BEGIN {
     if (!eval { import Socket "IPV6_V6ONLY"; IPV6_V6ONLY() }) { # First try the actual platform value
@@ -88,7 +89,7 @@ BEGIN {
 
     # Load just in time once explicitly invoked.
     my $sub = {};
-    my $s = sub {
+    $stub_wrapper = sub {
         my @c = caller 1;
         (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
         # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
@@ -112,7 +113,7 @@ BEGIN {
             __PACKAGE__->ipv6_package({}) and $ipv6_package and return &{$basename}(@_);
         }
     };
-    foreach my $func (@EXPORT_OK) { eval "sub $func { \$s->(\@_) }" if !defined &$func; }
+    foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !defined &$func; }
 }
 foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && defined &{"safe_$1\_$2"}; }
 
