@@ -334,17 +334,20 @@ sub ipv6_package {
     return $ipv6_package = $pkg;
 }
 
-if (!defined &IPV6_V6ONLY and !eval { import Socket "IPV6_V6ONLY"; IPV6_V6ONLY() }) { # First try the actual platform value
+sub IPV6_V6ONLY () {
+    my $IPV6_V6ONLY = eval { Socket::IPV6_V6ONLY() }; # First try the actual platform value
     my $why = $@; # XXX: Do we need to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
-    my $IPV6_V6ONLY = $^O eq 'linux' ? 26 : # XXX: Why is Linux different?
+    $IPV6_V6ONLY ||= $^O eq 'linux' ? 26 : # XXX: Why is Linux different?
         $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly|MSWin32|solaris|svr4)$/ ? 27 : undef; # XXX: "27" everywhere else?
-    if ($IPV6_V6ONLY) {
-        import constant IPV6_V6ONLY => $IPV6_V6ONLY;
-    } else { # XXX: Do we need to scrape it from kernel header files? Last ditch effort super ugly string-eval hack!
-        my $d = "/tmp/IP6Cache";
-        !eval { require "$d.pl" } and $IPV6_V6ONLY = do { mkdir $d; `h2ph -d $d -a netinet/in.h 2>/dev/null`; eval `grep -rl "sub IPV6_V6ONLY" $d|xargs cat|grep "sub IPV6_V6ONLY";echo "IPV6_V6ONLY()"`} and `rm -rf $d;echo "sub IPV6_V6ONLY(){$IPV6_V6ONLY}1">$d.pl`;
+    if (!$IPV6_V6ONLY) { # XXX: Do we need to scrape it from kernel header files? Last ditch effort super ugly string-eval hack!
+        my $d = "/tmp/IP6Cache"; !eval{$IPV6_V6ONLY=do"$d.pl"} and $IPV6_V6ONLY=do{mkdir $d;`h2ph -d $d -a netinet/in.h 2>/dev/null`;eval `echo "package _h2ph_shush_ipv6only;";grep -rl "sub IPV6_V6ONLY" $d|xargs cat|grep "sub IPV6_V6ONLY";echo "IPV6_V6ONLY()"`} and `rm -rvf $d 1>&2;echo $IPV6_V6ONLY|tee $d.pl`;
     }
-    die "$why\n$@\n[Socket $Socket::VERSION] Could not determine IPV6_V6ONLY on Unknown Platform [$^O]" unless defined &IPV6_V6ONLY;
+    if ($IPV6_V6ONLY) {
+        my $bricker=sub(){$IPV6_V6ONLY}; (my $me=(caller 0)[3])=~s/.*:://;
+        no strict 'refs';no warnings qw(redefine);*{"$_\::$me"}=$bricker foreach keys %{$exported->{$me}},__PACKAGE__;
+        return $IPV6_V6ONLY;
+    }
+    die "$why\n$@\n[Socket $Socket::VERSION] Could not determine IPV6_V6ONLY on Unknown Platform [$^O]";
 }
 
 1;
