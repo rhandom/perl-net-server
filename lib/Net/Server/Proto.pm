@@ -97,7 +97,7 @@ BEGIN {
     my $sub = {};
     $stub_wrapper = sub {
         my @c = caller 1;
-        (my $basename = (my $fullname = $c[3])) =~ s/.*:://;
+        my $fullname = __PACKAGE__."::".(my $basename = shift);
         # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
         $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
         # Always try Socket.pm first, then Socket6.pm
@@ -116,7 +116,7 @@ BEGIN {
         }
         die "$fullname: Failed to locate Socket symbol at $c[1] line $c[2]\n";
     };
-    foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !exists &$func; }
+    foreach my $func (@EXPORT_OK) { eval { no strict 'refs'; *$func = sub { $stub_wrapper->($func,@_) }; } if !exists &$func; }
 }
 
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
