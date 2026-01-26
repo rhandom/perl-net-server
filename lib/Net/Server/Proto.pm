@@ -32,14 +32,27 @@ my $have6;
 my $stub_wrapper;
 
 our @EXPORT;
-our @EXPORT_OK;
-sub safe_name_info;
-sub safe_addr_info;
+our @EXPORT_OK; # Allow any routine defined in this module to be exported, except block these static methods:
+our @EXPORT_DENIED = qw[
+    import
+    parse_info
+    get_addr_info
+    object
+];
 sub IPV6_V6ONLY();
 
 sub import {
     my $class = shift;
     my $callpkg = caller;
+    foreach my $func (@_) {
+        if (!grep {$_ eq $func} @EXPORT_OK) { # Trying to import something not in my list
+            if (!exists &$func) { # Symbol doesn't exist here yet
+                die "$func is not defined by ".__PACKAGE__." and cannot be imported";
+            }
+            die "$func is a static method invoked via ".__PACKAGE__."->$func so it cannot be imported" if grep {$_ eq $func} @EXPORT_DENIED;
+            push @EXPORT_OK, $func; # Verified routine or stub exists, so it's safe to append to my exportable list
+        }
+    }
     # Keep track of who imports any fake stub wrappers
     $exported->{$_}->{$callpkg}=1 foreach @_;
     return Exporter::export($class, $callpkg, @_);
@@ -75,8 +88,6 @@ BEGIN {
         inet_aton
         getaddrinfo
         getnameinfo
-        safe_addr_info
-        safe_name_info
     ];
 
     # Load just in time once explicitly invoked.
