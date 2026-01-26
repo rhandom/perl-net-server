@@ -31,6 +31,11 @@ my $exported = {};
 my $have6;
 my $stub_wrapper;
 
+our @EXPORT;
+our @EXPORT_OK;
+sub safe_name_info;
+sub safe_addr_info;
+
 BEGIN {
     if (!eval { import Socket "IPV6_V6ONLY"; IPV6_V6ONLY() }) { # First try the actual platform value
         my $why = $@; # XXX: Do we need to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
@@ -54,8 +59,6 @@ sub import {
     return Exporter::export($class, $callpkg, @_);
 }
 
-our @EXPORT;
-our @EXPORT_OK;
 BEGIN {
     # If the underlying constant or routine really isn't available in Socket nor Socket6,
     # then it will not die until run-time instead of crashing at compile-time.
@@ -86,6 +89,8 @@ BEGIN {
         inet_aton
         getaddrinfo
         getnameinfo
+        safe_addr_info
+        safe_name_info
     ];
 
     # Load just in time once explicitly invoked.
@@ -113,7 +118,6 @@ BEGIN {
     };
     foreach my $func (@EXPORT_OK) { eval "sub $func { \$stub_wrapper->(\@_) }" if !exists &$func; }
 }
-foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && exists &{"safe_$1\_$2"}; }
 
 # ($err, $hostname, $servicename) = safe_name_info($sockaddr, [$flags, [$xflags]])
 # Compatibility routine to always act like Socket::getnameinfo even if it doesn't exist or if IO::Socket::IP is not available.
