@@ -47,7 +47,11 @@ sub import {
     foreach my $func (@_) {
         if (!grep {$_ eq $func} @EXPORT_OK) { # Trying to import something not in my list
             if (!exists &$func) { # Symbol doesn't exist here yet
-                die "$func is not defined by ".__PACKAGE__." and cannot be imported";
+                grep {$_ eq $func} @Socket::EXPORT,@Socket::EXPORT_OK # Is exportable by Socket
+                or ($have6 || !defined $have6 && eval { require Socket6; $have6=1} ) && # Or else if Socket6 is available, AND
+                grep {$_ eq $func} @Socket6::EXPORT,@Socket6::EXPORT_OK # Is exportable by Socket6
+                or die "$func is not a valid Socket macro nor defined by ".__PACKAGE__." and cannot be imported";
+                no strict 'refs'; *$func = sub { return $stub_wrapper->($func,@_) };
             }
             die "$func is a static method invoked via ".__PACKAGE__."->$func so it cannot be imported" if grep {$_ eq $func} @EXPORT_DENIED;
             push @EXPORT_OK, $func; # Verified routine or stub exists, so it's safe to append to my exportable list
