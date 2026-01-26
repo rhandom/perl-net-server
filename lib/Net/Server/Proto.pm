@@ -121,7 +121,6 @@ foreach (@EXPORT_OK) { $_ = "safe_$1\_$2" if /^get(....)(info)$/ && exists &{"sa
 # The old Socket6 only allows for a single option $flags after the $sockaddr input and an error might be the first element. ($host,$sevice)=Socket6::getnameinfo($sockaddr, [$flags])
 # The new Socket also allows for an optional $xflags input and always returns its $err as the first element, even on success.
 sub safe_name_info {
-    return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getnameinfo");
     my ($sockaddr, $flags, $xflags) = @_; $sockaddr ||= sockaddr_in 0, inet_aton "0.0.0.0"; $flags ||= 0; $xflags ||= 0;
     my @res;
     eval { @res = getnameinfo $sockaddr, $flags, $xflags; 1 } or do { # Force 3-arg input to ensure old version will die: "Usage: Socket6::getnameinfo"
@@ -141,7 +140,6 @@ sub safe_name_info {
 # The old Socket6 accepts a list of optional hints and returns either an $err or a multiple of 5 output. (@fiver_chunks)=Socket6::getaddrinfo($node,$port,[$family,$socktype,$proto,$flags])
 # The new Socket accepts an optional HASHREF of hints and returns an $err followed by a list of HASHREFs.
 sub safe_addr_info {
-    return ('IPv6 not ready yet') if !$ipv6_package && !Socket->can("getaddrinfo");
     my ($host, $port, $hints) = @_; $host ||= ""; $port ||= 0;
     $hints ||= {};
     my @res;
