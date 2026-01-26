@@ -87,8 +87,9 @@ sub hup_server {}
 ################################################################
 package Net::Server::INET::Handle;
 
-use base qw(IO::Handle);
 use strict;
+use Carp qw(croak);
+use base qw(IO::Handle);
 
 sub new {
     my $class = shift;
@@ -172,7 +173,7 @@ sub FETCH {}
 
 sub read_until { # only sips the data - but it allows for compatibility with SSLEAY
     my ($client, $bytes, $end_qr) = @_;
-    die "One of bytes or end_qr should be defined for TCP read_until\n" if !defined($bytes) && !defined($end_qr);
+    croak "One of bytes or end_qr should be defined for TCP read_until" if !defined($bytes) && !defined($end_qr);
     my $content = '';
     my $ok = 0;
     while (1) {
