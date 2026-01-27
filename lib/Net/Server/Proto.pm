@@ -350,8 +350,10 @@ sub ipv6_package {
     return $ipv6_package = $pkg;
 }
 
+our $IPV6_V6ONLY;
 sub IPV6_V6ONLY () {
-    my $IPV6_V6ONLY = eval { Socket::IPV6_V6ONLY() }; # First try the actual platform value
+    return $IPV6_V6ONLY if $IPV6_V6ONLY;
+    $IPV6_V6ONLY = eval { Socket::IPV6_V6ONLY() }; # First try the actual platform value
     my $why = $@; # XXX: Do we need to hard-code magic numbers based on OS for old Perl < 5.14 / Socket < 1.94?
     $IPV6_V6ONLY ||= $^O eq 'linux' ? 26 : # XXX: Why is Linux different?
         $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly|MSWin32|solaris|svr4)$/ ? 27 : undef; # XXX: "27" everywhere else?
