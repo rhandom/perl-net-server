@@ -49,10 +49,10 @@ sub import {
         if (!grep {$_ eq $func} @EXPORT_OK) { # Trying to import something not in my list
             if (!exists &$func) { # Symbol doesn't exist here yet
                 grep {$_ eq $func} @Socket::EXPORT,@Socket::EXPORT_OK # Is exportable by Socket
-                or ($have6 || !defined $have6 && eval { require Socket6; $have6=1} ) && # Or else if Socket6 is available, AND
+                or ($have6 || !defined $have6 && eval{($have6=0)=require Socket6}) && # Or else if Socket6 is available, AND
                 grep {$_ eq $func} @Socket6::EXPORT,@Socket6::EXPORT_OK # Is exportable by Socket6
-                or croak "$func is not a valid Socket macro nor defined by ".__PACKAGE__." and cannot be imported";
-                no strict 'refs'; *$func = sub { return $stub_wrapper->($func,@_) };
+                or croak "$func is not a valid Socket macro nor defined by ".__PACKAGE__." and could not be imported";
+                no strict 'refs'; *$func = sub { $stub_wrapper->($func,@_) };
             }
             croak "$func is a static method invoked via ".__PACKAGE__."->$func so it cannot be imported" if grep {$_ eq $func} @EXPORT_DENIED;
             push @EXPORT_OK, $func; # Verified routine or stub exists, so it's safe to append to my exportable list
@@ -104,9 +104,9 @@ BEGIN {
         $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
         # Always try Socket.pm first, then Socket6.pm
         $sub->{$fullname} = Socket->can($basename) || $have6 && Socket6->can($basename) || eval { # Only try to load Socket6 once
-            die "No Socket6" if defined $have6 && !$have6; $have6||=0; $have6||=do{require Socket6;1}; package _Socket6::_IgnorePollution; # Hide from packaging scripts
-            # XXX: Why do Socket6 routines need "import" in order for "can" to materialize the real coderef? How very rude. But I don't really want to brick over myself, so use a temporary throw-away package just for import to dump it into.
-            Socket6->import($basename); Socket6->can($basename); # Try "can" again after "import"
+            die "No Socket6" if defined $have6 && !$have6; ($have6||=0)||=do{require Socket6;1};
+            Socket6->can($basename) or do{no strict 'refs';&{"Socket6::$basename"};0} or # Avoid Crash: Can't use string as a subroutine ref while "strict refs"
+            Socket6->can($basename); # Socket6 will conjure the constant routine on-the-fly via AUTOLOAD upon invocation, so "can" will work the second time.
         };
         if (my $code = $sub->{$fullname}) {
             no strict 'refs';
@@ -116,7 +116,7 @@ BEGIN {
             eval { @res = $c[5] ? $code->(@_) : scalar $code->(@_); 1 } or do { (my $why=$@) =~ s/\s*at .* line \d.*//s; die "$why at $c[1] line $c[2]\n"; };
             return $c[5] ? @res : $res[0];
         }
-        die "$fullname: Failed to locate Socket symbol at $c[1] line $c[2]\n";
+        die "$basename is not a valid Socket macro and could not be imported at $c[1] line $c[2]\n";
     };
     foreach my $func (@EXPORT_OK) { eval { no strict 'refs'; *$func = sub { $stub_wrapper->($func,@_) }; } if !exists &$func; }
 }
