@@ -1,6 +1,17 @@
 Revision history for Perl extension Net::Server.
 
-2.015  Jan 21 2025
+2.016  Jan 26 2026
+        - Honor platform-provided IPV6_V6ONLY value.
+        - Fix $xflags NIx_* logic emulation.
+        - Make stub honor wantarray context invocation.
+        - Don't require ipv6_package to run routines.
+        - Show correct line num if stub routine dies.
+        - Warn clean safe_* routines.
+        - Avoid "string" eval.
+        - Allow caller to import any Proto routine.
+        - Allow to import all exportable Socket macros.
+
+2.015  Jan 21 2026
         - Compatibility fix to work with MakeMaker prior to 6.58.
           (Pull Request #35 by Gabor Szabo <gabor@szabgab.com>)
         - Update META info from dzil. (rt #94977)
