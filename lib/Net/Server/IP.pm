@@ -30,6 +30,16 @@ sub configure {
     my ($self, $arg) = @_;
     die "configure: no arg" if !$arg or !%$arg;
     my $family = $arg->{'Family'} || $arg->{'Domain'};
+    if (!defined $family and my $addr = $arg->{'LocalHost'} || $arg->{'PeerHost'} || $arg->{'LocalAddr'} || $arg->{'PeerAddr'}) {
+        # Use Addr arg to hint which Family to use.
+        if ($addr =~ /^(\d+\.\d+\.\d+\.\d+)(|:\w+|\w+\(\d+\))$/) {
+            $family = AF_INET; # Surely IPv4
+        } elsif ($addr =~ /^\[[a-fA-F\d:]+\](|:\w+|\w+\(\d+\))$/ or $addr =~ /^(?:[a-fA-F\d]*:){2,7}([a-fA-F\d]*|\d+\.\d+\.\d+\.\d+)$/) {
+            $family = AF_INET6; # Surely IPv6
+        } else {
+            $family = AF_UNSPEC; # Some other Host, maybe a DNS word, so can't tell if it's IPv4 or IPv6 yet.
+        }
+    }
     if ($ISA[0] eq "IO::Socket::INET" and defined $family and $family ne AF_INET) {
         # Look for IPv6-compatible module
         my @try = ($ipv6_package?($ipv6_package):(), @preferred);
@@ -103,6 +113,17 @@ C<Domain> is synonym for C<Family>. Both args are the same.
 C<Family> will take precedence if both are supplied.
 
 If provided, this will be used to determine if IPv6 is required.
+
+=item LocalHost => STRING
+
+=item LocalAddr => STRING
+
+=item PeerHost => STRING
+
+=item PeerAddr => STRING
+
+Hostname with optional Port. If C<Family> is not provided,
+then this will be scanned as a hint for which C<Family> to use.
 
 =head1 AUTHOR
 
