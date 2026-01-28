@@ -46,10 +46,14 @@ sub configure {
         my @try = ($ipv6_package?($ipv6_package):(), @preferred);
         my $pm = sub { (my $f="$_[0].pm") =~ s|::|/|g; $f};
         my ($pkg) = grep { $INC{$pm->($_)} } @try;
-        my @err = ();
-        for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or push @err, ( $@=~/^(.*)/ && "[$_] $! - $1"); }
-        $pkg ? ($ISA[0] = $ipv6_package = $pkg) :
-        do { return if $@=join "\n","Preferred ipv6_package (@try) could not be loaded:",@err and $family; $family=undef; };
+        my $err = ();
+        for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or $err .= $@=~/^(.*)/ && "\n[$_] $! - $1"; }
+        if ($pkg) {
+            $ISA[0] = $ipv6_package = $pkg;
+        } else {
+            return if $@ = "Preferred ipv6_package (@try) could not be loaded:$err" and $family;
+            $family = undef;
+        }
     }
     if (defined $family) { # Only set the corresponding arg
         $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
