@@ -29,7 +29,8 @@ our @preferred = qw(IO::Socket::IP IO::Socket::INET6);
 sub configure {
     my ($self, $arg) = @_;
     die "configure: no arg" if !$arg or !%$arg;
-    my $family = $arg->{'Family'} || $arg->{'Domain'};
+    my $family = delete $arg->{'Family'};
+    if (defined (my $family2 = delete $arg->{'Domain'}) and !defined $family) { $family = $family2 };
     if (!defined $family and my $addr = $arg->{'LocalHost'} || $arg->{'PeerHost'} || $arg->{'LocalAddr'} || $arg->{'PeerAddr'}) {
         # Use Addr arg to hint which Family to use.
         if ($addr =~ /^(\d+\.\d+\.\d+\.\d+)(|:\w+|\w+\(\d+\))$/) {
@@ -50,7 +51,10 @@ sub configure {
         $pkg ? ($ISA[0] = $ipv6_package = $pkg) :
         do { return if $@=join "\n","Preferred ipv6_package (@try) could not be loaded:",@err and $family; $family=undef; };
     }
-    $arg->{'Domain'} = $arg->{'Family'} = $family if defined $family and $ISA[0] ne "IO::Socket::INET";
+    if (defined $family) { # Only set the corresponding arg
+        $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
+        $arg->{'Domain'} = $family if $self->isa("IO::Socket::INET6");
+    }
     return $self->SUPER::configure($arg);
 }
 
