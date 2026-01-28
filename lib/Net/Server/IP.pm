@@ -47,8 +47,8 @@ sub configure {
         my ($pkg) = grep { $INC{$pm->($_)} } @try;
         my @err = ();
         for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or push @err, ( $@=~/^(.*)/ && "[$_] $! - $1"); }
-        return if !$pkg and $@ = join "\n","Preferred ipv6_package (@try) could not be loaded:",@err;
-        $ISA[0] = $ipv6_package = $pkg;
+        $pkg ? ($ISA[0] = $ipv6_package = $pkg) :
+        do { return if $@=join "\n","Preferred ipv6_package (@try) could not be loaded:",@err and $family; $family=undef; };
     }
     $arg->{'Domain'} = $arg->{'Family'} = $family if defined $family and $ISA[0] ne "IO::Socket::INET";
     return $self->SUPER::configure($arg);
