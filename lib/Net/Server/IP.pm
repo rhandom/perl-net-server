@@ -29,7 +29,8 @@ our @preferred = qw(IO::Socket::IP IO::Socket::INET6);
 sub configure {
     my ($self, $arg) = @_;
     die "configure: no arg" if !$arg or !%$arg;
-    if ($ISA[0] eq "IO::Socket::INET" and Net::Server::Proto->requires_ipv6) {
+    my $family = $arg->{'Family'} || $arg->{'Domain'};
+    if ($ISA[0] eq "IO::Socket::INET" and defined $family and $family ne AF_INET) {
         # Look for IPv6-compatible module
         my @try = ($ipv6_package?($ipv6_package):(), @preferred);
         my $pm = sub { (my $f="$_[0].pm") =~ s|::|/|g; $f};
@@ -39,6 +40,7 @@ sub configure {
         return if !$pkg and $@ = join "\n","Preferred ipv6_package (@try) could not be loaded:",@err;
         $ISA[0] = $ipv6_package = $pkg;
     }
+    $arg->{'Domain'} = $arg->{'Family'} = $family if defined $family and $ISA[0] ne "IO::Socket::INET";
     return $self->SUPER::configure($arg);
 }
 
@@ -87,6 +89,20 @@ if available. To override this default behavior:
 
 Creates a new C<Net::Server::IP> handle object.  The arguments
 recognized are similar to C<IO::Socket::IP> or C<IO::Socket::INET6>.
+
+Special consideration applies to the following parameters:
+
+=over 8
+
+=item Family => INT (like C<IO::Socket::IP>)
+
+=item Domain => INT (like C<IO::Socket::INET6>)
+
+Address family for the socket. (e.g. C<AF_INET>, C<AF_INET6>)
+C<Domain> is synonym for C<Family>. Both args are the same.
+C<Family> will take precedence if both are supplied.
+
+If provided, this will be used to determine if IPv6 is required.
 
 =head1 AUTHOR
 

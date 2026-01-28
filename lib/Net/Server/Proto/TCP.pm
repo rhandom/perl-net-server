@@ -70,10 +70,7 @@ sub connect {
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $afis = Net::Server::Proto->requires_ipv6($server) ?
-        $sock->isa("IO::Socket::IP") ? "Family" :
-        $sock->isa("IO::Socket::INET6") ? "Domain" :
-        undef : undef; # XXX: Is there any single magic word for "Address Family" that works for both modules?
+    my $afis = Net::Server::Proto->requires_ipv6($server) ? "Family" : undef;
 
     $sock->configure({
         LocalPort => $port,
@@ -82,7 +79,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1,
         LocalAddr => ($host eq '*' ? undef : $host), # undef means listen on all interfaces
-        ($afis ? ($afis => $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC) : ()),
+        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
     }) or $server->fatal("Cannot bind and listen to TCP port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
