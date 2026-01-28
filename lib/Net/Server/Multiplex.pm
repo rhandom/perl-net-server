@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2001-2022
+#  Copyright (C) 2001-2026
 #
-#    Rob Brown <bbb@cpan,org>
+#    Rob Brown <bbb@cpan.org>
 #
 #    Paul Seamons <paul@seamons.com>
 #

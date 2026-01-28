@@ -2,9 +2,11 @@
 #
 #  Net::Server::Proto - Net::Server Protocol compatibility layer
 #
-#  Copyright (C) 2001-2022
+#  Copyright (C) 2001-2026
 #
 #    Paul Seamons <paul@seamons.com>
+#
+#    Rob Brown <bbb@cpan.org>
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
@@ -879,7 +881,18 @@ examples:
     #     ipv   => 4, # IPv4
     # });
 
-=head1 LICENCE
+=head1 AUTHOR
+
+Paul Seamons <paul@seamons.com>
+
+Rob Brown <bbb@cpan.org>
+
+=head1 SEE ALSO
+
+L<Socket>,
+L<Socket6>
+
+=head1 LICENSE
 
 Distributed under the same terms as Net::Server
 

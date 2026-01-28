@@ -3,11 +3,11 @@
 #  Net::Server
 #    ABSTRACT: Extensible Perl internet server
 #
-#  Copyright (C) 2001-2022
+#  Copyright (C) 2001-2026
 #
 #    Paul Seamons <paul@seamons.com>
 #
-#    Rob Brown <bbb@cpan,org>
+#    Rob Brown <bbb@cpan.org>
 #
 #  This package may be distributed under the terms of either the
 #  GNU General Public License
