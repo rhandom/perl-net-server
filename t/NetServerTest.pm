@@ -14,13 +14,9 @@ END {
 }
 
 sub skip_without_ipv6 {
-    my $err = "";
-    if (!eval { require IO::Socket::IP; IO::Socket::IP->new(LocalAddr=>"[::]",Listen=>1) or die ($@ || "IP CRASH $!") } and
-        do { delete $INC{'IO/Socket/IP.pm'}; ($err=$@)=~s/\s*$//; 1 } and
-        !eval { require IO::Socket::INET6; IO::Socket::INET6->new(LocalAddr=>"[::]",Listen=>1)}) {
-        my $reason = "SKIP ".(shift || "IPv6 is not supported");
-        $reason .= "\nIP - $err" if $err;
-        $reason .= "\nINET6 - $@" if $@;
+    if (!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) }) {
+        my $reason = shift || "IPv6 is not supported";
+        $reason = "SKIP $reason\n$@";
         $reason =~ s/\s*$/\n/;
         $reason =~ s/^/# /gm;
         print "1..0 $reason";
