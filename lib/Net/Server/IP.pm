@@ -25,6 +25,7 @@ use IO::Socket::INET ();
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to an IPv6-compatible class based upon our configuration
 our $ipv6_package = undef;
 our @preferred = qw(IO::Socket::IP IO::Socket::INET6);
+our $fake_ipv6 = undef; # Detect if IPv6 interface is spoofed by kernel (e.g. OpenVZ venet) instead of a real network interface.
 
 sub configure {
     my ($self, $arg) = @_;
@@ -49,6 +50,15 @@ sub configure {
         my $err = ();
         for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or $err .= $@=~/^(.*)/ && "\n[$_] $! - $1"; }
         if ($pkg) {
+            if (not $pkg->new(LocalAddr=>"[::]", Listen=>1)) { # Simple IPv6 ephemeral sanity pre-check didn't even work
+                if ($pkg->new(LocalAddr=>"[::]", Listen=>1, GetAddrInfoFlags => 0)) { # Yet DOES work without doing that getaddrinfo AI_ADDRCONFIG AF_NETLINK SOCK_RAW sendto RTM_GETADDR recvmsg interferfaces pre-check boogie dance?
+                    $fake_ipv6 = 1; $@ = ""; # Flag to remember this special network configuration. Pretend like there is no error.
+                } else {
+                    $@ = "bind: $pkg failed: $@ $!"; $pkg = undef; # This $pkg is of no use. Set error $@ with good excuse.
+                }
+            } else {
+                $fake_ipv6 = 0; # Works fine without monkeying anything.
+            }
             $ISA[0] = $ipv6_package = $pkg;
         } else {
             return if $@ = "Preferred ipv6_package (@try) could not be loaded:$err" and $family;
@@ -58,6 +68,7 @@ sub configure {
     if (defined $family) { # Only set the corresponding arg
         $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
         $arg->{'Domain'} = $family if $self->isa("IO::Socket::INET6");
+        $arg->{'GetAddrInfoFlags'} = 0 if !defined $arg->{'GetAddrInfoFlags'} and $fake_ipv6; # Special delicate network
     }
     return $self->SUPER::configure($arg);
 }
@@ -133,6 +144,13 @@ If provided, this will be used to determine if IPv6 is required.
 
 Hostname with optional Port. If C<Family> is not provided,
 then this will be scanned as a hint for which C<Family> to use.
+
+=item GetAddrInfoFlags => INT
+
+Normally with IO::Socket::IP, GetAddrInfoFlags will default this to
+Socket::AI_ADDRCONFIG. But this can cause problems on certain legacy
+emulation platforms, such as the OpenVZ spoofed venet and loopback
+interface. In such cases, GetAddrInfoFlags will default to 0 instead.
 
 =back
 
