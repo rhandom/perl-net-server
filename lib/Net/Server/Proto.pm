@@ -330,25 +330,9 @@ sub ipv6_package {
     my ($class, $server) = @_;
     return $ipv6_package if $ipv6_package;
     return undef if $ENV{'NO_IPV6'};
-
-    my $pkg = $server->{'server'}->{'ipv6_package'};
-    if ($pkg) {
-        (my $file = "$pkg.pm") =~ s|::|/|g;
-        eval { require $file } or $server->fatal("Could not load ipv6_package $pkg: $@");
-    } elsif ($INC{'IO/Socket/IP.pm'}) { # already loaded
-        $pkg = 'IO::Socket::IP';
-    } elsif ($INC{'IO/Socket/INET6.pm'}) {
-        $pkg = 'IO::Socket::INET6';
-    } elsif (eval { require IO::Socket::IP }) {
-        $pkg = 'IO::Socket::IP';
-    } else {
-        my $err = $@;
-        if (eval { require IO::Socket::INET6 }) {
-            $pkg = 'IO::Socket::INET6';
-        } else {
-            croak "Port configuration using IPv6 could not be started. Could not find or load IO::Socket::IP or IO::Socket::INET6:\n  $err  $@";
-        }
-    }
+    my $pkg = $server->{'server'}->{'ipv6_package'} || "Net::Server::IP";
+    (my $file = "$pkg.pm") =~ s|::|/|g;
+    eval { require $file } or $server->fatal("Could not load ipv6_package $pkg: $@");
     return $ipv6_package = $pkg;
 }
 
