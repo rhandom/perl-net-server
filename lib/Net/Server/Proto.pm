@@ -332,7 +332,7 @@ sub ipv6_package {
     return undef if $ENV{'NO_IPV6'};
     my $pkg = $server->{'server'}->{'ipv6_package'} || "Net::Server::IP";
     (my $file = "$pkg.pm") =~ s|::|/|g;
-    eval { require $file } or $server->fatal("Could not load ipv6_package $pkg: $@");
+    eval { require $file } or !warn "Could not load ipv6_package $pkg: $@\n" or $server->fatal("Could not load ipv6_package $pkg: $@");
     return $ipv6_package = $pkg;
 }
 

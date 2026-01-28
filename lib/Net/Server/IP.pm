@@ -103,6 +103,7 @@ if available. To override this default behavior:
 
 Creates a new C<Net::Server::IP> handle object.  The arguments
 recognized are similar to C<IO::Socket::IP> or C<IO::Socket::INET6>.
+If the constructor fails, check C<$@> for the error message.
 
 Special consideration applies to the following parameters:
 
@@ -128,6 +129,8 @@ If provided, this will be used to determine if IPv6 is required.
 
 Hostname with optional Port. If C<Family> is not provided,
 then this will be scanned as a hint for which C<Family> to use.
+
+=back
 
 =head1 AUTHOR
 
