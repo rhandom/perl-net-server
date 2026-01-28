@@ -14,7 +14,7 @@ END {
 }
 
 sub skip_without_ipv6 {
-    if (!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) }) {
+    if (!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package->new(Family=>Net::Server::Proto::AF_INET6(),LocalAddr=>"[::]",Listen=>1) or die ($@ || "IP CRASH $!")  }) {
         my $reason = shift || "IPv6 is not supported";
         $reason = "SKIP $reason\n$@";
         $reason =~ s/\s*$/\n/;
