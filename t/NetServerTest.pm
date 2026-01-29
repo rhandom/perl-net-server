@@ -87,7 +87,7 @@ sub prepare_test {
     is(read(NST_READ, my $buf, 2), 2, "Pipe works") || do { SKIP: { skip ("Couldn't use working pipe", $N - 3) }; exit };
     warn "# Checked pipe serialization\n" if debug;
     $env{'block_until_ready_to_test'} = sub { read(NST_READ, my $buf, 1) };
-    $env{'signal_ready_to_test'}      = sub { print NST_WRITE "1"; NST_WRITE->flush; };
+    $env{'signal_ready_to_test'}      = sub { alarm $env{'timeout'}; print NST_WRITE "1"; NST_WRITE->flush; };
 
     return \%env;
 }

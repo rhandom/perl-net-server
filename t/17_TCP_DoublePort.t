@@ -17,7 +17,6 @@ use_ok('Net::Server');
 
 sub accept {
     $env->{'signal_ready_to_test'}->();
-    alarm($env->{'timeout'});
     return shift->SUPER::accept(@_);
 }
 
