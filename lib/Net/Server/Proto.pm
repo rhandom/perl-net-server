@@ -38,9 +38,6 @@ our @EXPORT;
 our @EXPORT_OK; # Allow any routine defined in this module to be exported, except block these static methods:
 our @EXPORT_DENIED = qw[
     import
-    parse_info
-    get_addr_info
-    object
 ];
 sub IPV6_V6ONLY();
 
@@ -49,6 +46,7 @@ sub import {
     my $callpkg = caller;
     foreach my $func (@_) {
         if (!grep {$_ eq $func} @EXPORT_OK) { # Trying to import something not in my list
+            croak "$func: Can't import underbar routine" if $func =~ /^_/;
             if (!exists &$func) { # Symbol doesn't exist here yet
                 grep {$_ eq $func} @Socket::EXPORT,@Socket::EXPORT_OK # Is exportable by Socket
                 or ($have6 || !defined $have6 && eval{($have6=0)=require Socket6}) && # Or else if Socket6 is available, AND
@@ -178,7 +176,8 @@ sub CAN_DISABLE_V6ONLY {
 }
 
 sub parse_info {
-    my ($class, $port, $host, $proto, $ipv, $server) = @_;
+    my $class = $_[0] eq __PACKAGE__ ? shift : __PACKAGE__;
+    my ($port, $host, $proto, $ipv, $server) = @_;
 
     my $info;
     if (ref($port) eq 'HASH') {
@@ -258,13 +257,14 @@ sub parse_info {
 }
 
 sub get_addr_info {
-    my ($class, $host, $port, $proto, $server) = @_;
+    my $class = $_[0] eq __PACKAGE__ ? shift : __PACKAGE__;
+    my ($host, $port, $proto, $server) = @_;
     $host  = '*'   if ! defined $host;
     $port  = 0     if ! defined $port;
     $proto = 'tcp' if ! defined $proto;
     $server = {}   if ! defined $server;
     return ([$host, $port, '*']) if $proto =~ /UNIX/i;
-    $port = (getservbyname($port, $proto))[2] or croak "Could not determine port number from host [$host]:$_[2]" if $port =~ /\D/;
+    $port = (getservbyname($port, $proto))[2] or croak "Could not determine port number from host [$host]:$_[1]" if $port =~ /\D/;
 
     my @info;
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
@@ -313,7 +313,8 @@ sub get_addr_info {
 }
 
 sub object {
-    my ($class, $info, $server) = @_;
+    my $class = $_[0] eq __PACKAGE__ ? shift : __PACKAGE__;
+    my ($info, $server) = @_;
     my $proto_class = $info->{'proto'};
     if ($proto_class !~ /::/) {
         $server->fatal("Invalid proto class \"$proto_class\"") if $proto_class !~ /^\w+$/;
@@ -327,7 +328,8 @@ sub object {
 sub requires_ipv6 { $requires_ipv6 ? 1 : undef }
 
 sub ipv6_package {
-    my ($class, $server) = @_;
+    my $class = $_[0] eq __PACKAGE__ ? shift : __PACKAGE__;
+    my ($server) = @_;
     return $ipv6_package if $ipv6_package;
     return undef if $ENV{'NO_IPV6'};
     my $pkg = $server->{'server'}->{'ipv6_package'} || "Net::Server::IP";
