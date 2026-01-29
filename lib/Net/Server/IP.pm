@@ -19,7 +19,7 @@ package Net::Server::IP;
 
 use strict;
 use warnings;
-use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC);
+use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC IPPROTO_IPV6 IPV6_V6ONLY);
 use IO::Socket::INET ();
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to an IPv6-compatible class based upon our configuration
@@ -69,8 +69,21 @@ sub configure {
         $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
         $arg->{'Domain'} = $family if $self->isa("IO::Socket::INET6");
         $arg->{'GetAddrInfoFlags'} = 0 if !defined $arg->{'GetAddrInfoFlags'} and $fake_ipv6; # Special delicate network
+        if (defined $arg->{'V6Only'} and $self->isa("IO::Socket::INET6")) {
+            ${ *$self }{'NS_v6only'} = delete $arg->{'V6Only'};
+            delete ${ *$self }{'NS_v6only'} if $family eq AF_INET;
+        }
     }
     return $self->SUPER::configure($arg);
+}
+
+sub socket {
+    my $self = shift;
+    my $ret  = $self->SUPER::socket(@_);
+    if (defined (my $opt = ${ *$self }{'NS_v6only'})) {
+        eval { $self->setsockopt( IPPROTO_IPV6, IPV6_V6ONLY, $opt?1:0 ) } or warn "setsockopt(IPV6_V6ONLY) failed: ($!) ($@)";
+    }
+    return $ret;
 }
 
 1;
@@ -151,6 +164,21 @@ Normally with IO::Socket::IP, GetAddrInfoFlags will default this to
 Socket::AI_ADDRCONFIG. But this can cause problems on certain legacy
 emulation platforms, such as the OpenVZ spoofed venet and loopback
 interface. In such cases, GetAddrInfoFlags will default to 0 instead.
+
+=item V6Only => BOOL
+
+With IO::Socket::IP nothing will change. IO::Socket::INET6 normally
+ignores V6Only, so to make the convention consistent, now the same
+functionality will just work. So even if IO::Socket::IP is not
+installed, the V6Only option will be emulated with IO::Socket::INET6.
+
+If V6Only is true, then IPv4 sockets will not work on this handle.
+Set V6Only to 0 to enable Dual-Stack sockets to support IPv4-mapped
+IPv6 addresses (i.e., ::ffff:127.0.0.1) within the same handle.
+If V6Only is not set or is undef, then the Dual-Stack behavior will
+be whatever the Operating System default is. To avoid expected
+behaviors across different platforms, the V6Only arg should always
+be explicitly set (i.e., 0 or 1) rather than letting the OS choose.
 
 =back
 
