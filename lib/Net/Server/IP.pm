@@ -59,13 +59,13 @@ sub configure {
             } else {
                 $fake_ipv6 = 0; # Works fine without monkeying anything.
             }
-            $ISA[0] = $ipv6_package = $pkg;
+            $ISA[0] = $ipv6_package = $pkg if $pkg;
         } else {
             return if $@ = "Preferred ipv6_package (@try) could not be loaded:$err" and $family;
             $family = undef;
         }
     }
-    if (defined $family) { # Only set the corresponding arg
+    if (defined $family) { # Set the corresponding 'Family' arg:
         $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
         $arg->{'Domain'} = $family if $self->isa("IO::Socket::INET6");
         $arg->{'GetAddrInfoFlags'} = 0 if !defined $arg->{'GetAddrInfoFlags'} and $fake_ipv6; # Special delicate network
