@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use Carp qw(croak);
 use IO::Socket::INET ();
-use Net::Server::Proto qw(IPPROTO_IPV6 IPV6_V6ONLY SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
+use Net::Server::Proto qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to a v6 compatible class based upon our server configuration
 
@@ -56,21 +56,15 @@ sub log_connect {
     $server->log(2, "Binding to ".$sock->NS_proto." port ".$sock->NS_port." on host ".$sock->NS_host." with IPv".$sock->NS_ipv);
 }
 
-sub socket {
-    my $sock = shift;
-    my $ret  = $sock->SUPER::socket(@_);
-    my $ipv  = $sock->NS_ipv;
-    eval { setsockopt $sock, IPPROTO_IPV6, IPV6_V6ONLY, $ipv=~/[4*]/?0:1 } or warn "setsockopt(IPV6_V6ONLY) failed: ($!) ($@)" if $ipv =~ /[6*]/;
-    return $ret;
-}
-
 sub connect {
     my ($sock, $server) = @_;
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $afis = Net::Server::Proto->requires_ipv6($server) ? "Family" : undef;
+    my $afis = Net::Server::Proto->requires_ipv6($server) ?
+        $sock->isa("IO::Socket::INET6") ? "Domain" :
+        "Family" : undef; # XXX: Why doesn't IO::Socket::INET6 honor "Family"?
 
     $sock->configure({
         LocalPort => $port,
@@ -79,7 +73,8 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1,
         LocalAddr => ($host eq '*' ? undef : $host), # undef means listen on all interfaces
-        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
+        ($afis ? ($afis => $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC) : ()),
+        ($ipv =~ /[6*]/ ? (V6Only => $ipv eq '*' ? 0 : 1) : ()),
     }) or $server->fatal("Cannot bind and listen to TCP port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
