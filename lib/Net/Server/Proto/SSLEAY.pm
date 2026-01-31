@@ -320,25 +320,27 @@ sub read {
 }
 
 sub sysread  {
-    my ($client, $buf, $length, $offset) = @_;
-    $length = length $buf unless defined $length;
-    $offset = 0 unless defined $offset;
+    my ($client, $buf, $max, $offset) = @_;
+    delete ${*$client}{'_error'};
+    $max = 1 if !$max || $max<0;
+    $offset ||= 0;
+    ref $buf or $buf = \$_[1];
     my $ssl = $client->SSLeay;
-    my $data = Net::SSLeay::read($ssl, $length);
+    $! = 0;
+    my ($data, $rv) = Net::SSLeay::read($ssl, $max);
+    my $err = Net::SSLeay::get_error($ssl,-1);
 
     return if $!{EAGAIN} || $!{EINTR};
 
-    die "SSLeay print: $!\n" unless defined $data;
+    ${*$client}{'_error'} = "SSLEAY sysread: bang[$!] sslerror[$err]" and return if !defined $data;
 
-    $length = length($data);
-    $$buf = '' if !defined $buf;
-
+    defined $$buf or $$buf = '';
     if ($offset > length($$buf)) {
-        $$buf .= "\0" x ($offset - length($buf));
+        $$buf .= "\0" x ($offset - length($$buf));
     }
 
-    substr($$buf, $offset, length($$buf), $data);
-    return $length;
+    substr $$buf, $offset, length($$buf)-$offset, $data;
+    return length $data;
 }
 
 sub error { my $client = shift; return ${*$client}{'_error'} }
