@@ -73,12 +73,14 @@ my $ok = eval {
             or Net::SSLeay::die_now("Failed to create SSL $!");
         Net::SSLeay::set_fd($ssl, $remote->fileno);
         Net::SSLeay::connect($ssl);
-        my $line = Net::SSLeay::read($ssl);
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
-        note $line;
-        Net::SSLeay::write($ssl, "quit\n");
-        my $line2 = Net::SSLeay::read($ssl);
-        note $line2;
+        my ($line1, $rv1) = Net::SSLeay::read($ssl);
+        die "LINE1: Didn't get what was expected: [$rv1] ($line1)" if $line1 !~ /Net::Server/;
+        note "LINE1: ($rv1) $line1";
+        my $wrote1 = Net::SSLeay::write($ssl, "quit\n");
+        note "SEND1: [$wrote1]";
+        die "WROTE1: Failure? [$wrote1]" if $wrote1 < 0;
+        my ($line2, $rv2) = Net::SSLeay::read($ssl);
+        note "LINE2: ($rv2) $line2";
 
 
         $remote = NetServerTest::client_connect(PeerAddr => $env->{'hostname'}, PeerPort => $env->{'ports'}->[0]) || die "Couldn't open child to sock: $!";
@@ -93,9 +95,12 @@ my $ok = eval {
         Net::SSLeay::set_fd($ssl, $remote->fileno);
         Net::SSLeay::connect($ssl);
 
-        Net::SSLeay::write($ssl, "foo bar");
-        my $res = Net::SSLeay::read($ssl);
-        return $res eq "foo bar";
+        my $wrote2 = Net::SSLeay::write($ssl, "foo bar");
+        note "SEND2: [$wrote2]";
+        my ($line3,$rv3) = Net::SSLeay::read($ssl);
+        note "LINE3: ($rv3) $line3";
+        die "LINE3: Didn't get what was expected: ($line3)" if $line3 ne "foo bar";
+        return 1;
 
     ### child does the server
     } else {
