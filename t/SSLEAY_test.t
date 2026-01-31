@@ -42,7 +42,7 @@ sub process_request {
 
     until ($buf) {
         select($vec, undef, undef, undef);
-        $client->sysread(\$buf, 100, $total);
+        $client->sysread($buf, 100, $total);
     }
 
     select(undef, $vec, undef, undef);
