@@ -362,20 +362,35 @@ sub read {
     return length $read;
 }
 
-sub sysread  {
+sub sysread {
     my ($client, $buf, $max, $offset) = @_;
     delete ${*$client}{'_error'};
     $max = 1 if !$max || $max<0;
     $offset ||= 0;
     ref $buf or $buf = \$_[1];
-    my $ssl = $client->SSLeay;
-    $! = 0;
-    my ($data, $rv) = Net::SSLeay::read($ssl, $max);
-    my $err = Net::SSLeay::get_error($ssl,-1);
+    my $ssl = $client->SSLeay or return;
+    my $max_bytes = 16384; # Read as many bytes as possible
+    my ($retries, $data, $rv) = 5;
+    if (my $ready = $client->pending) {
+        my $buffer_size = defined ${*$client}{'SSLeay_buffer'} && length ${*$client}{'SSLeay_buffer'};
+        if (!$buffer_size) {
+            ($data, $rv) = Net::SSLeay::read($ssl, $max_bytes); # Hopefully $rv >= $ready
+            $buffer_size = length (${*$client}{'SSLeay_buffer'} = $data) if defined $data; # Successfully consumed Net::SSLeay buffer
+        }
+        !$buffer_size and ${*$client}{'_error'} = "SSLEAY failed reading buffer" and return;
+        $data = delete ${*$client}{'SSLeay_buffer'};
+    }
 
-    return if $!{EAGAIN} || $!{EINTR};
+    while ($retries-->0 and !defined $data) {
+        $! = 0;
+        ($data, $rv) = Net::SSLeay::read($ssl, $max_bytes);
+        last if defined $data;
+        return if $client->SSLeay_check_perm("SSLEAY sysread");
+    }
 
-    ${*$client}{'_error'} = "SSLEAY sysread: bang[$!] sslerror[$err]" and return if !defined $data;
+    defined $data or return;
+    my $length = length $data;
+    $length>$max and ${*$client}{'SSLeay_buffer'} = substr $data,$max,$length-$max,''; # If too long, leave the extraneous bytes in the buffer
 
     defined $$buf or $$buf = '';
     if ($offset > length($$buf)) {
@@ -383,7 +398,7 @@ sub sysread  {
     }
 
     substr $$buf, $offset, length($$buf)-$offset, $data;
-    return length $data;
+    return $length;
 }
 
 sub error { my $client = shift; return ${*$client}{'_error'} }
