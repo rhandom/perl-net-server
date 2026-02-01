@@ -427,7 +427,8 @@ sub getlines {
 sub print {
     my $client = shift;
     delete ${*$client}{'_error'};
-    my $buf    = @_ == 1 ? $_[0] : join('', @_);
+    my $OFS = defined $, ? $, : '';
+    my $buf = join $OFS, @_;
     return $client->write($buf);
 }
 
