@@ -428,20 +428,7 @@ sub print {
     my $client = shift;
     delete ${*$client}{'_error'};
     my $buf    = @_ == 1 ? $_[0] : join('', @_);
-    my $ssl    = $client->SSLeay;
-    while (length $buf) {
-        vec(my $vec = '', $client->fileno, 1) = 1;
-        select(undef, $vec, undef, undef);
-
-        my $write = Net::SSLeay::write($ssl, $buf);
-        return 0 if $client->SSLeay_check_error('SSLeay write');
-        if ($write == -1 && !$!{EAGAIN} && !$!{EINTR} && !$!{ENOBUFS}) {
-            ${*$client}{'_error'} = "SSLeay print: $!\n";
-            return;
-        }
-        substr($buf, 0, $write, "") if $write > 0;
-    }
-    return 1;
+    return $client->write($buf);
 }
 
 sub printf {
