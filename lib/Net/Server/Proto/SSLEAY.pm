@@ -246,6 +246,40 @@ sub SSLeay_check_error {
     return;
 }
 
+# my $err = $sock->SSLeay_check_perm($msg)
+# Returns permanent error string for $sock, or undef if no permanent error.
+# Do not call this method unless you receive an unknown error response
+# from one of the Net::SSLeay::* routines. If a temporary error is detected,
+# then it will run select() using the corresponding READ or WRITE bits
+# before returning undef.
+sub SSLeay_check_perm {
+    my ($client, $msg) = @_;
+    my $perm;
+    if (my $ssl = ${*$client}{'SSLeay'} and my $fn = $client->fileno()) {
+        my $err = Net::SSLeay::get_error($ssl, -1);
+        return if !$err;
+        vec(my $vec = '', $fn, 1) = 1;
+        if ($err == Net::SSLeay::ERROR_WANT_READ()) {
+            select($vec, undef, undef, undef); # This is not a real error. SSLeay just wants to read, so block until something is ready.
+            return;
+        }
+        if ($err == Net::SSLeay::ERROR_WANT_WRITE()) {
+            select(undef, $vec, undef, undef); # This is not a real error. SSLeay just wants to write, so block until socket has room.
+            return;
+        }
+        return if $!{'EAGAIN'} || $!{'EINTR'} || $!{'ENOBUFS'}; # Retryable safe errno
+        ($perm = "FD$fn-sslerr[$err] - ".Net::SSLeay::ERR_error_string($err)." [$!] $@")=~s/\s+$//;
+    }
+    return if !$perm;
+
+    $msg ||= "SSL ERROR";
+    my $errs = [ ${*$client}{'_error'} = $perm = "$msg: ($perm)" ];
+    if (my $cb = $client->SSL_error_callback) {
+        $cb->($client, $msg, $errs);
+    }
+    return $errs->[0];
+}
+
 # my $bytes = $sock->pending();
 # Returns number of bytes in the buffer.
 sub pending {
