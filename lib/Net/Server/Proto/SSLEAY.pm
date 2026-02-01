@@ -393,18 +393,18 @@ sub syswrite {
     delete ${*$client}{'_error'};
 
     $length = length $buf unless defined $length;
-    $offset = 0 unless defined $offset;
-    my $ssl    = $client->SSLeay;
-
-    my $write = Net::SSLeay::write_partial($ssl, $offset, $length, $buf);
-
-    return if $!{EAGAIN} || $!{EINTR};
-    if ($write < 0) {
-        ${*$client}{'_error'} = "SSLeay print: $!\n";
-        return;
+    $offset ||= 0;
+    my $ssl = $client->SSLeay;
+    my $content = substr $buf, $offset, $length;
+    my $tries = 5;
+    while ($tries-->0) {
+        $! = 0;
+        my $wrote = Net::SSLeay::write($ssl, $buf);
+        return $wrote if $wrote >= 0;
+        return if $client->SSLeay_check_perm("SSLEAY syswrite");
     }
 
-    return $write;
+    return;
 }
 
 sub getline {
