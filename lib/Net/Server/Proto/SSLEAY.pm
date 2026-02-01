@@ -23,6 +23,7 @@ use IO::Socket::INET;
 use Fcntl ();
 use Errno ();
 use Socket qw(SOMAXCONN);
+use Carp qw(croak);
 
 BEGIN {
     eval { require Net::SSLeay; 1 }
@@ -293,72 +294,39 @@ sub pending {
 ###----------------------------------------------------------------###
 
 sub read_until {
-    my ($client, $bytes, $end_qr, $non_greedy) = @_;
+    my ($client, $bytes, $end_qr) = @_;
+
+    croak "read_until: bytes must be positive, or else undef" if defined $bytes and !$bytes || $bytes !~ /^\d+$/;
 
     my $ssl = $client->SSLeay;
-    my $content = ${*$client}{'SSLeay_buffer'};
-    $content = '' if ! defined $content;
+
+    my $content = '';
     my $ok = 0;
-
-    # the rough outline for this loop came from http://devpit.org/wiki/OpenSSL_with_nonblocking_sockets_%28in_Perl%29
-    OUTER: while (1) {
-        if (!length($content)) {
-        }
-        elsif (defined($bytes) && length($content) >= $bytes) {
-            ${*$client}{'SSLeay_buffer'} = substr($content, $bytes, length($content), '');
-            $ok = 2;
-            last;
-        }
-        elsif (defined($end_qr) && $content =~ m/$end_qr/g) {
-            my $n = pos($content);
-            ${*$client}{'SSLeay_buffer'} = substr($content, $n, length($content), '');
+    my $n = undef;
+    while (!$ok) {
+        $client->sysread($content, 16384, length $content) or last;
+        if (defined($end_qr) && $content =~ m/$end_qr/g) {
+            $n = pos($content);
             $ok = 1;
-            last;
         }
-
-        # 'select' prevents spinloops waiting for new data on the socket, and are necessary for non-blocking filehandles.
-        vec(my $vec = '', $client->fileno, 1) = 1;
-        select($vec, undef, undef, undef);
-
-        my $n_empty = 0;
-        while (1) {
-            # 16384 is the maximum amount read() can return
-            my $n = 16384;
-            $n -= ($bytes - length($content)) if $non_greedy && ($bytes - length($content)) < $n;
-            my ($buf, $rv) = Net::SSLeay::read($ssl, 16384); # read the most we can - continue reading until the buffer won't read any more
-            if ($client->SSLeay_check_error('SSLeay read_until read')) {
-                last OUTER;
-            }
-
-            if (! defined($buf)) {
-                # Preserved from Net/Server/Proto/SSLEAY's version
-                last if $!{'EAGAIN'} || $!{'EINTR'} || $!{'ENOBUFS'};
-
-                # Treat these renegotiation errors like EAGAIN - select will handle it and the next SSL_read will resolve it.
-                last if $rv && ($rv == Net::SSLeay::ERROR_WANT_READ() || $rv == Net::SSLeay::ERROR_WANT_WRITE());
-
-                die "SSLeay read_until: $!\n";
-            }
-
-            if (!length($buf)) {
-                last OUTER if !length($buf) && $n_empty++;
-            } else {
-                $content .= $buf;
-                if ($non_greedy && length($content) == $bytes) {
-                    $ok = 3;
-                    last;
-                }
-            }
+        if ($bytes and length $content >= $bytes and !$ok || $n > $bytes) { # Keep qr match only if found earlier than $bytes
+            $n = $bytes;
+            $ok = 2;
         }
+    }
+    my $got = length $content;
+    if ($ok and $n and $got > $n) { # Whoops, got a little too much, so prepend the extra onto the front of the buffer for later
+        defined ${*$client}{'SSLeay_buffer'} or ${*$client}{'SSLeay_buffer'} = '';
+        ${*$client}{'SSLeay_buffer'} = substr($content,$n,$got-$n,'') . ${*$client}{'SSLeay_buffer'};
     }
     return wantarray ? ($ok, $content) : $content;
 }
 
 sub read {
     my ($client, $buf, $size, $offset) = @_;
-    my ($ok, $read) = $client->read_until($size, undef, 1);
+    my ($ok, $read) = $client->read_until($size);
     defined($_[1]) or $_[1] = '';
-    substr($_[1], $offset || 0, defined($buf) ? length($buf) : 0, $read);
+    substr($_[1], $offset || 0, length($_[1]), $read);
     return length $read;
 }
 
@@ -645,14 +613,16 @@ and avoid infinite waiting for bytes that are already available.
 
 =item C<read_until>
 
-Takes bytes and match qr.  If bytes is defined - it will read until
-that many bytes are found.  If match qr is defined, it will read until
-the buffer matches that qr.  If both are undefined, it will read until
-there is nothing left to read.
+  my $match = $sock->read_until($bytes, $end_qr);
+
+If $bytes is defined - it will read until that many bytes are found.
+If $end_qr is defined, it will read until the buffer matches that RegEx.
+If both are defined, it will read until whichever comes first.
+If both are undefined, it will read until there is nothing left to read.
 
 =item C<error>
 
-If an error occurred while writing, this method will return that error.
+If an error occurred during io, this method will return that error.
 
 =back
 
