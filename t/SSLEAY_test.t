@@ -37,15 +37,7 @@ sub process_request {
     my $buf;
 
     # Wait data
-    my $vec = '';
-    vec($vec, $client->fileno, 1) = 1;
-
-    until ($buf) {
-        select($vec, undef, undef, undef);
-        $client->sysread($buf, 100, $total);
-    }
-
-    select(undef, $vec, undef, undef);
+    my $res = $client->sysread($buf, 100, $total);
 
     $client->syswrite($buf);
 
