@@ -246,6 +246,15 @@ sub SSLeay_check_error {
     return;
 }
 
+# my $bytes = $sock->pending();
+# Returns number of bytes in the buffer.
+sub pending {
+    my $sock = shift;
+    my $ssl = $sock && ${*$sock}{'SSLeay'} or return 0;
+    return length ${*$sock}{'SSLeay_buffer'} if defined ${*$sock}{'SSLeay_buffer'};
+    return Net::SSLeay::pending($ssl);
+}
+
 
 ###----------------------------------------------------------------###
 
@@ -578,6 +587,12 @@ This module implements most of the common file handle operations.
 There are some additions though:
 
 =over 4
+
+=item C<pending>
+
+Returns how many bytes are in the memory buffer ready to read.
+This is required in order to be compatible with IO::Select::SSL
+and avoid infinite waiting for bytes that are already available.
 
 =item C<read_until>
 
