@@ -454,11 +454,23 @@ sub say {
     $client->print(@_, "\n");
 }
 
+# my $bytes = $sock->write($data, $length, $offset)
+# Returns the number of bytes from $data sent to the $sock
+# beginning at $offset and sending up to $length bytes.
+# If length is omitted, the entire $data string is sent.
+# If $offset is omitted, then starts from the beginning (0).
+# If only partial data is sent, then it will keep retrying
+# until all the data has been encrypted and sent.
 sub write {
     my $client = shift;
     my $buf    = shift;
     $buf = substr($buf, $_[1] || 0, $_[0]) if @_;
-    $client->print($buf);
+    my $total = 0;
+    while (my $sent = $client->syswrite($buf, length($buf)-$total, $total)) {
+        $total += $sent;
+        return $total if $total >= length $buf;
+    }
+    return;
 }
 
 sub seek {
