@@ -172,6 +172,7 @@ sub close {
     my $sock = shift;
     if ($sock->SSLeay_is_client) {
         if (my $ssl = ${*$sock}{'SSLeay'}) { # Avoid trying to build a new ctx just to throw it away
+            Net::SSLeay::shutdown($ssl);
             Net::SSLeay::free($ssl);
         }
     } else {

@@ -101,6 +101,7 @@ my $ok = eval {
         die "Port0.2: Failure? [$wrote]" if $wrote <= 0;
         ($line, $rv) = Net::SSLeay::read($ssl);
         note "Port0.3: ($rv) $line";
+        Net::SSLeay::shutdown($ssl); close $remote;
 
 
         # Port #1. TieHandle / Client EOF test
@@ -119,7 +120,7 @@ my $ok = eval {
         die "Port1.2: Failure? [$wrote]" if $wrote <= 0;
         ($line, $rv) = Net::SSLeay::read($ssl);
         note "Port1.3: ($rv) $line";
-        close $remote; # Force Client EOF
+        Net::SSLeay::shutdown($ssl); close $remote; # Graceful Close to Force Client EOF
 
 
         # Port #2. read_until / Server EOF test
@@ -144,6 +145,7 @@ my $ok = eval {
         die "Port2.4: Didn't get what was expected: [$rv] ($line)" if $line !~ /^.*2.*man/m;
         ($line, $rv) = Net::SSLeay::read($ssl);
         die "Port2.5: EOF expected, but got more bytes? [$rv] ($line)" if $line or $rv > 0;
+        Net::SSLeay::shutdown($ssl); close $remote;
 
 
         # Port #3. sysread/syswrite test
@@ -160,6 +162,7 @@ my $ok = eval {
         ($line,$rv) = Net::SSLeay::read($ssl);
         note "Port3.2: ($rv) $line";
         die "Port3.2: Didn't get what was expected: ($line)" if $line ne "foo bar";
+        Net::SSLeay::shutdown($ssl); close $remote;
 
         # All tests passed.
         return 1;
