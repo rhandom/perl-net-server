@@ -172,7 +172,9 @@ sub close {
     my $sock = shift;
     if ($sock->SSLeay_is_client) {
         if (my $ssl = ${*$sock}{'SSLeay'}) { # Avoid trying to build a new ctx just to throw it away
-            Net::SSLeay::shutdown($ssl);
+            my $should_shutdown = 1; # Net::SSLeay <= 1.85 does not have is_init_finished(), so just attempt shutdown in this case:
+            eval { $should_shutdown = 0 if !Net::SSLeay::is_init_finished($ssl) };
+            Net::SSLeay::shutdown($ssl) if $should_shutdown;
             Net::SSLeay::free($ssl);
         }
     } else {
