@@ -156,7 +156,7 @@ sub bind_SSL {
 
     Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL());  $sock->SSLeay_check_fatal("SSLeay bind_SSL CTX_set_options");
 
-    # 0x1:  SSL_MODE_ENABLE_PARTIAL_WRITE
+    # 0x01: SSL_MODE_ENABLE_PARTIAL_WRITE
     # 0x10: SSL_MODE_RELEASE_BUFFERS (ignored before OpenSSL v1.0.0)
     Net::SSLeay::CTX_set_mode($ctx, 0x11);  $sock->SSLeay_check_fatal("SSLeay bind_SSL CTX_set_mode");
 
@@ -228,7 +228,7 @@ sub SSLeay {
 sub SSLeay_check_fatal {
     my ($client, $msg) = @_;
     if (my $err = $client->SSLeay_check_error($msg, 1)) {
-        my ($file, $pkg, $line) = caller;
+        my ($pkg, $file, $line) = caller;
         die "$msg at $file line $line\n  ".join('  ', @$err);
     }
 }
