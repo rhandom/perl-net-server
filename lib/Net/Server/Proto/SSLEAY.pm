@@ -171,7 +171,9 @@ sub bind_SSL {
 sub close {
     my $sock = shift;
     if ($sock->SSLeay_is_client) {
-        Net::SSLeay::free($sock->SSLeay);
+        if (my $ssl = ${*$sock}{'SSLeay'}) { # Avoid trying to build a new ctx just to throw it away
+            Net::SSLeay::free($ssl);
+        }
     } else {
         Net::SSLeay::CTX_free($sock->SSLeay_context);
     }
