@@ -98,7 +98,7 @@ my $ok = eval {
         note "Port0.1: ($rv) $line";
         $wrote = Net::SSLeay::write($ssl, "quit\n");
         note "Port0.2: ($wrote) written";
-        die "Port0.2: Failure? [$wrote]" if $wrote < 0;
+        die "Port0.2: Failure? [$wrote]" if $wrote <= 0;
         ($line, $rv) = Net::SSLeay::read($ssl);
         note "Port0.3: ($rv) $line";
 
@@ -116,7 +116,7 @@ my $ok = eval {
         note "Port1.1: ($rv) $line";
         $wrote = Net::SSLeay::write($ssl, "sup\n");
         note "Port1.2: ($wrote) written";
-        die "Port1.2: Failure? [$wrote]" if $wrote < 0;
+        die "Port1.2: Failure? [$wrote]" if $wrote <= 0;
         ($line, $rv) = Net::SSLeay::read($ssl);
         note "Port1.3: ($rv) $line";
         close $remote; # Force Client EOF
@@ -156,6 +156,7 @@ my $ok = eval {
         Net::SSLeay::connect($ssl);
         $wrote = Net::SSLeay::write($ssl, "foo bar");
         note "Port3.1: ($wrote) written";
+        die "Port3.1: Failure? [$wrote]" if $wrote <= 0;
         ($line,$rv) = Net::SSLeay::read($ssl);
         note "Port3.2: ($rv) $line";
         die "Port3.2: Didn't get what was expected: ($line)" if $line ne "foo bar";
