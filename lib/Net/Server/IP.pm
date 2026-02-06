@@ -25,7 +25,7 @@ use IO::Socket::INET ();
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to an IPv6-compatible class based upon our configuration
 our $ipv6_package = undef;
 our @preferred = qw(IO::Socket::IP IO::Socket::INET6);
-our $fake_ipv6 = undef; # Detect if IPv6 interface is spoofed by kernel (e.g. OpenVZ venet) instead of a real network interface.
+our $fake_danger = undef; # Detect if fake interface is spoofed by kernel (e.g. OpenVZ venet) instead of a real public network interface.
 
 sub configure {
     my ($self, $arg) = @_;
@@ -50,14 +50,15 @@ sub configure {
         my $err = ();
         for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or $err .= $@=~/^(.*)/ && "\n[$_] $! - $1"; }
         if ($pkg) {
-            if (not $pkg->new(LocalAddr=>"[::]", Listen=>1)) { # Simple IPv6 ephemeral sanity pre-check didn't even work
-                if ($pkg->new(LocalAddr=>"[::]", Listen=>1, GetAddrInfoFlags => 0)) { # Yet DOES work without doing that getaddrinfo AI_ADDRCONFIG AF_NETLINK SOCK_RAW sendto RTM_GETADDR recvmsg interferfaces pre-check boogie dance?
-                    $fake_ipv6 = 1; $@ = ""; # Flag to remember this special network configuration. Pretend like there is no error.
+            my $args = { Listen=>1 };
+            if (not $pkg->new(LocalAddr=>"[::]", Listen=>1) or not $pkg->new(LocalAddr=>"127.0.0.1", Listen=>1)) { # Simple ephemeral sanity pre-check didn't even work
+                if ($pkg->new(LocalAddr=>"[::]", Listen=>1, GetAddrInfoFlags => 0) or $pkg->new(LocalAddr=>"127.0.0.1", Listen=>1, GetAddrInfoFlags => 0)) { # Yet DOES work without doing that getaddrinfo AI_ADDRCONFIG AF_NETLINK SOCK_RAW sendto RTM_GETADDR recvmsg interferfaces pre-check boogie dance?
+                    $fake_danger = 1; $@ = ""; # Flag to remember this special network configuration. Pretend like there is no error.
                 } else {
-                    $@ = "bind: $pkg failed: $@ $!"; $pkg = undef; # This $pkg is of no use. Set error $@ with good excuse.
+                    $@ = "bind: $pkg failed: $! $@"; $pkg = undef; # This $pkg is of no use. Set error $@ with good excuse.
                 }
             } else {
-                $fake_ipv6 = 0; # Works fine without monkeying anything.
+                $fake_danger = 0; # Works fine without monkeying anything.
             }
             $ISA[0] = $ipv6_package = $pkg if $pkg;
         } else {
@@ -68,7 +69,7 @@ sub configure {
     if (defined $family) { # Set the corresponding 'Family' arg:
         $arg->{'Family'} = $family if $self->isa("IO::Socket::IP");
         $arg->{'Domain'} = $family if $self->isa("IO::Socket::INET6");
-        $arg->{'GetAddrInfoFlags'} = 0 if !defined $arg->{'GetAddrInfoFlags'} and $fake_ipv6; # Special delicate network
+        $arg->{'GetAddrInfoFlags'} = 0 if !defined $arg->{'GetAddrInfoFlags'} and $fake_danger; # Special delicate network
         if (defined $arg->{'V6Only'} and $self->isa("IO::Socket::INET6")) {
             ${ *$self }{'NS_v6only'} = delete $arg->{'V6Only'};
             delete ${ *$self }{'NS_v6only'} if $family eq AF_INET;
