@@ -46,9 +46,9 @@ sub configure {
         # Look for IPv6-compatible module
         my @try = ($ipv6_package?($ipv6_package):(), @preferred);
         my $pm = sub { (my $f="$_[0].pm") =~ s|::|/|g; $f};
-        my ($pkg) = grep { $INC{$pm->($_)} } @try;
-        my $err = ();
-        for (@try) { last if $pkg; eval{require $pm->($_);$pkg=$_} or $err .= $@=~/^(.*)/ && "\n[$_] $! - $1"; }
+        my ($pkg) = grep { $INC{$pm->($_)} && !$_->isa(__PACKAGE__) } @try;
+        my $err = '';
+        for (@try) { last if $pkg; eval{require $pm->($_);die "Circular ISA" if $_->isa(__PACKAGE__);$pkg=$_} or $err .= $@=~/^(.*)/ && "\n[$_] ($!) $1"; }
         if ($pkg) {
             my $args = { Listen=>1 };
             if (not $pkg->new(LocalAddr=>"[::]", Listen=>1) or not $pkg->new(LocalAddr=>"127.0.0.1", Listen=>1)) { # Simple ephemeral sanity pre-check didn't even work
