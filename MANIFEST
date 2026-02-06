@@ -46,8 +46,10 @@ t/16_TCP_StackIPV.t
 t/17_TCP_DoublePort.t
 t/21_IPv6_socketip.t
 t/22_IPv6_socketinet6.t
+t/23_IPv6_recurse.t
 t/FakeWrapper1.pm
 t/FakeWrapper2.pm
+t/FakeWrapper3.pm
 t/NetServerTest.pm
 t/Options.t
 t/Options.t.conf
