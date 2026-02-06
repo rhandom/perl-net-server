@@ -34,6 +34,7 @@ my $ok = eval {
 
         ### connect to child using IPv4
         my $remote = NetServerTest::client_connect(
+            Timeout  => $env->{'timeout'}-1, # Successful loopback network connection ought to be very fast
             PeerAddr => $IPv6,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp');

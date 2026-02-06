@@ -33,6 +33,7 @@ my $ok = eval {
 
         ### connect to child using IPv6
         my $remote = Net::Server::Proto->ipv6_package->new(
+            Timeout  => $env->{'timeout'}-1, # Successful loopback network connection ought to be very fast
             PeerAddr => $fail,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp');
