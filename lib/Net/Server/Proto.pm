@@ -322,20 +322,19 @@ sub object {
     }
     (my $file = "${proto_class}.pm") =~ s|::|/|g;
     $server->fatal("Unable to load module for proto \"$proto_class\": $@") if ! eval { require $file };
+    if (my $pkg = $server->{'server'}->{'ipv6_package'} and !$Net::Server::IP::ipv6_package) {
+        eval {require Net::Server::IP;$Net::Server::IP::ipv6_package=$pkg};
+    }
     return $proto_class->object($info, $server);
 }
 
 sub requires_ipv6 { $requires_ipv6 ? 1 : undef }
 
 sub ipv6_package {
-    my $class = $_[0] eq __PACKAGE__ ? shift : __PACKAGE__;
-    my ($server) = @_;
     return $ipv6_package if $ipv6_package;
     return undef if $ENV{'NO_IPV6'};
-    my $pkg = $server->{'server'}->{'ipv6_package'} || "Net::Server::IP";
-    (my $file = "$pkg.pm") =~ s|::|/|g;
-    eval { require $file } or !warn "Could not load ipv6_package $pkg: $@\n" or $server->fatal("Could not load ipv6_package $pkg: $@");
-    return $ipv6_package = $pkg;
+    eval {require Net::Server::IP;1} or !warn "Could not load ipv6_package: $@" or die "Could not load ipv6_package: $@";
+    return $ipv6_package = "Net::Server::IP";
 }
 
 our $IPV6_V6ONLY;
