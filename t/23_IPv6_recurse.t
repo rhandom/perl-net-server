@@ -7,7 +7,7 @@ use warnings;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok note);
-#skip_without_ipv6;
+exit 0+!print "1..0 # SKIP IPv6 is not supported\n" if !grep {-r "$_/IO/Socket/IP.pm" or -r "$_/IO/Socket/INET6.pm"} @INC;
 my $pkg = "FakeWrapper3"; # Net::Server::IP
 my $IPv6 = "::1"; # Should connect to IPv6
 $ENV{NET_SERVER_TEST_HOSTNAME} ||= "127.0.0.1"; # Fake IPv4 to prevent prepare_test from pre-loading ipv6_package
