@@ -93,6 +93,7 @@ my $ok = eval {
         my $remote = IO::Socket::SSL->new(
             PeerAddr => $env->{'hostname'},
             PeerPort => $env->{'ports'}->[0],
+            Family => ($env->{'ipv'} =~ /[6*]/ ? Socket::AF_INET6() : Socket::AF_INET()),
             SSL_verify_mode => $mode,
         ) || die "Couldn't open child to sock: $!";
 
