@@ -1,27 +1,16 @@
-
+#!perl
 use strict;
 use warnings;
-
-
-
-use ExtUtils::MakeMaker 6.30;
-
-
+use ExtUtils::MakeMaker;
 
 my %WriteMakefileArgs = (
-  "ABSTRACT" => "Extensible Perl internet server",
-  "AUTHOR" => "Paul Seamons <paul\@seamons.com> and Rob Brown <bbb\@cpan.org>",
-  "BUILD_REQUIRES" => {},
-  "CONFIGURE_REQUIRES" => {
-    "ExtUtils::MakeMaker" => "6.30"
-  },
-  "DISTNAME" => "Net-Server",
-  "EXE_FILES" => [
-    "bin/net-server"
-  ],
-  "LICENSE" => "perl",
-  "NAME" => "Net::Server",
-  "PREREQ_PM" => {
+  ABSTRACT => "Extensible Perl internet server",
+  AUTHOR => 'Paul Seamons <paul@seamons.com> and Rob Brown <bbb@cpan.org>',
+  DISTNAME => "Net-Server",
+  EXE_FILES => [ "bin/net-server" ],
+  LICENSE => "perl",
+  NAME => "Net::Server",
+  PREREQ_PM => {
     "Carp" => 0,
     "File::Temp" => 0,
     "IO::Socket" => 0,
@@ -29,9 +18,8 @@ my %WriteMakefileArgs = (
     "Socket" => 0,
     "Time::HiRes" => 0
   },
-  "TEST_REQUIRES" => {},
-  "VERSION_FROM" => "lib/Net/Server.pm",
-  "test" => {
+  VERSION_FROM => "lib/Net/Server.pm",
+  test => {
     "TESTS" => "t/*.t"
   },
   META_MERGE => {
@@ -51,25 +39,7 @@ my %WriteMakefileArgs = (
   },
 );
 
-
-my %FallbackPrereqs = (
-  "IO::Socket" => 0,
-  "POSIX" => 0,
-  "Socket" => 0,
-  "Time::HiRes" => 0
-);
-
-
-unless ( eval { ExtUtils::MakeMaker->VERSION(6.63_03) } ) {
-  delete $WriteMakefileArgs{TEST_REQUIRES};
-  delete $WriteMakefileArgs{BUILD_REQUIRES};
-  $WriteMakefileArgs{PREREQ_PM} = \%FallbackPrereqs;
-}
-
-delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
-  unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
+delete $WriteMakefileArgs{LICENSE}    if !eval { ExtUtils::MakeMaker->VERSION(6.31) };
+delete $WriteMakefileArgs{META_MERGE} if !eval { ExtUtils::MakeMaker->VERSION(6.46) };
 
 WriteMakefile(%WriteMakefileArgs);
-
-
-
