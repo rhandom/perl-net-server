@@ -43,7 +43,7 @@ my $ok = eval {
         $remote = NetServerTest::client_connect(
             PeerAddr => $IPv4,
             PeerPort => $env->{'ports'}->[0],
-            Proto    => 'tcp') || die "Couldn't open sock to [$IPv4] [$env->{'ports'}->[0]]: $!";
+            Proto    => 'tcp') or die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]: [$!] $@";
 
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;

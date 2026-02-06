@@ -42,7 +42,7 @@ my $ok = eval {
         $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $good,
             PeerPort => $env->{'ports'}->[0],
-            Proto    => 'tcp') || die "Couldn't open sock: $!";
+            Proto    => 'tcp') or die "IPv6 connection failed to [$good] [$env->{'ports'}->[0]]: [$!] $@";
 
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;

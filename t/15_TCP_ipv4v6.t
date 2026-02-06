@@ -35,14 +35,13 @@ my $ok = eval {
         my $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $IPv4,
             PeerPort => $env->{'ports'}->[0],
-            Proto    => 'tcp');
-        die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]" if !$remote;
+            Proto    => 'tcp') or die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]: [$!] $@";
 
         ### connect to child using IPv6
         $remote = Net::Server::Proto->ipv6_package->new(
             PeerAddr => $IPv6,
             PeerPort => $env->{'ports'}->[0],
-            Proto    => 'tcp') || die "Couldn't open sock to [$IPv6] [$env->{'ports'}->[0]]: $!";
+            Proto    => 'tcp') or die "IPv6 connection failed to [$IPv6] [$env->{'ports'}->[0]]: [$!] $@";
 
         my $line = <$remote>;
         die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
