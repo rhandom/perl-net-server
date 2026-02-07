@@ -21,6 +21,7 @@ use strict;
 use warnings;
 use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC IPPROTO_IPV6 IPV6_V6ONLY);
 use IO::Socket::INET ();
+use Exporter qw(import);
 
 our @ISA = qw(IO::Socket::INET); # we may dynamically change this to an IPv6-compatible class based upon our configuration
 our $ipv6_package = undef;
