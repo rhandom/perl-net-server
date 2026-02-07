@@ -72,6 +72,16 @@ sub process_request {
     $self->server_close;
 }
 
+# Safe read regardless of Net::SSLeay version
+# ($got, $result) = SSLread($ssl);
+sub SSLread {
+    my $ssl = shift;
+    my ($chunk, $rv) = Net::SSLeay::read($ssl); # Read max available
+    $rv = defined $chunk ? length $chunk : -1 if !defined $rv and $Net::SSLeay::VERSION < 1.49; # Spoof $rv if older versions
+    return ($chunk, $rv) if wantarray;
+    return $chunk;
+}
+
 my $ok = eval {
     local $SIG{'ALRM'} = sub { die "Timeout\n" };
     alarm $env->{'timeout'};
@@ -93,13 +103,13 @@ my $ok = eval {
         $ssl = Net::SSLeay::new($ctx) or Net::SSLeay::die_now("Failed to create SSL $!");
         Net::SSLeay::set_fd($ssl, $remote->fileno);
         Net::SSLeay::connect($ssl);
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         die "Port0.1: Didn't get what was expected: [$rv] ($line)" if $line !~ /Net::Server/;
         note "Port0.1: ($rv) $line";
         $wrote = Net::SSLeay::write($ssl, "quit\n");
         note "Port0.2: ($wrote) written";
         die "Port0.2: Failure? [$wrote]" if $wrote <= 0;
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         note "Port0.3: ($rv) $line";
         Net::SSLeay::shutdown($ssl); close $remote;
 
@@ -112,13 +122,13 @@ my $ok = eval {
         $ssl = Net::SSLeay::new($ctx) or Net::SSLeay::die_now("Failed to create SSL $!");
         Net::SSLeay::set_fd($ssl, $remote->fileno);
         Net::SSLeay::connect($ssl);
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         die "Port1.1: Didn't get what was expected: [$rv] ($line)" if $line !~ /Net::Server/ or $rv <= 0;
         note "Port1.1: ($rv) $line";
         $wrote = Net::SSLeay::write($ssl, "sup\n");
         note "Port1.2: ($wrote) written";
         die "Port1.2: Failure? [$wrote]" if $wrote <= 0;
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         note "Port1.3: ($rv) $line";
         Net::SSLeay::shutdown($ssl); close $remote; # Graceful Close to Force Client EOF
 
@@ -131,19 +141,19 @@ my $ok = eval {
         $ssl = Net::SSLeay::new($ctx) or Net::SSLeay::die_now("Failed to create SSL $!");
         Net::SSLeay::set_fd($ssl, $remote->fileno);
         Net::SSLeay::connect($ssl);
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         die "Port2.1: Didn't get what was expected: [$rv] ($line)" if $line !~ /Net::Server/ or $rv <= 0;
         note "Port2.1: ($rv) $line";
         $wrote = Net::SSLeay::write($ssl, "sup!\r\nman!\r\n");
         note "Port2.2: ($wrote) written";
         die "Port2.2: Failure? [$wrote]" if $wrote <= 0;
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         note "Port2.3: ($rv) $line";
         die "Port2.3: Didn't get what was expected: [$rv] ($line)" if $line !~ /^.*1.*sup/m;
-        ($line, $rv) = Net::SSLeay::read($ssl) if $line !~ /^.*2.*man/;
+        ($line, $rv) = SSLread($ssl) if $line !~ /^.*2.*man/;
         note "Port2.4: ($rv) $line";
         die "Port2.4: Didn't get what was expected: [$rv] ($line)" if $line !~ /^.*2.*man/m;
-        ($line, $rv) = Net::SSLeay::read($ssl);
+        ($line, $rv) = SSLread($ssl);
         die "Port2.5: EOF expected, but got more bytes? [$rv] ($line)" if $line or $rv > 0;
         Net::SSLeay::shutdown($ssl); close $remote;
 
@@ -159,7 +169,7 @@ my $ok = eval {
         $wrote = Net::SSLeay::write($ssl, "foo bar");
         note "Port3.1: ($wrote) written";
         die "Port3.1: Failure? [$wrote]" if $wrote <= 0;
-        ($line,$rv) = Net::SSLeay::read($ssl);
+        ($line,$rv) = SSLread($ssl);
         note "Port3.2: ($rv) $line";
         die "Port3.2: Didn't get what was expected: ($line)" if $line ne "foo bar";
         Net::SSLeay::shutdown($ssl); close $remote;
