@@ -9,7 +9,7 @@ my $env = prepare_test({n_tests => 8, start_port => 20200, n_ports => 4}); # run
 
 if (! eval { require Net::SSLeay }
    ) {
-  SKIP: { skip("Cannot load Net::SSleay libraries to test Socket SSL server: $@", 1); };
+  SKIP: { skip("Cannot load Net::SSLeay libraries to test Socket SSL server: $@", 5); };
     exit;
 }
 if (! eval { require Net::Server::Proto::SSLEAY }) {
