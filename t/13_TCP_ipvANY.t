@@ -8,6 +8,7 @@ use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok note skip_without_ipv6);
 skip_without_ipv6;
+exit 0+!print "1..0 # SKIP Platform does not permit disabling V6ONLY\n" if !Net::Server::Proto->CAN_DISABLE_V6ONLY;
 my $IPv4 = "127.0.0.1"; # Should connect to IPv4
 my $IPv6 = "::1"; # Should also connect to IPv6
 my $env = prepare_test({n_tests => 5, start_port => 20700, n_ports => 1}); # runs three of its own tests
