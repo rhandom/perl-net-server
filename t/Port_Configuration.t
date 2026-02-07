@@ -9,7 +9,7 @@ Port_Configuration.t - Test different ways of specifying the port
 package FooServer;
 
 use strict;
-use Net::Server::Proto qw(SOMAXCONN);
+use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC SOMAXCONN);
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok note skip);
@@ -18,7 +18,6 @@ prepare_test({
     plan_only => 1,
     hostname  => 'localhost', # passing in an explicit one keeps it from doing IPv* resolution
 });
-#use CGI::Ex::Dump qw(debug);
 
 use_ok('Net::Server');
 
@@ -54,8 +53,6 @@ sub p_c { # port check
     my ($args, $hash, $args_to_new) = @_;
     my $prop = eval { ($args_to_new ? FooServer->new(@$args)->run : FooServer->run(@$args))->{'server'} }
         || do { note "$@ at line $line"; {} };
-#    use CGI::Ex::Dump qw(debug);
-#    debug $prop;
     my $got = {bind => $prop->{'_bind'}};
     if ($hash->{'sock'}) {
         push @{ $got->{'sock'} }, NS_props($_) for @{ $prop->{'sock'} || [] };
@@ -88,11 +85,11 @@ sub NS_props {
 # tcp, udp
 
 if (!eval {
-    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die "listen: IO::Socket::INET failed. $@";
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 25;
+      skip "Cannot load IPv4 libraries - skipping IPv4 proto tests ($err)", 25;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
@@ -304,7 +301,7 @@ if (!eval { require Net::SSLeay; 1 }) {
       skip "Cannot load Net::SSLeay - skipping SSLEAY proto tests", 3;
     };
 } elsif (!eval {
-    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die "listen: IO::Socket::INET failed. $@";
 }) {
     chomp(my $err = $@);
   SKIP: {
@@ -334,10 +331,10 @@ if (!eval { require Net::SSLeay; 1 }) {
 
 if (!eval { require IO::Socket::SSL }) {
   SKIP: {
-      skip "Cannot load Net::SSLeay - skipping SSLEAY proto tests", 1;
+      skip "Cannot load IO::Socket::SSL - skipping SSL proto tests", 1;
     };
 } elsif (!eval {
-    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die;
+    IO::Socket::INET->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die "listen: IO::Socket::INET failed. $@";
 }) {
     chomp(my $err = $@);
   SKIP: {
@@ -358,10 +355,10 @@ if (!eval { require IO::Socket::SSL }) {
 
 if (!eval {
     my $ipv6local = `cat /etc/hosts 2>/dev/null` =~ /^::1.*[\ \t](\S+)/m ? $1 : die "Missing IPv6 loopback hosts entry";
-    my $pkg = eval { require IO::Socket::IP } ? 'IO::Socket::IP' : eval { require IO::Socket::INET6 } ? 'IO::Socket::INET6' : die "Could not load IO::Socket::IP or IO::Socket::INET6: $@";
-    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-NoLocalAddr failed";
-    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-WithAddr failed";
-    $pkg->new->configure({LocalAddr => $ipv6local, LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Domain => Net::Server::Proto::AF_INET6()}) or die "IPv6-LocalHost $ipv6local failed";
+    my $pkg = Net::Server::Proto->ipv6_package;
+    $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Family => AF_INET6}) or die "IPv6-NoLocalAddr failed. $@";
+    $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die "IPv6-WithAddr failed. $@";
+    $pkg->new->configure({LocalAddr => $ipv6local, LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Family => AF_INET6}) or die "IPv6-LocalHost $ipv6local failed. $@";
 }) {
     chomp(my $err = $@);
   SKIP: {
