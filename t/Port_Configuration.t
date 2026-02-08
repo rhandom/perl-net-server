@@ -44,8 +44,8 @@ $dump = sub {
     my $ref = shift;
     my $ind = shift || '';
     return (!defined $ref) ? 'undef' : ($ref eq '0') ? 0 : ($ref=~/^[1-9]\d{0,12}$/) ? $ref : "'$ref'" if ! ref $ref;
-    return "[".join(', ',map {$dump->($_)} @$ref).']' if ref $ref eq 'ARRAY';
-    return "{".join(',',map {"\n$ind  $_ => ".$dump->($ref->{$_},"$ind  ")} sort keys %$ref)."\n$ind}";
+    return '['.join(', ',map {$dump->($_, $ind)} @$ref).']' if ref $ref eq 'ARRAY';
+    return '{'.join(',',map {"\n$ind  $_ => ".$dump->($ref->{$_},"$ind  ")} sort keys %$ref)."\n$ind}";
 };
 
 sub p_c { # port check
