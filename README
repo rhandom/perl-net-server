@@ -1694,7 +1694,7 @@ THANKS
 
     Thanks to Dominic Humphries for helping not kill pid files on HUP.
 
-    Thanks to Kristoffer Møllerhøj for fixing UDP on Multiplex.
+    Thanks to Kristoffer Mullerhoj for fixing UDP on Multiplex.
 
     Thanks to mishikal for patches for helping identify un-cleaned up
     children.
@@ -1741,6 +1741,8 @@ THANKS
     Thanks to Emanuele <targeta> for a small patch releasing semaphores.
 
     Thanks to Rob <hookbot> for daemonization fixes with zero pid file.
+
+    Thanks to Grok 4.1 xAI for providing patches for various fixes.
 
 SEE ALSO
     Please see also Net::Server::Fork, Net::Server::INET,
