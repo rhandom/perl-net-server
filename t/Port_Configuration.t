@@ -329,7 +329,7 @@ if (!eval { require Net::SSLeay; 1 }) {
 
 }
 
-if (!eval { require IO::Socket::SSL }) {
+if (!eval { require Net::Server::Proto::SSL }) { # Safer than loading IO::Socket::SSL directly to keep warnings clean
   SKIP: {
       skip "Cannot load IO::Socket::SSL - skipping SSL proto tests", 1;
     };

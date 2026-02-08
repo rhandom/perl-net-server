@@ -24,7 +24,7 @@ use Net::Server::Proto qw(SOMAXCONN);
 BEGIN {
     # IO::Socket::SSL will automatically become IO::Socket::IP if it is available.
     # This is different from Net::Server::Proto::SSLEAY that only does it if IPv6 is requested.
-    if (! eval { require IO::Socket::SSL }) {
+    if (! eval { local $^W=0; require IO::Socket::SSL }) { # Quiet "redefined" warnings in case IO::Socket::INET6 <= 2.66
         die "Module IO::Socket::SSL is required for SSL - you may alternately try SSLEAY. $@";
     }
 }
