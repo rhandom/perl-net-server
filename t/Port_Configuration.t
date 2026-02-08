@@ -305,7 +305,7 @@ if (!eval { require Net::SSLeay; 1 }) {
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 3;
+      skip "Cannot load IPv4 library - skipping SSLEAY proto tests ($err)", 3;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
@@ -338,7 +338,7 @@ if (!eval { require Net::Server::Proto::SSL }) { # Safer than loading IO::Socket
 }) {
     chomp(my $err = $@);
   SKIP: {
-      skip "Cannot load IPv6 libraries - skipping IPv6 proto tests ($err)", 1;
+      skip "Cannot load IPv4 library - skipping SSL proto tests ($err)", 1;
     };
 } else {
     local $ENV{'IPV'} = 4; # pretend to be on a system without IPv6
