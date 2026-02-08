@@ -9,8 +9,14 @@ my %env;
 use constant debug => $ENV{'NS_DEBUG'} ? 1 : 0;
 
 END {
-    warn "# number of tests ran ".($env{'_ok_n'} || 0)." did not match number of specified tests ".($env{'_ok_N'} || 0)."\n"
-        if ($env{'_ok_N'} || 0) ne ($env{'_ok_n'} || 0) && ($env{'_ok_pid'} || 0) == $$;
+    if (($env{'_ok_pid'} || 0) == $$) {
+        my $should = 0+$env{'_ok_N'};
+        my $actual = 0+$env{'_ok_n'};
+        my $exit = scalar keys %{ $env{'_not_ok'} };
+        $exit = 254 if $exit > 254;
+        $exit ||= -1 and warn "# Looks like you planned $should tests but ran $actual\n" if $should ne $actual;
+        exit $exit if $exit;
+    }
 }
 
 sub skip_without_ipv6 {
@@ -162,12 +168,13 @@ sub get_ports {
 sub ok {
     my ($ok, $msg, $level) = @_;
     my $n = ++$env{'_ok_n'};
-    print "".($ok ? "" : "not ")."ok $n";
-    print " - $msg" if defined $msg;
-    print "\n" if $msg !~ /\n\Z/;
+    print (($ok ? "" : "not ")."ok $n");
+    print " - $msg" if defined $msg && $msg =~ s/\s*$//;
+    print "\n";
     if (! $ok) {
         my ($pkg, $file, $line) = caller($level || 0);
         print "#   failed at $file line $line\n";
+        $env{'_not_ok'}->{$n} = $line;
     }
     return $ok;
 }
