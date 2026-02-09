@@ -102,14 +102,12 @@ BEGIN {
         my $fullname = __PACKAGE__."::".(my $basename = shift);
         # Manually run routine if import failed to brick over symbol in local namespace during the last attempt.
         $sub->{$fullname} ? (return $sub->{$fullname}->(@_)) : (die "$fullname: Unable to replace symbol") if exists $sub->{$fullname};
-        # Always try Socket.pm first, then Socket6.pm
-        $sub->{$fullname} = Socket->can($basename) || $have6 && Socket6->can($basename) || eval { # Only try to load Socket6 once
-            die "No Socket6" if defined $have6 && !$have6; ($have6||=0)||=do{require Socket6;1};
-            Socket6->can($basename) or do{no strict 'refs';&{"Socket6::$basename"};0} or # Avoid Crash: Can't use string as a subroutine ref while "strict refs"
-            Socket6->can($basename); # Socket6 will conjure the constant routine on-the-fly via AUTOLOAD upon invocation, so "can" will work the second time.
-        };
+        # Socket < 2.xxx and Socket6 can conjure constant routine on-the-fly via AUTOLOAD upon invocation, so "can" may not work until the second time.
+        no strict 'refs'; # Avoid Crash: Can't use string as a subroutine ref while "strict refs"
+        $sub->{$fullname}  = Socket ->can($basename) || eval { &{"Socket ::$basename"};0} || Socket ->can($basename); # Always try Socket.pm first, then Socket6.pm
+        $sub->{$fullname}||= Socket6->can($basename) || eval { &{"Socket6::$basename"};0} || Socket6->can($basename)
+            if $have6 or !defined $have6 && eval { ($have6||=0)||=do{require Socket6;1} }; # Only try to load Socket6 the first time Socket couldn't find something.
         if (my $code = $sub->{$fullname}) {
-            no strict 'refs';
             no warnings qw(redefine prototype); # Don't spew when redefining the stub in the packages that imported it (as well as mine) with the REAL routine
             eval { *{"$_\::$basename"}=$code foreach keys %{$exported->{$basename}}; *$fullname=$code } or warn "$fullname: On-The-Fly replacement failed: $@";
             my @res = (); # Run REAL routine preserving the same wantarray-ness context as caller
