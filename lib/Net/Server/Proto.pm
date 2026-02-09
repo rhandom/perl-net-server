@@ -268,7 +268,7 @@ sub get_addr_info {
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = inet_aton($host) or croak "Unresolveable host [$host]:$port: invalid ip";
         push @info, [inet_ntoa($addr), $port, 4];
-    } elsif (eval { $class->ipv6_package($server) }) { # Hopefully IPv6 package has already been loaded by now, if it's available.
+    } elsif (eval { ipv6_package()->new(LocalAddr=>"::", Listen=>1) }) { # PreTest to ensure we can even handle a simple IPv6 Addr
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
         my @res = safe_addr_info($host eq '*' ? '' : $host, $port, { family=>AF_UNSPEC, socktype=>$socktype, protocol=>$proto_id, flags=>AI_PASSIVE });
@@ -331,7 +331,7 @@ sub requires_ipv6 { $requires_ipv6 ? 1 : undef }
 sub ipv6_package {
     return $ipv6_package if $ipv6_package;
     return undef if $ENV{'NO_IPV6'};
-    eval {require Net::Server::IP;1} or !warn "Could not load ipv6_package: $@" or die "Could not load ipv6_package: $@";
+    eval {require Net::Server::IP;1} or !warn "ipv6_package: Failure! [$!] [$@]" or die "ipv6_package: Failure! [$!] [$@]";
     return $ipv6_package = "Net::Server::IP";
 }
 
