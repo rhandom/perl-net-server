@@ -75,7 +75,7 @@ ok($configured_ports == 1 || $configured_ports == 2, "Had correct configured por
 my @socks = @{ $prop->{'sock'} };
 is(scalar(@socks), scalar(@{ $prop->{'_bind'} }), "Sockets matched ports");
 my $sock = $socks[0];
-is(eval { $sock->NS_host  }, (eval{$sock->NS_ipv}eq 4?'*':'::'), "Right host".eval { ": ".$sock->NS_host()."/IPv".$sock->NS_ipv });
+is(eval { $sock->NS_host  }, (eval{$sock->NS_ipv}eq 4?'0.0.0.0':'::'), "Right host".eval { ": ".$sock->NS_host()."/IPv".$sock->NS_ipv });
 is(eval { $sock->NS_port  }, 20203, "Right port");
 is(eval { $sock->NS_proto }, 'TCP', "Right proto");
 
