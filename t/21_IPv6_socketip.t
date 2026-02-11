@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test ipv6_package with FakeWrapper1 for IO::Socket::IP
+# Test ipv6_package with FakeWrapper1 for IO::Socket::IP using IPv6
 use strict;
 use warnings;
 use FindBin qw($Bin);
@@ -48,7 +48,7 @@ my $ok = eval {
         my $line = <$remote>;
         note "Banner: $line";
         print $remote "exit\n";
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /SUCCESS.*Welcome/;
+        die "Didn't get the banner expected: $line" if $line !~ /SUCCESS.*Welcome.*Net::Server/;
         return 1;
 
     ### child does the server

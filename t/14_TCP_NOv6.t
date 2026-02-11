@@ -11,7 +11,7 @@ my $IPv4 = "127.0.0.1"; # Should connect to IPv4
 my $IPv6 = "::1"; # Should not connect to IPv6
 $ENV{NO_IPV6} = 1;
 my $env = prepare_test({n_tests => 6, start_port => 20700, n_ports => 1}); # runs three of its own tests
-ok(!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) }, "NO_IPV6 Success! No ipv6_package detected");
+ok(!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package() }, "NO_IPV6 Success! No ipv6_package detected");
 
 use_ok('Net::Server');
 @Net::Server::Test::ISA = qw(Net::Server);
@@ -47,7 +47,8 @@ my $ok = eval {
             Proto    => 'tcp') or die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]: [$!] $@";
 
         my $line = <$remote>;
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        note "IPv4 Banner: $line";
+        die "Didn't get the banner expected: $line" if $line !~ /Welcome.*Net::Server/;
         print $remote "exit\n";
         return 1;
 

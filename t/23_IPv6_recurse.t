@@ -49,7 +49,7 @@ my $ok = eval {
         my $line = <$remote>;
         note "Banner: $line";
         print $remote "exit\n";
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /SUCCESS.*Welcome/;
+        die "Didn't get the banner expected: $line" if $line !~ /SUCCESS.*Welcome.*Net::Server/;
         return 1;
 
     ### child does the server

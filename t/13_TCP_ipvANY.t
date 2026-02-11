@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test to ensure IPv* listener binds both IPv4 and IPv6 interfaces.
+# Test to ensure IPv* listens on both IPv4 (mapped) and IPv6 within a single listener sock.
 use strict;
 use warnings;
 use FindBin qw($Bin);
@@ -17,8 +17,19 @@ use_ok('Net::Server');
 @Net::Server::Test::ISA = qw(Net::Server);
 
 sub accept {
+    my $self = shift;
+    my $s = scalar @{ $self->{'server'}->{'sock'} };
+    my $l = scalar @{ $self->{'server'}->{'_bind'} };
+    die "Expected one Dual Stack sock but got [sock=$s] [_bind=$l]" if 1 != $s || 1 != $l;
     $env->{'signal_ready_to_test'}->();
-    return shift->SUPER::accept(@_);
+    return $self->SUPER::accept(@_);
+}
+
+sub process_request {
+    my ($self, $client) = @_;
+    my $remote_addr = $client->peerhost;
+    print "<$remote_addr> ";
+    return $self->SUPER::process_request($client);
 }
 
 my $ok = eval {
@@ -37,6 +48,10 @@ my $ok = eval {
             PeerAddr => $IPv4,
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp') or die "IPv4 connection failed to [$IPv4] [$env->{'ports'}->[0]]: [$!] $@";
+        my $line = <$remote>;
+        note "IPv4 Banner: $line";
+        # If CAN_DISABLE_V6ONLY with IPv*, then IPv4 connections should use IPv4-Mapped addresses on a single IPv6 sock:
+        die "Didn't get the banner expected: $line" if $line !~ /<::ffff:\Q$IPv4\E>.*Welcome.*Net::Server/i;
 
         ### connect to child using IPv6
         $remote = Net::Server::Proto->ipv6_package->new(
@@ -44,8 +59,9 @@ my $ok = eval {
             PeerPort => $env->{'ports'}->[0],
             Proto    => 'tcp') or die "IPv4 connection failed to [$IPv6] [$env->{'ports'}->[0]]: [$!] $@";
 
-        my $line = <$remote>;
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        $line = <$remote>;
+        note "IPv6 Banner: $line";
+        die "Didn't get the banner expected: $line" if $line !~ /<\Q$IPv6\E>.*Welcome.*Net::Server/;
         print $remote "exit\n";
         return 1;
 

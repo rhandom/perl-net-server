@@ -46,7 +46,8 @@ my $ok = eval {
             Proto    => 'tcp') or die "IPv6 connection failed to [$good] [$env->{'ports'}->[0]]: [$!] $@";
 
         my $line = <$remote>;
-        die "Didn't get the type of line we were expecting: ($line)" if $line !~ /Net::Server/;
+        note "IPv6 Banner: $line";
+        die "Didn't get the banner expected: $line" if $line !~ /Welcome.*Net::Server/;
         print $remote "exit\n";
         return 1;
 
