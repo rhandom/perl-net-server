@@ -54,17 +54,15 @@ sub object {
             : 0;
     $flg = ($flg =~ /^(\d+)$/) ? $1 : 0;
 
-    my @sock = $class->new(); # XXX: Is it possible that multiple connections will be returned if INET6 is in effect?
-    foreach my $sock (@sock) {
-        $sock->NS_host($info->{'host'});
-        $sock->NS_port($info->{'port'});
-        $sock->NS_ipv( $info->{'ipv'} );
-        $sock->NS_recv_len($len);
-        $sock->NS_recv_flags($flg);
-        $sock->NS_broadcast(exists($info->{'udp_broadcast'}) ? $info->{'udp_broadcast'} : $udp->{'upd_broadcast'});
-        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
-    }
-    return wantarray ? @sock : $sock[0];
+    my $sock = $class->new;
+    $sock->NS_host($info->{'host'});
+    $sock->NS_port($info->{'port'});
+    $sock->NS_ipv( $info->{'ipv'} );
+    $sock->NS_recv_len($len);
+    $sock->NS_recv_flags($flg);
+    $sock->NS_broadcast(exists($info->{'udp_broadcast'}) ? $info->{'udp_broadcast'} : $udp->{'upd_broadcast'});
+    ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
+    return $sock;
 }
 
 sub connect {

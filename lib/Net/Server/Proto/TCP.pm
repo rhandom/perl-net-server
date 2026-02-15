@@ -33,17 +33,15 @@ sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return $
 sub object {
     my ($class, $info, $server) = @_;
 
-    my @sock = $class->new();
-    foreach my $sock (@sock) {
-        $sock->NS_host($info->{'host'});
-        $sock->NS_port($info->{'port'});
-        $sock->NS_ipv( $info->{'ipv'} );
-        $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
-                        : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : SOMAXCONN);
-        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
-    }
-    return wantarray ? @sock : $sock[0];
+    my $sock = $class->new;
+    $sock->NS_host($info->{'host'});
+    $sock->NS_port($info->{'port'});
+    $sock->NS_ipv( $info->{'ipv'} );
+    $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                    : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                    : SOMAXCONN);
+    ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
+    return $sock;
 }
 
 sub log_connect {

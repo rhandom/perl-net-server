@@ -65,26 +65,24 @@ sub object {
         \%temp;
     };
 
-    my @sock = $class->SUPER::new();
-    foreach my $sock (@sock) {
-        $sock->NS_host($info->{'host'});
-        $sock->NS_port($info->{'port'});
-        $sock->NS_ipv( $info->{'ipv'} );
-        $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
-                        : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : SOMAXCONN);
-        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
+    my $sock = $class->new;
+    $sock->NS_host($info->{'host'});
+    $sock->NS_port($info->{'port'});
+    $sock->NS_ipv( $info->{'ipv'} );
+    $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                    : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                    : SOMAXCONN);
+    ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
 
-        for my $key (@ssl_args) {
-            my $val = defined($info->{$key}) ? $info->{$key}
-                    : defined($ssl->{$key})  ? $ssl->{$key}
-                    : $server->can($key) ? $server->$key($info->{'host'}, $info->{'port'}, 'SSLEAY')
-                    : undef;
-            next if ! defined $val;
-            $sock->$key($val) if defined $val;
-        }
+    for my $key (@ssl_args) {
+        my $val = defined($info->{$key}) ? $info->{$key}
+                : defined($ssl->{$key})  ? $ssl->{$key}
+                : $server->can($key) ? $server->$key($info->{'host'}, $info->{'port'}, 'SSLEAY')
+                : undef;
+        next if ! defined $val;
+        $sock->$key($val) if defined $val;
     }
-    return wantarray ? @sock : $sock[0];
+    return $sock;
 }
 
 sub log_connect {
