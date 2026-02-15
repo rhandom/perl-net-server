@@ -96,7 +96,7 @@ sub reconnect { # after a sig HUP
     my $isa_v6 = Net::Server::Proto->requires_ipv6($server) ? $sock->isa(Net::Server::Proto->ipv6_package($server)) : undef;
     if ($isa_v6) {
         my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC();
+        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
     }
 
     if ($port ne $sock->NS_port) {

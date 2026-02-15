@@ -22,7 +22,7 @@ use warnings;
 use IO::Socket::INET;
 use Fcntl ();
 use Errno ();
-use Socket qw(SOMAXCONN);
+use Socket qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 use Carp qw(croak);
 
 BEGIN {
@@ -111,8 +111,8 @@ sub connect { # connect the first time
         Listen    => $lstn,
         ReuseAddr => 1,
         Reuse     => 1,
+        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        ($isa_v6 ? (Domain => ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC()) : ()),
     }) || $server->fatal("Can't connect to SSLEAY port $port on $host [$!]");
 
     if ($port eq '0' and $port = $sock->sockport) {
@@ -136,7 +136,7 @@ sub reconnect { # connect on a sig -HUP
     my $isa_v6 = Net::Server::Proto->requires_ipv6($server) ? $sock->isa(Net::Server::Proto->ipv6_package($server)) : undef;
     if ($isa_v6) {
         my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC();
+        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
     }
 
     $sock->bind_SSL($server);
