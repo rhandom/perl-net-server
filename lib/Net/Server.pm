@@ -39,6 +39,10 @@ use Net::Server::Proto qw[
     sockaddr_in6
     inet_ntoa
     inet_ntop
+    get_addr_info
+    ipv6_package
+    object
+    parse_info
     safe_name_info
 ];
 use Net::Server::Daemonize qw(check_pid_file create_pid_file safe_fork
@@ -295,12 +299,12 @@ sub prepared_ports {
 
 sub port_info {
     my ($self, $port, $host, $proto, $ipv) = @_;
-    return Net::Server::Proto->parse_info($port, $host, $proto, $ipv, $self);
+    return parse_info($port, $host, $proto, $ipv, $self);
 }
 
 sub proto_object {
     my ($self, $info) = @_;
-    return Net::Server::Proto->object($info, $self);
+    return object($info, $self);
 }
 
 sub bind { # bind to the port (This should serve all but INET)
@@ -555,7 +559,7 @@ sub get_client_info {
             if ($family == AF_INET) {
                 ($prop->{'peerport'}, $addr) = sockaddr_in($peer);
                 $prop->{'peeraddr'} = inet_ntoa($addr);
-            } elsif (eval { Net::Server::Proto->ipv6_package($self) }) {
+            } elsif (eval { ipv6_package() }) {
                 ($prop->{'peerport'}, $addr) = sockaddr_in6($peer);
                 $prop->{'peeraddr'} = inet_ntop($client->sockdomain, $addr);
             } else {
@@ -576,7 +580,7 @@ sub get_client_info {
             $prop->{'peerhost'} = gethostbyaddr($addr, AF_INET);
         }
         if ($prop->{'peerhost'} && $prop->{'double_reverse_lookups'}) {
-            $prop->{'peerhost_rev'} = {map {$_->[0] => 1} Net::Server::Proto->get_addr_info($prop->{'peerhost'}, undef, undef, $self)};
+            $prop->{'peerhost_rev'} = {map {$_->[0] => 1} get_addr_info($prop->{'peerhost'}, undef, undef, $self)};
         }
     }
 

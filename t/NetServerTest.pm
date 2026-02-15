@@ -32,7 +32,7 @@ sub skip_without_ipv6 {
 
 sub client_connect {
     shift if $_[0] && $_[0] eq __PACKAGE__;
-    my $pkg = eval { $env{'ipv'} && $env{'ipv'} =~ /[6*]/ && do { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) } } || "IO::Socket::INET";
+    my $pkg = eval { $env{'ipv'} && $env{'ipv'} =~ /[6*]/ && do { require Net::Server::Proto; Net::Server::Proto->ipv6_package } } || "IO::Socket::INET";
     warn "IPv6 FAILURE! $@" if $@;
     return $pkg->new(@_);
 }
