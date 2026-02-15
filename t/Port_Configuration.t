@@ -9,7 +9,7 @@ Port_Configuration.t - Test different ways of specifying the port
 package FooServer;
 
 use strict;
-use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC SOMAXCONN);
+use Net::Server::Proto qw(AF_INET AF_INET6 AF_UNSPEC SOMAXCONN ipv6_package);
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok is use_ok note skip);
@@ -355,7 +355,7 @@ if (!eval { require Net::Server::Proto::SSL }) { # Safer than loading IO::Socket
 
 if (!eval {
     my $ipv6local = `cat /etc/hosts 2>/dev/null` =~ /^::1.*[\ \t](\S+)/m ? $1 : die "Missing IPv6 loopback hosts entry";
-    my $pkg = Net::Server::Proto->ipv6_package;
+    my $pkg = ipv6_package();
     $pkg->new->configure({LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Family => AF_INET6}) or die "IPv6-NoLocalAddr failed. $@";
     $pkg->new->configure({LocalAddr => '::1', LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1}) or die "IPv6-WithAddr failed. $@";
     $pkg->new->configure({LocalAddr => $ipv6local, LocalPort => 20203, Proto => 'tcp', Listen => 1, ReuseAddr => 1, Family => AF_INET6}) or die "IPv6-LocalHost $ipv6local failed. $@";
