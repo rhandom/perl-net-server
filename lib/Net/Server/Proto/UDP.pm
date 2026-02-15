@@ -38,11 +38,6 @@ sub NS_broadcast  { my $sock = shift; ${*$sock}{'NS_broadcast'}  = shift if @_; 
 sub object {
     my ($class, $info, $server) = @_;
 
-    # we cannot do this at compile time because we have not yet read the configuration then
-    # (this is the height of rudeness changing another's class on their behalf)
-    $Net::Server::Proto::TCP::ISA[0] = Net::Server::Proto->ipv6_package($server)
-        if $Net::Server::Proto::TCP::ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
-
     my $udp = $server->{'server'}->{'udp_args'} ||= do {
         my %temp = map {$_ => undef} @udp_args;
         $server->configure({map {$_ => \$temp{$_}} @udp_args});
@@ -77,10 +72,6 @@ sub connect {
     my $host = $sock->NS_host;
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
-    my $afis = Net::Server::Proto->requires_ipv6($server) ?
-        $sock->isa("IO::Socket::IP") ? "Family" :
-        $sock->isa("IO::Socket::INET6") ? "Domain" :
-        undef : undef; # XXX: Is there any single magic word for "Address Family" that works for both modules?
 
     $sock->configure({
         LocalPort => $port,
@@ -88,7 +79,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1, # XXX: Is this needed on UDP?
         LocalAddr => ($host eq '*' ? undef : $host), # undef means on all interfaces
-        ($afis ? ($afis => $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC) : ()),
+        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
         ($sock->NS_broadcast ? (Broadcast => 1) : ()),
     }) or $server->fatal("Cannot bind to UDP port $port on $host [$!]");
 

@@ -22,8 +22,7 @@ use warnings;
 use Carp qw(croak);
 use IO::Socket::INET ();
 use Net::Server::Proto qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
-
-our @ISA = qw(IO::Socket::INET); # we may dynamically change this to a v6 compatible class based upon our server configuration
+use base qw(Net::Server::IP); # Can safely handle IPv4 or IPv6 on the fly
 
 sub NS_proto { 'TCP' }
 sub NS_port   { my $sock = shift; ${*$sock}{'NS_port'}   = shift if @_; return ${*$sock}{'NS_port'}   }
@@ -33,10 +32,6 @@ sub NS_listen { my $sock = shift; ${*$sock}{'NS_listen'} = shift if @_; return $
 
 sub object {
     my ($class, $info, $server) = @_;
-
-    # we cannot do this at compile time because we have not yet read the configuration then
-    $ISA[0] = Net::Server::Proto->ipv6_package($server)
-        if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
     my @sock = $class->new();
     foreach my $sock (@sock) {
@@ -62,9 +57,6 @@ sub connect {
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $afis = Net::Server::Proto->requires_ipv6($server) ?
-        $sock->isa("IO::Socket::INET6") ? "Domain" :
-        "Family" : undef; # XXX: Why doesn't IO::Socket::INET6 honor "Family"?
 
     $sock->configure({
         LocalPort => $port,
@@ -73,7 +65,7 @@ sub connect {
         ReuseAddr => 1,
         Reuse     => 1,
         LocalAddr => ($host eq '*' ? undef : $host), # undef means listen on all interfaces
-        ($afis ? ($afis => $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC) : ()),
+        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
         ($ipv =~ /[6*]/ ? (V6Only => $ipv eq '*' ? 0 : 1) : ()),
     }) or $server->fatal("Cannot bind and listen to TCP port $port on $host [$!]");
 
@@ -93,11 +85,8 @@ sub reconnect { # after a sig HUP
     $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     $sock->fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 
-    my $isa_v6 = Net::Server::Proto->requires_ipv6($server) ? $sock->isa(Net::Server::Proto->ipv6_package($server)) : undef;
-    if ($isa_v6) {
-        my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
-    }
+    my $ipv = $sock->NS_ipv;
+    ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
 
     if ($port ne $sock->NS_port) {
         $server->log(2, "  Re-bound to previously assigned port $port");
