@@ -62,27 +62,25 @@ sub object {
         \%temp;
     };
 
-    my @sock = $class->SUPER::new();
-    foreach my $sock (@sock) {
-        $sock->NS_host($info->{'host'});
-        $sock->NS_port($info->{'port'});
-        $sock->NS_ipv( $info->{'ipv'} );
-        $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
-                        : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
-                        : SOMAXCONN);
-        ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
+    my $sock = $class->new;
+    $sock->NS_host($info->{'host'});
+    $sock->NS_port($info->{'port'});
+    $sock->NS_ipv( $info->{'ipv'} );
+    $sock->NS_listen(defined($info->{'listen'}) ? $info->{'listen'}
+                    : defined($server->{'server'}->{'listen'}) ? $server->{'server'}->{'listen'}
+                    : SOMAXCONN);
+    ${*$sock}{'NS_orig_port'} = $info->{'orig_port'} if defined $info->{'orig_port'};
 
-        my %seen;
-        for my $key (grep {!$seen{$_}++} (@ssl_args, sort grep {/^SSL_/} keys %$info)) { # allow for any SSL_ arg to get passed in via 
-            my $val = defined($info->{$key}) ? $info->{$key}
-                    : defined($ssl->{$key})  ? $ssl->{$key}
-                    : $server->can($key) ? $server->$key($info->{'host'}, $info->{'port'}, 'SSL')
-                    : undef;
-            next if ! defined $val;
-            $sock->$key($val) if defined $val;
-        }
+    my %seen;
+    for my $key (grep {!$seen{$_}++} (@ssl_args, sort grep {/^SSL_/} keys %$info)) { # allow for any SSL_ arg to get passed in via server configurations
+        my $val = defined($info->{$key}) ? $info->{$key}
+                : defined($ssl->{$key})  ? $ssl->{$key}
+                : $server->can($key) ? $server->$key($info->{'host'}, $info->{'port'}, 'SSL')
+                : undef;
+        next if ! defined $val;
+        $sock->$key($val) if defined $val;
     }
-    return wantarray ? @sock : $sock[0];
+    return $sock;
 }
 
 sub log_connect {
