@@ -19,11 +19,11 @@ package Net::Server::Proto::SSLEAY;
 
 use strict;
 use warnings;
-use IO::Socket::INET;
 use Fcntl ();
 use Errno ();
-use Socket qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 use Carp qw(croak);
+use base qw(Net::Server::IP); # Can safely handle IPv4 or IPv6 on the fly
+use Net::Server::Proto qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 
 BEGIN {
     eval { require Net::SSLeay; 1 }
@@ -35,7 +35,6 @@ BEGIN {
     eval { [Fcntl::F_GETFL(), Fcntl::F_SETFL(), Fcntl::O_NONBLOCK()] } || die "Could not access Fcntl constant while loading ".__PACKAGE__.": $@";
 }
 
-our @ISA = qw(IO::Socket::INET);
 our $AUTOLOAD;
 
 my @ssl_args = qw(
@@ -65,10 +64,6 @@ sub object {
         $server->configure({map {$_ => \$temp{$_}} @ssl_args});
         \%temp;
     };
-
-    # we cannot do this at compile time because we have not yet read the configuration then
-    $ISA[0] = Net::Server::Proto->ipv6_package($server)
-        if $ISA[0] eq 'IO::Socket::INET' && Net::Server::Proto->requires_ipv6($server);
 
     my @sock = $class->SUPER::new();
     foreach my $sock (@sock) {
@@ -103,7 +98,6 @@ sub connect { # connect the first time
     my $port = $sock->NS_port;
     my $ipv  = $sock->NS_ipv;
     my $lstn = $sock->NS_listen;
-    my $isa_v6 = Net::Server::Proto->requires_ipv6($server) ? $sock->isa(Net::Server::Proto->ipv6_package($server)) : undef;
 
     $sock->SUPER::configure({
         LocalPort => $port,
@@ -133,11 +127,8 @@ sub reconnect { # connect on a sig -HUP
     $server->log(3,"Reassociating file descriptor $fd with ".$sock->NS_proto." on [".$sock->NS_host."]:".$sock->NS_port.", using IPv".$sock->NS_ipv);
     my $resp = $sock->fdopen( $fd, 'w' ) or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 
-    my $isa_v6 = Net::Server::Proto->requires_ipv6($server) ? $sock->isa(Net::Server::Proto->ipv6_package($server)) : undef;
-    if ($isa_v6) {
-        my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
-    }
+    my $ipv = $sock->NS_ipv;
+    ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
 
     $sock->bind_SSL($server);
 

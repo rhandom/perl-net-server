@@ -27,7 +27,6 @@ use Exporter ();
 use constant NIx_NOHOST => 1; # The getNameInfo Xtended flags are too difficult to obtain on some older systems,
 use constant NIx_NOSERV => 2; # So just hard-code the constant numbers.
 
-my $requires_ipv6 = 0;
 my $ipv6_package;
 my $can_disable_v6only;
 my $exported = {};
@@ -230,7 +229,6 @@ sub parse_info {
         foreach my $row (@rows) {
             my ($host, $port, $ipv, $warn) = @$row;
             push @_info, {host => $host, port => $port, ipv => $ipv, proto => $info->{'proto'}, $warn ? (warn => $warn) : ()};
-            $requires_ipv6++ if $ipv ne '4' && $proto ne 'ssl'; # we need to know if Proto::TCP needs to reparent as a child of an IPv6 compatible socket library
         }
         if (@rows > 1 && $rows[0]->[1] == 0) {
             $server->log(2, "Determining auto-assigned port (0) for host $info->{'host'} (prebind)");
@@ -245,7 +243,6 @@ sub parse_info {
         }
     } elsif ($ipv =~ /6/ || $info->{'host'} =~ /:/) {
         push @_info, {%$info, ipv => '6'};
-        $requires_ipv6++ if $proto ne 'ssl'; # IO::Socket::SSL does its own determination
         push @_info, {%$info, ipv => '4'} if $ipv =~ /4/ && $info->{'host'} !~ /:/;
     } else {
         push @_info, {%$info, ipv => '4'};
@@ -325,8 +322,6 @@ sub object {
     }
     return $proto_class->object($info, $server);
 }
-
-sub requires_ipv6 { $requires_ipv6 ? 1 : undef }
 
 sub ipv6_package {
     return $ipv6_package if $ipv6_package;

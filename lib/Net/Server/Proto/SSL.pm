@@ -132,10 +132,8 @@ sub reconnect { # after a sig HUP
     });
     $sock->IO::Socket::INET::fdopen($fd, 'w') or $server->fatal("Error opening to file descriptor ($fd) [$!]");
 
-    if ($sock->isa("IO::Socket::IP") || $sock->isa("IO::Socket::INET6")) {
-        my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
-    }
+    my $ipv = $sock->NS_ipv;
+    ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
 
     if ($port ne $sock->NS_port) {
         $server->log(2, "  Re-bound to previously assigned port $port");
