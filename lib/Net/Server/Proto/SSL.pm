@@ -19,12 +19,12 @@ package Net::Server::Proto::SSL;
 
 use strict;
 use warnings;
-use Net::Server::Proto qw(SOMAXCONN);
+use Net::Server::Proto qw(SOMAXCONN AF_INET AF_INET6 AF_UNSPEC);
 
 BEGIN {
     # IO::Socket::SSL will automatically become IO::Socket::IP if it is available.
     # This is different from Net::Server::Proto::SSLEAY that only does it if IPv6 is requested.
-    if (! eval { local $^W=0; require IO::Socket::SSL }) { # Quiet "redefined" warnings in case IO::Socket::INET6 <= 2.66
+    if (! eval { local $^W=0; require IO::Socket::SSL; 1 }) { # Quiet "redefined" warnings in case IO::Socket::INET6 <= 2.66
         die "Module IO::Socket::SSL is required for SSL - you may alternately try SSLEAY. $@";
     }
 }
@@ -103,9 +103,8 @@ sub connect {
         Listen    => $lstn,
         ReuseAddr => 1,
         Reuse     => 1,
+        Family    => ($ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC),
         (($host ne '*') ? (LocalAddr => $host) : ()), # * is all
-        (($sock->isa('IO::Socket::IP') || $sock->isa('IO::Socket::INET6'))
-            ? (Domain => ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC()) : ()),
         (map {$_ => $sock->$_();} grep {/^SSL_/} keys %{*$sock}),
         SSL_server => 1,
         SSL_startHandshake => 0,
@@ -135,7 +134,7 @@ sub reconnect { # after a sig HUP
 
     if ($sock->isa("IO::Socket::IP") || $sock->isa("IO::Socket::INET6")) {
         my $ipv = $sock->NS_ipv;
-        ${*$sock}{'io_socket_domain'} = ($ipv eq '6') ? Net::Server::Proto::AF_INET6() : ($ipv eq '4') ? Net::Server::Proto::AF_INET() : Net::Server::Proto::AF_UNSPEC();
+        ${*$sock}{'io_socket_domain'} = $ipv eq '6' ? AF_INET6 : $ipv eq '4' ? AF_INET : AF_UNSPEC;
     }
 
     if ($port ne $sock->NS_port) {
