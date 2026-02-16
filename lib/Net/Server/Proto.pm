@@ -265,7 +265,7 @@ sub get_addr_info {
     if ($host =~ /^\d+(?:\.\d+){3}$/) {
         my $addr = inet_aton($host) or croak "Unresolveable host [$host]:$port: invalid ip";
         push @info, [inet_ntoa($addr), $port, 4];
-    } elsif (eval { ipv6_package()->new(LocalAddr=>"::", Listen=>1) }) { # PreTest to ensure we can even handle a simple IPv6 Addr
+    } elsif (eval { ipv6_package() and AI_PASSIVE }) { # PreTest to ensure AddressInfo AI_* operations can even try on this platform.
         my $proto_id = getprotobyname(lc($proto) eq 'udp' ? 'udp' : 'tcp');
         my $socktype = lc($proto) eq 'udp' ? SOCK_DGRAM : SOCK_STREAM;
         my @res = safe_addr_info($host eq '*' ? '' : $host, $port, { family=>AF_UNSPEC, socktype=>$socktype, protocol=>$proto_id, flags=>AI_PASSIVE });
