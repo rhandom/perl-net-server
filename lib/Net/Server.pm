@@ -559,7 +559,7 @@ sub get_client_info {
             if ($family == AF_INET) {
                 ($prop->{'peerport'}, $addr) = sockaddr_in($peer);
                 $prop->{'peeraddr'} = inet_ntoa($addr);
-            } elsif (eval { ipv6_package() }) {
+            } elsif (eval { ipv6_package($self) }) {
                 ($prop->{'peerport'}, $addr) = sockaddr_in6($peer);
                 $prop->{'peeraddr'} = inet_ntop($client->sockdomain, $addr);
             } else {
