@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test ipv6_package with FakeWrapper2 for IO::Socket::INET6 using IPv6
+# Test ipv6_package with FakeWrapper2 for IO::Socket::INET6 using IPv*
 use strict;
 use warnings;
 use FindBin qw($Bin);
@@ -60,7 +60,7 @@ my $ok = eval {
             Net::Server::Test->run(
                 port => "$env->{'ports'}->[0]/tcp",
                 host => "*",
-                ipv  => "6",
+                ipv  => "*",
                 background => 0,
                 setsid => 0,
                 ipv6_package => $pkg,

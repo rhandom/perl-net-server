@@ -1,14 +1,14 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test ipv6_package with FakeWrapper2 for IO::Socket::INET6 using IPv6
+# Test an invalid {ipv6_package} to make sure Net::Server::IP still fails over to something valid.
 use strict;
 use warnings;
 use FindBin qw($Bin);
 use lib $Bin;
 use NetServerTest qw(prepare_test ok use_ok note);
-exit 0+!print "1..0 # SKIP No IO::Socket::INET6 found\n" if !grep {-r "$_/IO/Socket/INET6.pm"} @INC;
-my $pkg = "FakeWrapper2"; # IO::Socket::INET6
+exit 0+!print "1..0 # SKIP IPv6 is not supported\n" if !grep {-r "$_/IO/Socket/IP.pm" or -r "$_/IO/Socket/INET6.pm"} @INC;
+my $pkg = "BoGuS::IP::PcKg"; # Net::Server::IP
 my $IPv6 = "::1"; # Should connect to IPv6
 $ENV{NET_SERVER_TEST_HOSTNAME} ||= "127.0.0.1"; # Fake IPv4 to prevent prepare_test from pre-loading ipv6_package
 my $env = prepare_test({n_tests => 5, start_port => 20700, n_ports => 1}); # runs three of its own tests
@@ -23,7 +23,8 @@ sub accept {
 
 sub process_request {
     my ($self, $client) = @_;
-    my $proof = $client->can("can_wrap2") ? "SUCCESS" : "FAILURE";
+    # Just make sure falls back to any valid IPv6 module if ipv6_package requested fails to load.
+    my $proof = $client->peerhost eq $IPv6 ? "SUCCESS" : "FAILURE";
     print $client "$proof IPv6-Package Tester ".__FILE__." |CLIENT=$client| ";
     return $self->SUPER::process_request($client);
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 package Net::Server::Test;
-# Test ipv6_package with FakeWrapper1 for IO::Socket::IP
+# Test ipv6_package with FakeWrapper1 for IO::Socket::IP using IPv6
 use strict;
 use warnings;
 use FindBin qw($Bin);
