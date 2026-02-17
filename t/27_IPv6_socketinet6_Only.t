@@ -6,8 +6,6 @@ use strict;
 use warnings;
 use FindBin qw($Bin);
 use lib $Bin;
-#use lib "$Bin/BorkINET6"; # Pretend like there is no IO::Socket::INET6 installed.
-#use lib "$Bin/BorkSOCK6"; # Pretend like there is no Socket6 installed.
 use lib "$Bin/BorkIOSIP"; # Pretend like there is no IO::Socket::IP installed.
 
 use NetServerTest qw(prepare_test ok use_ok note);
@@ -58,7 +56,6 @@ my $ok = eval {
     } else {
         eval {
             open STDERR, ">", "/dev/null";
-            open STDERR, ">", "/tmp/test.err";
             local $SIG{ALRM} = sub { die "Timeout" };
             alarm(5);
             Net::Server::Test->run(

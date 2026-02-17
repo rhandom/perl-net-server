@@ -8,7 +8,6 @@ use FindBin qw($Bin);
 use lib $Bin;
 use lib "$Bin/BorkINET6"; # Pretend like there is no IO::Socket::INET6 installed.
 use lib "$Bin/BorkSOCK6"; # Pretend like there is no Socket6 installed.
-#use lib "$Bin/BorkIOSIP"; # Testing ipv6_package
 
 use NetServerTest qw(prepare_test ok use_ok note);
 exit 0+!print "1..0 # SKIP No IO::Socket::IP found\n" if !grep {-r "$_/IO/Socket/IP.pm"} @INC;
@@ -58,7 +57,6 @@ my $ok = eval {
     } else {
         eval {
             open STDERR, ">", "/dev/null";
-            open STDERR, ">", "/tmp/test.err";
             local $SIG{ALRM} = sub { die "Timeout" };
             alarm(5);
             Net::Server::Test->run(
