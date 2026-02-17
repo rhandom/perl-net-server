@@ -37,10 +37,10 @@ Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 README
+t/NetServerTest.pm
 t/FakeWrapper1.pm
 t/FakeWrapper2.pm
 t/FakeWrapper3.pm
-t/NetServerTest.pm
 t/BorkINET6/IO/Socket/INET6.pm
 t/BorkIOSIP/IO/Socket/IP.pm
 t/BorkSOCK6/Socket6.pm
@@ -54,8 +54,8 @@ t/17_TCP_DoublePort.t
 t/20_IPv6_bogus.t
 t/21_IPv6_socketip.t
 t/22_IPv6_socketinet6.t
-t/24_IPvA_socketip.t
 t/23_IPv6_recurse.t
+t/24_IPvA_socketip.t
 t/25_IPvA_socketinet6.t
 t/26_IPv6_socketip_Only.t
 t/27_IPv6_socketinet6_Only.t
