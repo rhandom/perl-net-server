@@ -2,7 +2,7 @@
 #
 #  Net::Server::Proto::UNIXDGRAM - Net::Server Protocol module
 #
-#  Copyright (C) 2001-2022
+#  Copyright (C) 2001-2026
 #
 #    Paul Seamons <paul@seamons.com>
 #

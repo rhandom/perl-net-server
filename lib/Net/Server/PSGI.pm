@@ -2,7 +2,7 @@
 #
 #  Net::Server::PSGI - Extensible Perl HTTP PSGI base server
 #
-#  Copyright (C) 2011-2022
+#  Copyright (C) 2011-2026
 #
 #    Paul Seamons <paul@seamons.com>
 #

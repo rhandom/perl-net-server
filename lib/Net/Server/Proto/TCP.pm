@@ -2,7 +2,7 @@
 #
 #  Net::Server::Proto::TCP - Net::Server Protocol module
 #
-#  Copyright (C) 2001-2022
+#  Copyright (C) 2001-2026
 #
 #    Paul Seamons <paul@seamons.com>
 #
@@ -107,7 +107,7 @@ sub accept {
     return wantarray ? ($client, $peername) : $client;
 }
 
-sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropriately for Multipex
+sub poll_cb { # implemented for psgi compatibility - TODO - should poll appropriately for Multiplex
     my ($self, $cb) = @_;
     return $cb->($self);
 }
