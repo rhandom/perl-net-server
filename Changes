@@ -1,5 +1,12 @@
 Revision history for Perl extension Net::Server.
 
+2.018  Feb 17 2026
+        - Add more ipv6_package tests.
+        - Fix t/Options.t to expect 0.0.0.0 on IPv4-Only systems.
+        - Get rid of requires_ipv6() sniffing.
+        - Make Proto->object always return a single object.
+        - Honor {ipv6_package} config preference even for IPv*.
+
 2.017  Feb 08 2026
         - Thanks to Paul Evans <pevans@cpan.org> "<LeoNerd>" hint
           about IO::Socket rudely force importing random symbols.
