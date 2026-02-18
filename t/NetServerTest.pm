@@ -20,7 +20,7 @@ END {
 }
 
 sub skip_without_ipv6 {
-    if (!eval { require Net::Server::Proto; Net::Server::Proto->ipv6_package->new(LocalAddr=>"[::]",Listen=>1) or die ($@ || "IP CRASH $!")  }) {
+    if (!eval { require Net::Server::IP; Net::Server::IP->new(LocalAddr=>"::",Listen=>1) or die ($@ || "IP CRASH $!")  }) {
         my $reason = shift || "IPv6 is not supported";
         $reason = "SKIP $reason\n$@";
         $reason =~ s/\s*$/\n/;
@@ -32,9 +32,11 @@ sub skip_without_ipv6 {
 
 sub client_connect {
     shift if $_[0] && $_[0] eq __PACKAGE__;
-    my $pkg = eval { $env{'ipv'} && $env{'ipv'} =~ /[6*]/ && do { require Net::Server::Proto; Net::Server::Proto->ipv6_package({}) } } || "IO::Socket::INET";
+    my $pkg = eval { require Net::Server::IP; "Net::Server::IP" } || "IO::Socket::INET";
     warn "IPv6 FAILURE! $@" if $@;
-    return $pkg->new(@_);
+    my $client = $pkg->new(@_);
+    note("connect FAILURE! $@") if $@;
+    return $client;
 }
 
 # most of our tests need forking, a certain number of ports, and some pipes
